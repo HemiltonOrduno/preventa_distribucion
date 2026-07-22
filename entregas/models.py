@@ -44,12 +44,13 @@ class Vehiculo(models.Model):
         db_table = 'vehiculo'
 
 class CargaVehiculo(models.Model):
-    fecha_carga = models.DateField(auto_now_add=True)
+    fecha_carga = models.DateField()
     usuario = models.ForeignKey(Usuario, on_delete=models.PROTECT)
     vehiculo = models.ForeignKey(Vehiculo, on_delete=models.PROTECT)
 
     class Meta:
-        db_table = 'carga_vehiculo'
+        db_table = 'emp_vehiculo'
+        unique_together = ('usuario', 'vehiculo', 'fecha_carga')
 
 class EdoEntrega(models.Model):
     nombre = models.CharField(max_length=50)
