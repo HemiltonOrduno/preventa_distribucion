@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Coordinador - Sabritas Tijuana</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: sans-serif; display: flex; height: 100vh; background: #f0f2f5; }
+
+        #sidebar-left {
+            width: 220px;
+            background: #1a237e;
+            display: flex;
+            flex-direction: column;
+            z-index: 100;
+        }
+
+        #sidebar-left .logo {
+            padding: 20px 15px;
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        #sidebar-left .logo span {
+            display: block;
+            font-size: 11px;
+            font-weight: normal;
+            opacity: 0.7;
+            margin-top: 3px;
+        }
+
+        #sidebar-left nav { flex: 1; padding: 12px 0; }
+
+        #sidebar-left nav button {
+            display: block;
+            width: 100%;
+            padding: 12px 20px;
+            background: none;
+            border: none;
+            color: rgba(255,255,255,0.8);
+            font-size: 13px;
+            text-align: left;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
+
+        #sidebar-left nav button:hover,
+        #sidebar-left nav button.active {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            border-left-color: #90caf9;
+        }
+
+        .icon { margin-right: 10px; font-size: 15px; }
+
+        #centro { flex: 1; display: flex; flex-direction: column; position: relative; }
+
+        #filtro-rutas {
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 500;
+            display: flex;
+            gap: 6px;
+            background: white;
+            padding: 6px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        #filtro-rutas button {
+            padding: 6px 14px;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            background: #f0f2f5;
+            color: #555;
+            transition: all 0.2s;
+        }
+
+        #filtro-rutas button.active { background: #1a237e; color: white; }
+
+        .dot-rojo { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #c62828; margin-right: 5px; }
+        .dot-azul { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #1565c0; margin-right: 5px; }
+
+        #map { flex: 1; }
+
+        #sidebar-right {
+            width: 290px;
+            background: white;
+            border-left: 1px solid #dee2e6;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #sidebar-right .header {
+            background: #1a237e;
+            color: white;
+            padding: 15px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        #sidebar-right .body { flex: 1; overflow-y: auto; padding: 12px; }
+
+        .resumen-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+            border: 1px solid #dee2e6;
+        }
+
+        .resumen-card .titulo {
+            font-size: 11px;
+            color: #888;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .resumen-card .numero { font-size: 28px; font-weight: bold; color: #1a237e; }
+        .resumen-card .subtexto { font-size: 11px; color: #888; margin-top: 4px; }
+
+        .progress-bar {
+            height: 6px;
+            background: #dee2e6;
+            border-radius: 3px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+
+        .progress-bar .fill { height: 100%; border-radius: 3px; transition: width 0.5s; }
+        .fill-visita { background: #c62828; }
+        .fill-entrega { background: #1565c0; }
+
+        #detalle-ruta { display: none; }
+
+        .btn-cerrar {
+            display: block;
+            width: 100%;
+            padding: 8px;
+            background: #f0f2f5;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-bottom: 10px;
+            color: #555;
+            text-align: left;
+        }
+
+        .btn-cerrar:hover { background: #dee2e6; }
+
+        .detalle-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f2f5;
+            font-size: 13px;
+        }
+
+        .detalle-item .label { color: #888; }
+        .detalle-item .valor { font-weight: bold; color: #333; }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .badge-activa { background: #e8f5e9; color: #2e7d32; }
+        .badge-pausada { background: #fff3e0; color: #e65100; }
+        .badge-completada { background: #e3f2fd; color: #1565c0; }
+        .badge-creada { background: #f3e5f5; color: #6a1b9a; }
+
+        .parada-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f2f5;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .parada-item:hover { background: #f8f9fa; border-radius: 6px; padding: 8px 6px; }
+
+        .parada-num {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            font-size: 11px;
+            font-weight: bold;
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .parada-num.almacen { background: #c62828; }
+        .parada-num.establecimiento { background: #1565c0; }
+
+        .parada-info { flex: 1; }
+        .parada-nombre { font-size: 12px; font-weight: bold; color: #333; }
+        .parada-sub { font-size: 11px; color: #888; margin-top: 2px; }
+
+        #modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #modal-overlay.visible { display: flex; }
+
+        #modal {
+            background: white;
+            border-radius: 12px;
+            width: 620px;
+            max-height: 80vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+        }
+
+        #modal-header {
+            background: #1a237e;
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #modal-header h3 { font-size: 15px; }
+        #modal-header button { background: none; border: none; color: white; font-size: 20px; cursor: pointer; }
+
+        #modal-tabs { display: flex; border-bottom: 1px solid #dee2e6; }
+
+        #modal-tabs button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            background: none;
+            font-size: 13px;
+            cursor: pointer;
+            color: #888;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        #modal-tabs button.active {
+            color: #1a237e;
+            border-bottom-color: #1a237e;
+            font-weight: bold;
+        }
+
+        #modal-body { flex: 1; overflow-y: auto; padding: 15px; }
+
+        #modal-filtros { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+
+        #modal-filtros button {
+            padding: 5px 12px;
+            border: 1px solid #dee2e6;
+            border-radius: 20px;
+            background: white;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        #modal-filtros button.active {
+            background: #1a237e;
+            color: white;
+            border-color: #1a237e;
+        }
+
+        .ruta-item {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 8px;
+            border: 1px solid #dee2e6;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .ruta-item:hover { border-color: #1a237e; }
+        .ruta-nombre { font-weight: bold; font-size: 13px; margin-bottom: 6px; }
+
+        .ruta-info {
+            font-size: 12px;
+            color: #888;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+        }
+
+        #loading-modal {
+            text-align: center;
+            padding: 30px;
+            color: #888;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="sidebar-left">
+    <div class="logo">
+        🚚 Sabritas Tijuana
+        <span>Panel del Coordinador</span>
+    </div>
+    <nav>
+        <button class="active" onclick="accion('crear-ruta', this)">
+            <span class="icon">➕</span> Crear ruta
+        </button>
+        <button onclick="accion('ver-rutas', this)">
+            <span class="icon">📋</span> Ver rutas activas
+        </button>
+        <button onclick="accion('gestionar-zonas', this)">
+            <span class="icon">🗺️</span> Gestionar zonas
+        </button>
+        <button onclick="accion('gestionar-establecimientos', this)">
+            <span class="icon">🏪</span> Gestionar establecimientos
+        </button>
+    </nav>
+</div>
+
+<div id="centro">
+    <div id="filtro-rutas">
+        <button class="active" onclick="filtrarRutas('todas', this)">Todas</button>
+        <button onclick="filtrarRutas('visita', this)">
+            <span class="dot-rojo"></span>Visita
+        </button>
+        <button onclick="filtrarRutas('entrega', this)">
+            <span class="dot-azul"></span>Entrega
+        </button>
+    </div>
+    <div id="map"></div>
+</div>
+
+<div id="sidebar-right">
+    <div class="header">📊 Resumen del día</div>
+    <div class="body">
+        <div id="resumen-general">
+            <div class="resumen-card">
+                <div class="titulo">Rutas de visita activas</div>
+                <div class="numero" id="num-rutas-visita">-</div>
+                <div class="subtexto" id="progreso-visita-texto">Cargando...</div>
+                <div class="progress-bar">
+                    <div class="fill fill-visita" id="barra-visita" style="width:0%"></div>
+                </div>
+            </div>
+            <div class="resumen-card">
+                <div class="titulo">Rutas de entrega activas</div>
+                <div class="numero" id="num-rutas-entrega">-</div>
+                <div class="subtexto" id="progreso-entrega-texto">Cargando...</div>
+                <div class="progress-bar">
+                    <div class="fill fill-entrega" id="barra-entrega" style="width:0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="detalle-ruta">
+            <button class="btn-cerrar" onclick="cerrarDetalleRuta()">← Volver al resumen</button>
+            <div id="detalle-contenido"></div>
+        </div>
+    </div>
+</div>
+
+<div id="modal-overlay" onclick="cerrarModalClick(event)">
+    <div id="modal">
+        <div id="modal-header">
+            <h3>Rutas activas del día</h3>
+            <button onclick="cerrarModal()">×</button>
+        </div>
+        <div id="modal-tabs">
+            <button class="active" onclick="cambiarTabModal('visita', this)">🔴 Rutas de visita</button>
+            <button onclick="cambiarTabModal('entrega', this)">🔵 Rutas de entrega</button>
+        </div>
+        <div id="modal-body">
+            <div id="modal-filtros">
+                <button class="active" onclick="filtrarModal('todas', this)">Todas</button>
+                <button onclick="filtrarModal('activa', this)">Activas</button>
+                <button onclick="filtrarModal('camino', this)">En camino</button>
+                <button onclick="filtrarModal('pausada', this)">Pausadas</button>
+            </div>
+            <div id="loading-modal">Cargando rutas...</div>
+            <div id="lista-rutas-modal"></div>
+        </div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    const tijuanaBounds = L.latLngBounds([32.38, -117.15], [32.62, -116.88]);
+
+    const map = L.map('map', {
+        center: [32.5149, -117.0382],
+        zoom: 12,
+        minZoom: 12,
+        maxZoom: 18,
+        maxBounds: tijuanaBounds,
+        maxBoundsViscosity: 1.0
+    });
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    let capasRutas = { visita: [], entrega: [] };
+    let filtroActual = 'todas';
+    let tabModalActual = 'visita';
+    let datosRutas = { rutas_visita: [], rutas_entrega: [] };
+    let rutaSeleccionadaLayer = null;
+
+    function cargarDatos() {
+        fetch('/api/rutas/rutas-activas/')
+            .then(res => res.json())
+            .then(data => {
+                datosRutas = data;
+                cargarResumen();
+                dibujarRutasEnMapa();
+            })
+            .catch(err => console.error('Error cargando rutas:', err));
+    }
+
+    function cargarResumen() {
+        const rv = datosRutas.rutas_visita;
+        const re = datosRutas.rutas_entrega;
+
+        const totalV = rv.length;
+        const completadasV = rv.filter(r => r.completadas >= r.total_establecimientos && r.total_establecimientos > 0).length;
+        const progresoV = totalV > 0 ? Math.round((completadasV / totalV) * 100) : 0;
+
+        document.getElementById('num-rutas-visita').innerText = totalV;
+        document.getElementById('progreso-visita-texto').innerText = `${completadasV} de ${totalV} completadas`;
+        document.getElementById('barra-visita').style.width = progresoV + '%';
+
+        const totalE = re.length;
+        const completadasE = re.filter(r => r.estado === 'Entregada').length;
+        const progresoE = totalE > 0 ? Math.round((completadasE / totalE) * 100) : 0;
+
+        document.getElementById('num-rutas-entrega').innerText = totalE;
+        document.getElementById('progreso-entrega-texto').innerText = `${completadasE} de ${totalE} completadas`;
+        document.getElementById('barra-entrega').style.width = progresoE + '%';
+    }
+
+    function dibujarRutasEnMapa() {
+        capasRutas.visita.forEach(c => map.removeLayer(c));
+        capasRutas.entrega.forEach(c => map.removeLayer(c));
+        capasRutas = { visita: [], entrega: [] };
+
+        if (filtroActual === 'todas' || filtroActual === 'visita') {
+            datosRutas.rutas_visita.forEach(r => {
+                fetch(`/api/rutas/ruta-visita/${r.id}/detalle/`)
+                    .then(res => res.json())
+                    .then(data => {
+                        if (!data.establecimientos) return;
+                        data.establecimientos.filter(e => e.latitud && e.longitud).forEach(e => {
+                            const m = L.circleMarker([parseFloat(e.latitud), parseFloat(e.longitud)], {
+                                radius: 6, color: '#c62828', fillColor: '#c62828', fillOpacity: 0.8, weight: 2
+                            }).addTo(map)
+                            .bindPopup(`<b>${e.establecimiento_nombre}</b><br>Vendedor: ${r.vendedor}<br>Estado: ${e.estado_visita || 'Pendiente'}`)
+                            .on('click', () => mostrarDetalleRuta('visita', r));
+                            capasRutas.visita.push(m);
+                        });
+                    }).catch(() => {});
+            });
+        }
+
+        if (filtroActual === 'todas' || filtroActual === 'entrega') {
+            datosRutas.rutas_entrega.forEach(r => {
+                fetch(`/api/rutas/entrega/${r.entrega_id}/ruta/`)
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.error) return;
+                        const coords = data.geometria.coordinates.map(c => [c[1], c[0]]);
+                        const linea = L.polyline(coords, { color: '#1565c0', weight: 4, opacity: 0.7 })
+                            .addTo(map)
+                            .bindPopup(`<b>${r.nombre}</b><br>Repartidor: ${r.repartidor}<br>Estado: ${r.estado}`)
+                            .on('click', () => mostrarDetalleRuta('entrega', r));
+                        capasRutas.entrega.push(linea);
+
+                        data.paradas.forEach(p => {
+                            const color = p.tipo === 'almacen' ? '#c62828' : '#1565c0';
+                            const m = L.circleMarker([p.lat, p.lon], {
+                                radius: p.tipo === 'almacen' ? 8 : 6, color, fillColor: color, fillOpacity: 1, weight: 2
+                            }).addTo(map)
+                            .bindPopup(p.tipo === 'almacen' ? '<b>Almacén</b>' : `<b>${p.nombre}</b><br>Pedido #${p.pedido_id}`);
+                            capasRutas.entrega.push(m);
+                        });
+                    }).catch(() => {});
+            });
+        }
+    }
+
+    function filtrarRutas(tipo, btn) {
+        filtroActual = tipo;
+        document.querySelectorAll('#filtro-rutas button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        dibujarRutasEnMapa();
+    }
+
+    function accion(tipo, btn) {
+        document.querySelectorAll('#sidebar-left nav button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        if (tipo === 'ver-rutas') abrirModal();
+        else if (tipo === 'crear-ruta') alert('Funcionalidad: Crear ruta de entrega');
+        else if (tipo === 'gestionar-zonas') alert('Funcionalidad: Gestionar zonas');
+        else if (tipo === 'gestionar-establecimientos') alert('Funcionalidad: Gestionar establecimientos');
+    }
+
+    function abrirModal() {
+        document.getElementById('modal-overlay').classList.add('visible');
+        renderizarListaModal();
+    }
+
+    function cerrarModal() {
+        document.getElementById('modal-overlay').classList.remove('visible');
+    }
+
+    function cerrarModalClick(e) {
+        if (e.target === document.getElementById('modal-overlay')) cerrarModal();
+    }
+
+    function cambiarTabModal(tipo, btn) {
+        tabModalActual = tipo;
+        document.querySelectorAll('#modal-tabs button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderizarListaModal();
+    }
+
+    function filtrarModal(filtro, btn) {
+        document.querySelectorAll('#modal-filtros button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderizarListaModal(filtro);
+    }
+
+    function getBadgeClass(estado) {
+        estado = estado.toLowerCase();
+        if (estado.includes('complet') || estado.includes('entregad')) return 'badge-completada';
+        if (estado.includes('paus')) return 'badge-pausada';
+        if (estado.includes('cread')) return 'badge-creada';
+        return 'badge-activa';
+    }
+
+    function renderizarListaModal(filtroEstado = 'todas') {
+        const lista = document.getElementById('lista-rutas-modal');
+        document.getElementById('loading-modal').style.display = 'none';
+        lista.innerHTML = '';
+
+        const rutas = tabModalActual === 'visita' ? datosRutas.rutas_visita : datosRutas.rutas_entrega;
+        const filtradas = filtroEstado === 'todas' ? rutas : rutas.filter(r => r.estado.toLowerCase().includes(filtroEstado));
+
+        if (filtradas.length === 0) {
+            lista.innerHTML = '<p style="text-align:center;color:#888;padding:20px;">No hay rutas con ese filtro</p>';
+            return;
+        }
+
+        filtradas.forEach(r => {
+            const total = tabModalActual === 'visita' ? r.total_establecimientos : r.total_pedidos;
+            const completadas = tabModalActual === 'visita' ? r.completadas : r.entregados;
+            const progreso = total > 0 ? Math.round((completadas / total) * 100) : 0;
+
+            const div = document.createElement('div');
+            div.className = 'ruta-item';
+            div.innerHTML = `
+                <div class="ruta-nombre">${r.nombre} <span class="badge ${getBadgeClass(r.estado)}">${r.estado}</span></div>
+                <div class="ruta-info">
+                    <span>👤 ${tabModalActual === 'visita' ? r.vendedor : r.repartidor}</span>
+                    <span>📍 ${r.zona}</span>
+                    ${tabModalActual === 'entrega' && r.vehiculo ? `<span>🚚 ${r.vehiculo}</span>` : ''}
+                </div>
+                <div style="font-size:11px;color:#888;margin-bottom:4px;">${completadas}/${total} (${progreso}%)</div>
+                <div class="progress-bar">
+                    <div class="fill ${tabModalActual === 'visita' ? 'fill-visita' : 'fill-entrega'}" style="width:${progreso}%"></div>
+                </div>
+            `;
+            div.onclick = () => { cerrarModal(); mostrarDetalleRuta(tabModalActual, r); };
+            lista.appendChild(div);
+        });
+    }
+
+    function mostrarDetalleRuta(tipo, ruta) {
+        document.getElementById('resumen-general').style.display = 'none';
+        document.getElementById('detalle-ruta').style.display = 'block';
+
+        const total = tipo === 'visita' ? ruta.total_establecimientos : ruta.total_pedidos;
+        const completadas = tipo === 'visita' ? ruta.completadas : ruta.entregados;
+        const progreso = total > 0 ? Math.round((completadas / total) * 100) : 0;
+
+        document.getElementById('detalle-contenido').innerHTML = `
+            <div style="font-weight:bold;font-size:14px;margin-bottom:12px;">${ruta.nombre}</div>
+            <div class="detalle-item">
+                <span class="label">Estado</span>
+                <span class="valor"><span class="badge ${getBadgeClass(ruta.estado)}">${ruta.estado}</span></span>
+            </div>
+            <div class="detalle-item">
+                <span class="label">Zona</span>
+                <span class="valor">${ruta.zona}</span>
+            </div>
+            <div class="detalle-item">
+                <span class="label">${tipo === 'visita' ? 'Vendedor' : 'Repartidor'}</span>
+                <span class="valor">${tipo === 'visita' ? ruta.vendedor : ruta.repartidor}</span>
+            </div>
+            ${tipo === 'entrega' && ruta.vehiculo ? `
+            <div class="detalle-item">
+                <span class="label">Vehículo</span>
+                <span class="valor">${ruta.vehiculo}</span>
+            </div>
+            <div class="detalle-item">
+                <span class="label">Total a cobrar</span>
+                <span class="valor">$${parseFloat(ruta.total || 0).toFixed(2)}</span>
+            </div>` : ''}
+            <div class="detalle-item">
+                <span class="label">${tipo === 'visita' ? 'Visitas' : 'Entregas'}</span>
+                <span class="valor">${completadas}/${total} (${progreso}%)</span>
+            </div>
+            <div class="progress-bar" style="margin-bottom:12px;">
+                <div class="fill ${tipo === 'visita' ? 'fill-visita' : 'fill-entrega'}" style="width:${progreso}%"></div>
+            </div>
+            <div style="font-size:12px;font-weight:bold;color:#333;margin-bottom:8px;">Paradas:</div>
+            <div id="lista-paradas-detalle"><p style="color:#888;font-size:12px;">Cargando paradas...</p></div>
+        `;
+
+        if (tipo === 'entrega') {
+            fetch(`/api/rutas/entrega/${ruta.entrega_id}/ruta/`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.error) return;
+                    renderizarParadas(data.paradas);
+                    if (rutaSeleccionadaLayer) map.removeLayer(rutaSeleccionadaLayer);
+                    const coords = data.geometria.coordinates.map(c => [c[1], c[0]]);
+                    rutaSeleccionadaLayer = L.polyline(coords, { color: '#1565c0', weight: 5, opacity: 1 }).addTo(map);
+                    map.fitBounds(rutaSeleccionadaLayer.getBounds(), { padding: [40, 40] });
+                });
+        } else {
+            fetch(`/api/rutas/ruta-visita/${ruta.id}/detalle/`)
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.establecimientos) return;
+                    renderizarParadasVisita(data.establecimientos);
+                });
+        }
+    }
+
+    function renderizarParadas(paradas) {
+        const lista = document.getElementById('lista-paradas-detalle');
+        lista.innerHTML = '';
+        [...paradas].sort((a, b) => a.orden - b.orden).forEach((p, i) => {
+            const div = document.createElement('div');
+            div.className = 'parada-item';
+            div.innerHTML = `
+                <div class="parada-num ${p.tipo}">${i}</div>
+                <div class="parada-info">
+                    <div class="parada-nombre">${p.nombre}</div>
+                    <div class="parada-sub">${p.tipo === 'almacen' ? 'Punto de salida' : `Pedido #${p.pedido_id} · $${p.subtotal}`}</div>
+                </div>
+            `;
+            div.onclick = () => map.setView([p.lat, p.lon], 16);
+            lista.appendChild(div);
+        });
+    }
+
+    function renderizarParadasVisita(establecimientos) {
+        const lista = document.getElementById('lista-paradas-detalle');
+        lista.innerHTML = '';
+        establecimientos.forEach((e, i) => {
+            const div = document.createElement('div');
+            div.className = 'parada-item';
+            div.innerHTML = `
+                <div class="parada-num establecimiento">${i + 1}</div>
+                <div class="parada-info">
+                    <div class="parada-nombre">${e.establecimiento_nombre}</div>
+                    <div class="parada-sub">${e.colonia} · ${e.estado_visita || 'Pendiente'}</div>
+                </div>
+            `;
+            if (e.latitud && e.longitud) div.onclick = () => map.setView([parseFloat(e.latitud), parseFloat(e.longitud)], 16);
+            lista.appendChild(div);
+        });
+    }
+
+    function cerrarDetalleRuta() {
+        document.getElementById('resumen-general').style.display = 'block';
+        document.getElementById('detalle-ruta').style.display = 'none';
+        if (rutaSeleccionadaLayer) { map.removeLayer(rutaSeleccionadaLayer); rutaSeleccionadaLayer = null; }
+    }
+
+    window.addEventListener('load', cargarDatos);
+</script>
+</body>
+</html>

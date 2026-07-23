@@ -24,3 +24,6 @@ media/
 # Windows
 Thumbs.db
 desktop.ini
+
+# OSRM datos procesados
+osrm-data/

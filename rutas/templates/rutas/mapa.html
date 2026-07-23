@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapa de Rutas - Sabritas Tijuana</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: sans-serif; display: flex; height: 100vh; }
+
+        #panel {
+            width: 320px;
+            background: #f8f9fa;
+            border-right: 1px solid #dee2e6;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #panel-header {
+            background: #1a237e;
+            color: white;
+            padding: 15px;
+            font-size: 15px;
+            font-weight: bold;
+        }
+
+        #panel-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+        }
+
+        #info-ruta {
+            background: white;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+            border: 1px solid #dee2e6;
+            font-size: 13px;
+            display: none;
+        }
+
+        #info-ruta .dato {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+
+        #info-ruta .dato span:last-child {
+            font-weight: bold;
+            color: #1a237e;
+        }
+
+        #lista-paradas { list-style: none; }
+
+        #lista-paradas li {
+            background: white;
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            border: 1px solid #dee2e6;
+            font-size: 13px;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        #lista-paradas li:hover { border-color: #1a237e; }
+
+        #lista-paradas li .parada-orden {
+            display: inline-block;
+            background: #1a237e;
+            color: white;
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
+            text-align: center;
+            line-height: 22px;
+            font-size: 11px;
+            margin-right: 8px;
+        }
+
+        #lista-paradas li.almacen .parada-orden { background: #c62828; }
+        #lista-paradas li .parada-nombre { font-weight: bold; }
+
+        #lista-paradas li .parada-detalle {
+            font-size: 11px;
+            color: #888;
+            margin-top: 3px;
+            margin-left: 30px;
+        }
+
+        #selector-entrega {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        #selector-entrega input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+
+        #selector-entrega button {
+            padding: 8px 12px;
+            background: #1a237e;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        #selector-entrega button:hover { background: #283593; }
+
+        #map { flex: 1; }
+
+        #loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-size: 13px;
+        }
+
+        .badge-subtotal {
+            display: inline-block;
+            background: #e8f5e9;
+            color: #2e7d32;
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-size: 11px;
+            font-weight: bold;
+            margin-left: 4px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="panel">
+    <div id="panel-header">🗺️ Rutas Sabritas Tijuana</div>
+    <div id="panel-body">
+
+        <div id="selector-entrega">
+            <input type="number" id="input-entrega" placeholder="ID de entrega" min="1" value="1" />
+            <button onclick="calcularRutaEntrega()">Ver ruta</button>
+        </div>
+
+        <div id="info-ruta">
+            <div class="dato">
+                <span>Distancia total:</span>
+                <span id="distancia">-</span>
+            </div>
+            <div class="dato">
+                <span>Duración estimada:</span>
+                <span id="duracion">-</span>
+            </div>
+            <div class="dato">
+                <span>Total paradas:</span>
+                <span id="total-paradas">-</span>
+            </div>
+            <div class="dato">
+                <span>Zona:</span>
+                <span id="zona-ruta">-</span>
+            </div>
+        </div>
+
+        <div id="loading">Calculando ruta...</div>
+
+        <ul id="lista-paradas"></ul>
+    </div>
+</div>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    const tijuanaBounds = L.latLngBounds(
+        [32.38, -117.15],
+        [32.62, -116.88]
+    );
+
+    const map = L.map('map', {
+        center: [32.5149, -117.0382],
+        zoom: 12,
+        minZoom: 12,
+        maxZoom: 18,
+        maxBounds: tijuanaBounds,
+        maxBoundsViscosity: 1.0
+    });
+
+    map.setMaxBounds(tijuanaBounds);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        bounds: tijuanaBounds
+    }).addTo(map);
+
+    const iconoAlmacen = L.divIcon({
+        className: '',
+        html: `<div style="background:#c62828;width:18px;height:18px;border-radius:50%;border:3px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.4);"></div>`,
+        iconAnchor: [9, 9]
+    });
+
+    const iconoEstablecimiento = L.divIcon({
+        className: '',
+        html: `<div style="background:#1a237e;width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.4);"></div>`,
+        iconAnchor: [7, 7]
+    });
+
+    let rutaLayer = null;
+    let marcadores = [];
+
+    function limpiarMapa() {
+        if (rutaLayer) { map.removeLayer(rutaLayer); rutaLayer = null; }
+        marcadores.forEach(m => map.removeLayer(m));
+        marcadores = [];
+        document.getElementById('lista-paradas').innerHTML = '';
+        document.getElementById('info-ruta').style.display = 'none';
+    }
+
+    function calcularRutaEntrega() {
+        const entregaId = document.getElementById('input-entrega').value;
+        if (!entregaId) {
+            alert('Ingresa un ID de entrega');
+            return;
+        }
+
+        limpiarMapa();
+        document.getElementById('loading').style.display = 'block';
+
+        fetch(`/api/rutas/entrega/${entregaId}/ruta/`)
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('loading').style.display = 'none';
+
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+
+                document.getElementById('info-ruta').style.display = 'block';
+                document.getElementById('distancia').innerText = data.distancia_total_km + ' km';
+                document.getElementById('duracion').innerText = data.duracion_total_min + ' min';
+                document.getElementById('total-paradas').innerText = data.paradas.length;
+
+                const coords = data.geometria.coordinates.map(c => [c[1], c[0]]);
+                rutaLayer = L.polyline(coords, { color: '#1a237e', weight: 5, opacity: 0.8 }).addTo(map);
+
+                const paradasOrdenadas = [...data.paradas].sort((a, b) => a.orden - b.orden);
+
+                const lista = document.getElementById('lista-paradas');
+                paradasOrdenadas.forEach((p, i) => {
+                    const icono = p.tipo === 'almacen' ? iconoAlmacen : iconoEstablecimiento;
+                    const marker = L.marker([p.lat, p.lon], { icon: icono })
+                        .addTo(map)
+                        .bindPopup(`
+                            <b>${p.nombre}</b><br>
+                            ${p.tipo === 'almacen' ? 'Punto de salida' : `
+                                Colonia: ${p.colonia}<br>
+                                Pedido #${p.pedido_id}<br>
+                                Subtotal: $${p.subtotal}
+                            `}
+                        `);
+                    marcadores.push(marker);
+
+                    const li = document.createElement('li');
+                    li.className = p.tipo === 'almacen' ? 'almacen' : '';
+                    li.innerHTML = `
+                        <span class="parada-orden">${i}</span>
+                        <span class="parada-nombre">${p.nombre}</span>
+                        ${p.tipo !== 'almacen' ? `
+                            <div class="parada-detalle">
+                                ${p.colonia}
+                                <span class="badge-subtotal">$${p.subtotal}</span>
+                            </div>
+                        ` : '<div class="parada-detalle">Punto de salida</div>'}
+                    `;
+                    li.onclick = () => {
+                        map.setView([p.lat, p.lon], 15);
+                        marker.openPopup();
+                    };
+                    lista.appendChild(li);
+                });
+
+                map.fitBounds(rutaLayer.getBounds(), { padding: [30, 30] });
+            })
+            .catch(err => {
+                document.getElementById('loading').style.display = 'none';
+                alert('Error de conexión: ' + err);
+            });
+    }
+
+    // Cargar ruta 1 automáticamente al abrir
+window.addEventListener('load', function() {
+    calcularRutaEntrega();
+});
+</script>
+</body>
+</html>
