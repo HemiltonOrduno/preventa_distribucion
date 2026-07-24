@@ -354,3 +354,11 @@ CREATE TABLE DETALLE_MOVIMIENTO(
     FOREIGN KEY (cod_movimientos) REFERENCES MOVIMIENTOS(codigo),
     FOREIGN KEY (cod_producto) REFERENCES PRODUCTO(codigo)
 );
+
+ALTER TABLE ruta_visita ADD COLUMN dia VARCHAR(10) NOT NULL DEFAULT 'Lunes';
+
+UPDATE ruta_visita SET dia = 'Lunes' WHERE numero IN (1, 2);
+UPDATE ruta_visita SET dia = 'Martes' WHERE numero IN (3, 4);
+UPDATE ruta_visita SET dia = 'Miércoles' WHERE numero IN (5, 6);
+UPDATE ruta_visita SET dia = 'Jueves' WHERE numero IN (7, 8);
+UPDATE ruta_visita SET dia = 'Viernes' WHERE numero IN (9, 10);

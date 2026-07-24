@@ -1,0 +1,259 @@
+{% extends 'rutas/base_coordinador.html' %}
+
+{% block title %}Gestionar Rutas de Visita{% endblock %}
+{% block nav_rutas_visita %}active{% endblock %}
+{% block page_icon %}🗓️{% endblock %}
+{% block page_title %}Gestionar Rutas de Visita{% endblock %}
+
+{% block extra_styles %}
+.card {
+    background: white;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 12px;
+    border: 1px solid #dee2e6;
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.card-title {
+    font-size: 14px;
+    font-weight: bold;
+    color: #1a237e;
+}
+
+.badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: bold;
+}
+
+.badge-activa { background: #e8f5e9; color: #2e7d32; }
+.badge-pausada { background: #fff3e0; color: #e65100; }
+.badge-completada { background: #e3f2fd; color: #1565c0; }
+
+.info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+    font-size: 13px;
+}
+
+.info-grid .label { color: #888; font-size: 11px; }
+.info-grid .valor { font-weight: bold; color: #333; }
+
+.progress-bar {
+    height: 6px;
+    background: #dee2e6;
+    border-radius: 3px;
+    margin-bottom: 12px;
+    overflow: hidden;
+}
+
+.progress-bar .fill {
+    height: 100%;
+    background: #c62828;
+    border-radius: 3px;
+    transition: width 0.5s;
+}
+
+.asignar-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.asignar-row select {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    font-size: 13px;
+}
+
+.btn-asignar {
+    padding: 8px 16px;
+    background: #1a237e;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.btn-asignar:hover { background: #283593; }
+
+.filtro-dia {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.filtro-dia button {
+    padding: 6px 14px;
+    border: 1px solid #dee2e6;
+    border-radius: 20px;
+    background: white;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.filtro-dia button.active {
+    background: #1a237e;
+    color: white;
+    border-color: #1a237e;
+}
+
+#loading {
+    text-align: center;
+    padding: 40px;
+    color: #888;
+}
+
+.toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: #2e7d32;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    display: none;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+{% endblock %}
+
+{% block content %}
+<div class="filtro-dia" id="filtro-dia">
+    <button class="active" onclick="filtrarDia('hoy', this)">Hoy</button>
+    <button onclick="filtrarDia('Lunes', this)">Lunes</button>
+    <button onclick="filtrarDia('Martes', this)">Martes</button>
+    <button onclick="filtrarDia('Miércoles', this)">Miércoles</button>
+    <button onclick="filtrarDia('Jueves', this)">Jueves</button>
+    <button onclick="filtrarDia('Viernes', this)">Viernes</button>
+    <button onclick="filtrarDia('Sábado', this)">Sábado</button>
+</div>
+
+<div id="loading">Cargando rutas...</div>
+<div id="lista-rutas"></div>
+
+<div class="toast" id="toast"></div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let vendedoresDisponibles = [];
+let todasLasRutas = [];
+
+window.addEventListener('load', () => {
+    cargarTodo();
+});
+
+function cargarTodo() {
+    Promise.all([
+        fetch('/api/rutas/rutas-visita-todas/').then(r => r.json()),
+        fetch('/api/rutas/rutas-visita-hoy/').then(r => r.json())
+    ]).then(([rutasData, hoyData]) => {
+        todasLasRutas = rutasData.rutas;
+        vendedoresDisponibles = hoyData.vendedores_disponibles;
+        document.getElementById('loading').style.display = 'none';
+        renderizarRutas(todasLasRutas.filter(r => r.dia === hoyData.dia_hoy));
+    });
+}
+
+function filtrarDia(dia, btn) {
+    document.querySelectorAll('.filtro-dia button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    if (dia === 'hoy') {
+        fetch('/api/rutas/rutas-visita-hoy/')
+            .then(r => r.json())
+            .then(data => renderizarRutas(todasLasRutas.filter(r => r.dia === data.dia_hoy)));
+    } else {
+        renderizarRutas(todasLasRutas.filter(r => r.dia === dia));
+    }
+}
+
+function renderizarRutas(rutas) {
+    const lista = document.getElementById('lista-rutas');
+    lista.innerHTML = '';
+
+    if (rutas.length === 0) {
+        lista.innerHTML = '<p style="text-align:center;color:#888;padding:40px;">No hay rutas para este día</p>';
+        return;
+    }
+
+    rutas.forEach(r => {
+        const total = r.total_establecimientos || 0;
+        const completadas = r.completadas || 0;
+        const progreso = total > 0 ? Math.round((completadas / total) * 100) : 0;
+
+        const badgeClass = r.estado === 'Completada' ? 'badge-completada'
+            : r.estado === 'Pausada' ? 'badge-pausada' : 'badge-activa';
+
+        let optionsHTML = vendedoresDisponibles.map(v =>
+            `<option value="${v.id}" ${v.id == r.vendedor_id ? 'selected' : ''}>${v.nombre}</option>`
+        ).join('');
+
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.innerHTML = `
+            <div class="card-header">
+                <div class="card-title">${r.nombre}</div>
+                <span class="badge ${badgeClass}">${r.estado}</span>
+            </div>
+            <div class="info-grid">
+                <div><div class="label">Zona</div><div class="valor">${r.zona}</div></div>
+                <div><div class="label">Día</div><div class="valor">${r.dia}</div></div>
+                <div><div class="label">Visitas</div><div class="valor">${completadas}/${total}</div></div>
+                <div><div class="label">Progreso</div><div class="valor">${progreso}%</div></div>
+            </div>
+            <div class="progress-bar"><div class="fill" style="width:${progreso}%"></div></div>
+            <div><div style="font-size:11px;color:#888;margin-bottom:6px;">Vendedor asignado:</div>
+            <div class="asignar-row">
+                <select id="sel-${r.id}">${optionsHTML}</select>
+                <button class="btn-asignar" onclick="asignarVendedor(${r.id})">Asignar</button>
+            </div></div>
+        `;
+        lista.appendChild(div);
+    });
+}
+
+function asignarVendedor(rutaId) {
+    const select = document.getElementById(`sel-${rutaId}`);
+    const vendedorId = select.value;
+    const vendedorNombre = select.options[select.selectedIndex].text;
+
+    fetch(`/api/rutas/ruta-visita/${rutaId}/asignar-vendedor/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vendedor_id: vendedorId })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.error) { alert('Error: ' + data.error); return; }
+        mostrarToast(`✓ ${vendedorNombre} asignado correctamente`);
+    })
+    .catch(() => alert('Error de conexión'));
+}
+
+function mostrarToast(msg) {
+    const toast = document.getElementById('toast');
+    toast.innerText = msg;
+    toast.style.display = 'block';
+    setTimeout(() => toast.style.display = 'none', 3000);
+}
+</script>
+{% endblock %}
