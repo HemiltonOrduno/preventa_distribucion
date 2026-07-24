@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Dashboard Coordinador{% endblock %} - Sabritas Tijuana</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: sans-serif; display: flex; height: 100vh; background: #f0f2f5; }
+
+        /* ===== SIDEBAR IZQUIERDO ===== */
+        #sidebar-left {
+            width: 220px;
+            background: #1a237e;
+            display: flex;
+            flex-direction: column;
+            z-index: 100;
+            flex-shrink: 0;
+        }
+
+        #sidebar-left .logo {
+            padding: 20px 15px;
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            text-decoration: none;
+            display: block;
+        }
+
+        #sidebar-left .logo span {
+            display: block;
+            font-size: 11px;
+            font-weight: normal;
+            opacity: 0.7;
+            margin-top: 3px;
+        }
+
+        #sidebar-left nav { flex: 1; padding: 12px 0; }
+
+        #sidebar-left nav a {
+            display: block;
+            width: 100%;
+            padding: 12px 20px;
+            background: none;
+            border: none;
+            color: rgba(255,255,255,0.8);
+            font-size: 13px;
+            text-align: left;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+            text-decoration: none;
+        }
+
+        #sidebar-left nav a:hover,
+        #sidebar-left nav a.active {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            border-left-color: #90caf9;
+        }
+
+        .icon { margin-right: 10px; font-size: 15px; }
+
+        /* ===== CONTENIDO PRINCIPAL ===== */
+        #contenido {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* ===== HEADER ===== */
+        #page-header {
+            background: white;
+            border-bottom: 1px solid #dee2e6;
+            padding: 15px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #1a237e;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* ===== BODY ===== */
+        #page-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        {% block extra_styles %}{% endblock %}
+    </style>
+</head>
+<body>
+
+<!-- SIDEBAR IZQUIERDO -->
+<div id="sidebar-left">
+    <a href="/api/rutas/coordinador/" class="logo">
+        🚚 Sabritas Tijuana
+        <span>Panel del Coordinador</span>
+    </a>
+    <nav>
+        <a href="/api/rutas/coordinador/" class="{% block nav_mapa %}{% endblock %}">
+            <span class="icon">🗺️</span> Mapa de rutas
+        </a>
+        <a href="/api/rutas/gestionar-rutas-visita/" class="{% block nav_rutas_visita %}{% endblock %}">
+            <span class="icon">🗓️</span> Rutas de visita
+        </a>
+        <a href="/api/rutas/gestionar-rutas-entrega/" class="{% block nav_rutas_entrega %}{% endblock %}">
+            <span class="icon">🚚</span> Rutas de entrega
+        </a>
+        <a href="/api/rutas/gestionar-zonas/" class="{% block nav_zonas %}{% endblock %}">
+            <span class="icon">📍</span> Gestionar zonas
+        </a>
+        <a href="/api/rutas/gestionar-establecimientos/" class="{% block nav_establecimientos %}{% endblock %}">
+            <span class="icon">🏪</span> Gestionar establecimientos
+        </a>
+    </nav>
+</div>
+
+<!-- CONTENIDO -->
+<div id="contenido">
+    <div id="page-header">
+        {% block page_icon %}{% endblock %}
+        {% block page_title %}Dashboard{% endblock %}
+    </div>
+    <div id="page-body">
+        {% block content %}{% endblock %}
+    </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+{% block extra_scripts %}{% endblock %}
+</body>
+</html>

@@ -13,6 +13,7 @@ class RutaVisita(models.Model):
     nombre = models.CharField(max_length=100)
     descripcion = models.CharField(max_length=200, blank=True, null=True)
     porcentaje = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    dia = models.CharField(max_length=10, default='Lunes')
     zona = models.ForeignKey(Zona, on_delete=models.PROTECT)
     usuario = models.ForeignKey(
         Usuario,
