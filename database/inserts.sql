@@ -1384,7 +1384,7 @@ INSERT INTO EMP_VEHICULO (empleado, vehiculo, fecha_cargo) VALUES
 (32, 29, '2026-07-21'),
 (33, 30, '2026-07-21');
 
---ahora de ayer
+-- ahora de ayer
 INSERT INTO EMP_VEHICULO (empleado, vehiculo, fecha_cargo) VALUES
 (24, 21, '2026-07-20'),
 (25, 22, '2026-07-20'),
