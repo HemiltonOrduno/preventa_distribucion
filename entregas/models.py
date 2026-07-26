@@ -105,3 +105,12 @@ class Devolucion(models.Model):
 
     class Meta:
         db_table = 'devolucion'
+        
+class RutaEntregaOrden(models.Model):
+    ruta_entrega = models.ForeignKey(RutaEntrega, on_delete=models.PROTECT)
+    establecimiento = models.ForeignKey(Establecimiento, on_delete=models.PROTECT)
+    orden = models.IntegerField()
+
+    class Meta:
+        db_table = 'ruta_entrega_orden'
+        unique_together = ('ruta_entrega', 'establecimiento')

@@ -15,10 +15,6 @@ ALMACEN = {
 OSRM_URL = "http://127.0.0.1:5000"
 
 
-def mapa(request):
-    return render(request, "rutas/mapa.html")
-
-
 def coordinador(request):
     return render(request, "rutas/coordinador.html")
 
@@ -559,7 +555,7 @@ def calcular_ruta_visita_coordinador(request, ruta_id):
         "geometria": trip["geometry"],
         "paradas": paradas
     }, json_dumps_params={'ensure_ascii': False})
-    
+
 def gestionar_rutas_visita(request):
     return render(request, 'rutas/gestionar_rutas_visita.html')
 
@@ -600,3 +596,135 @@ def rutas_visita_todas(request):
     return JsonResponse({
         "rutas": rutas
     }, json_dumps_params={'ensure_ascii': False})
+    
+@csrf_exempt
+def guardar_orden_ruta_entrega(request, ruta_id):
+    """
+    Guarda el orden de las paradas de una ruta de entrega.
+    """
+    if request.method != 'POST':
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+
+    try:
+        body = json.loads(request.body)
+        paradas = body.get("paradas", [])
+    except Exception:
+        return JsonResponse({"error": "JSON inválido"}, status=400)
+
+    if not paradas:
+        return JsonResponse({"error": "No se proporcionaron paradas"}, status=400)
+
+    with connection.cursor() as cursor:
+        # Eliminar orden anterior
+        cursor.execute("DELETE FROM ruta_entrega_orden WHERE ruta_entrega = %s", [ruta_id])
+
+        # Insertar nuevo orden
+        for p in paradas:
+            if p.get('tipo') == 'establecimiento':
+                cursor.execute("""
+                    INSERT INTO ruta_entrega_orden (ruta_entrega, establecimiento, orden)
+                    VALUES (%s, %s, %s)
+                """, [ruta_id, p['establecimiento_id'], p['orden']])
+
+    return JsonResponse({
+        "mensaje": "Orden guardado correctamente",
+        "ruta_id": ruta_id
+    }, json_dumps_params={'ensure_ascii': False})
+    
+def zonas(request):
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT
+                z.num AS id,
+                z.nombre,
+                z.descripcion,
+                z.lat_min, z.lat_max,
+                z.lon_min, z.lon_max,
+                COUNT(e.numero) AS total_establecimientos
+            FROM zona z
+            LEFT JOIN establecimiento e ON e.zona = z.num
+            GROUP BY z.num, z.nombre, z.descripcion, z.lat_min, z.lat_max, z.lon_min, z.lon_max
+            ORDER BY z.num
+        """)
+        columns = [col[0] for col in cursor.description]
+        result = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+    for r in result:
+        for campo in ['lat_min', 'lat_max', 'lon_min', 'lon_max']:
+            if r[campo] is not None:
+                r[campo] = float(r[campo])
+
+    return JsonResponse({"zonas": result}, json_dumps_params={'ensure_ascii': False})
+
+
+@csrf_exempt
+def actualizar_zona(request, zona_id):
+    if request.method != 'POST':
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+
+    try:
+        body = json.loads(request.body)
+    except Exception:
+        return JsonResponse({"error": "JSON inválido"}, status=400)
+
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            UPDATE zona SET
+                lat_min = %s, lat_max = %s,
+                lon_min = %s, lon_max = %s
+            WHERE num = %s
+        """, [
+            body.get('lat_min'), body.get('lat_max'),
+            body.get('lon_min'), body.get('lon_max'),
+            zona_id
+        ])
+
+    return JsonResponse({"mensaje": "Zona actualizada correctamente"}, json_dumps_params={'ensure_ascii': False})
+
+def establecimientos(request):
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT
+                e.numero AS id,
+                e.nombre,
+                e.estColonia AS colonia,
+                e.telefono,
+                e.latitud,
+                e.longitud,
+                z.num AS zona_id,
+                z.nombre AS zona_nombre,
+                ee.nombre AS estado
+            FROM establecimiento e
+            INNER JOIN zona z ON z.num = e.zona
+            INNER JOIN edo_establecimiento ee ON ee.codigo = e.edo_establecimiento
+            ORDER BY z.nombre, e.nombre
+        """)
+        columns = [col[0] for col in cursor.description]
+        result = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+    for r in result:
+        for campo in ['latitud', 'longitud']:
+            if r[campo] is not None:
+                r[campo] = float(r[campo])
+
+    return JsonResponse({"establecimientos": result}, json_dumps_params={'ensure_ascii': False})
+
+
+@csrf_exempt
+def actualizar_establecimiento(request, est_id):
+    if request.method != 'POST':
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+
+    try:
+        body = json.loads(request.body)
+    except Exception:
+        return JsonResponse({"error": "JSON inválido"}, status=400)
+
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            UPDATE establecimiento
+            SET zona = %s, edo_establecimiento = %s
+            WHERE numero = %s
+        """, [body.get('zona'), body.get('estado'), est_id])
+
+    return JsonResponse({"mensaje": "Establecimiento actualizado"}, json_dumps_params={'ensure_ascii': False})

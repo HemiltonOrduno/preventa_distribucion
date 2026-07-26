@@ -1,0 +1,435 @@
+{% extends 'rutas/base_coordinador.html' %}
+
+{% block title %}Gestionar Establecimientos{% endblock %}
+{% block nav_establecimientos %}active{% endblock %}
+
+{% block extra_styles %}
+#layout {
+    display: flex;
+    gap: 16px;
+    height: calc(100vh - 60px);
+    overflow: hidden;
+}
+
+#panel-lista {
+    width: 320px;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.search-box {
+    padding: 8px 12px;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    font-size: 13px;
+    width: 100%;
+}
+
+.filtros-row {
+    display: flex;
+    gap: 6px;
+}
+
+.filtro-select {
+    flex: 1;
+    padding: 7px 8px;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    font-size: 12px;
+    background: white;
+}
+
+.resumen {
+    font-size: 11px;
+    color: #888;
+    margin-bottom: 8px;
+}
+
+#lista-establecimientos {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.est-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    background: white;
+    border-radius: 8px;
+    margin-bottom: 6px;
+    border: 1px solid #dee2e6;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.est-item:hover { border-color: #1a237e; background: #f0f4ff; }
+.est-item.activo { border-color: #1a237e; background: #f0f4ff; }
+
+.est-icono {
+    font-size: 20px;
+    flex-shrink: 0;
+}
+
+.est-info { flex: 1; overflow: hidden; }
+.est-nombre { font-size: 13px; font-weight: bold; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.est-sub { font-size: 11px; color: #888; margin-top: 2px; }
+
+.badge-zona {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: bold;
+    background: #e3f2fd;
+    color: #1565c0;
+}
+
+.badge-activo { background: #e8f5e9; color: #2e7d32; }
+.badge-inactivo { background: #ffebee; color: #c62828; }
+
+#mapa-establecimientos {
+    flex: 1;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #dee2e6;
+}
+
+/* MODAL */
+#modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+}
+
+#modal-overlay.visible { display: flex; }
+
+#modal {
+    background: white;
+    border-radius: 12px;
+    width: 420px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+}
+
+#modal-header {
+    background: #1a237e;
+    color: white;
+    padding: 15px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#modal-header h3 { font-size: 14px; }
+#modal-header button { background: none; border: none; color: white; font-size: 20px; cursor: pointer; }
+
+#modal-body { padding: 20px; }
+
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; font-size: 12px; color: #888; margin-bottom: 4px; }
+.form-group input, .form-group select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    font-size: 13px;
+}
+
+#modal-footer {
+    padding: 15px 20px;
+    border-top: 1px solid #dee2e6;
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.btn-cancelar { padding: 8px 16px; background: #f0f2f5; color: #555; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; }
+.btn-guardar { padding: 8px 16px; background: #1a237e; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; }
+
+.toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: #2e7d32;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    display: none;
+    z-index: 3000;
+}
+{% endblock %}
+
+{% block page_icon %}🏪{% endblock %}
+{% block page_title %}Gestionar Establecimientos{% endblock %}
+
+{% block content %}
+<div id="layout">
+    <div id="panel-lista">
+        <div class="toolbar">
+            <input type="text" class="search-box" id="buscador" placeholder="🔍 Buscar establecimiento..." oninput="filtrar()">
+            <div class="filtros-row">
+                <select class="filtro-select" id="filtro-zona" onchange="filtrar()">
+                    <option value="">Todas las zonas</option>
+                </select>
+                <select class="filtro-select" id="filtro-estado" onchange="filtrar()">
+                    <option value="">Todos</option>
+                    <option value="Activo">Activo</option>
+                    <option value="Inactivo">Inactivo</option>
+                </select>
+            </div>
+        </div>
+        <div class="resumen" id="resumen"></div>
+        <div id="lista-establecimientos">Cargando...</div>
+    </div>
+
+    <div id="mapa-establecimientos"></div>
+</div>
+
+<!-- MODAL EDITAR -->
+<div id="modal-overlay" onclick="cerrarModalClick(event)">
+    <div id="modal">
+        <div id="modal-header">
+            <h3 id="modal-titulo">Editar establecimiento</h3>
+            <button onclick="cerrarModal()">×</button>
+        </div>
+        <div id="modal-body">
+            <input type="hidden" id="edit-id">
+            <div class="form-group">
+                <label>Nombre</label>
+                <input type="text" id="edit-nombre" readonly style="background:#f8f9fa;">
+            </div>
+            <div class="form-group">
+                <label>Colonia</label>
+                <input type="text" id="edit-colonia" readonly style="background:#f8f9fa;">
+            </div>
+            <div class="form-group">
+                <label>Zona asignada</label>
+                <select id="edit-zona"></select>
+            </div>
+            <div class="form-group">
+                <label>Estado</label>
+                <select id="edit-estado">
+                    <option value="EST001">Activo</option>
+                    <option value="EST002">Inactivo</option>
+                </select>
+            </div>
+        </div>
+        <div id="modal-footer">
+            <button class="btn-cancelar" onclick="cerrarModal()">Cancelar</button>
+            <button class="btn-guardar" onclick="guardarEstablecimiento()">Guardar cambios</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let todosLosEstablecimientos = [];
+let todasLasZonas = [];
+let mapa = null;
+let marcadores = {};
+let itemActivo = null;
+
+window.addEventListener('load', () => {
+    inicializarMapa();
+    cargarDatos();
+});
+
+function inicializarMapa() {
+    mapa = L.map('mapa-establecimientos', {
+        center: [32.505, -117.010],
+        zoom: 12
+    });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(mapa);
+}
+
+function cargarDatos() {
+    Promise.all([
+        fetch('/api/rutas/establecimientos/').then(r => r.json()),
+        fetch('/api/rutas/zonas/').then(r => r.json())
+    ]).then(([estData, zonasData]) => {
+        todosLosEstablecimientos = estData.establecimientos;
+        todasLasZonas = zonasData.zonas;
+
+        const filtroZona = document.getElementById('filtro-zona');
+        todasLasZonas.forEach(z => {
+            const opt = document.createElement('option');
+            opt.value = z.id;
+            opt.innerText = z.nombre;
+            filtroZona.appendChild(opt);
+        });
+
+        renderizar(todosLosEstablecimientos);
+        dibujarMarcadores(todosLosEstablecimientos);
+    });
+}
+
+function filtrar() {
+    const busqueda = document.getElementById('buscador').value.toLowerCase();
+    const zonaFiltro = document.getElementById('filtro-zona').value;
+    const estadoFiltro = document.getElementById('filtro-estado').value;
+
+    const filtrados = todosLosEstablecimientos.filter(e => {
+        const matchBusqueda = e.nombre.toLowerCase().includes(busqueda) ||
+                              e.colonia.toLowerCase().includes(busqueda);
+        const matchZona = zonaFiltro === '' || e.zona_id == zonaFiltro;
+        const matchEstado = estadoFiltro === '' || e.estado === estadoFiltro;
+        return matchBusqueda && matchZona && matchEstado;
+    });
+
+    renderizar(filtrados);
+    dibujarMarcadores(filtrados);
+}
+
+function renderizar(establecimientos) {
+    const lista = document.getElementById('lista-establecimientos');
+    lista.innerHTML = '';
+
+    document.getElementById('resumen').innerText =
+        `${establecimientos.length} de ${todosLosEstablecimientos.length} establecimientos`;
+
+    establecimientos.forEach(e => {
+        const div = document.createElement('div');
+        div.className = 'est-item';
+        div.id = `item-${e.id}`;
+        div.innerHTML = `
+            <div class="est-icono">🏪</div>
+            <div class="est-info">
+                <div class="est-nombre">${e.nombre}</div>
+                <div class="est-sub">
+                    ${e.colonia} · 
+                    <span class="badge-zona">${e.zona_nombre}</span>
+                    <span class="badge-estado ${e.estado === 'Activo' ? 'badge-activo' : 'badge-inactivo'}">${e.estado}</span>
+                </div>
+            </div>
+        `;
+        div.onclick = () => seleccionar(e);
+        lista.appendChild(div);
+    });
+}
+
+function dibujarMarcadores(establecimientos) {
+    Object.values(marcadores).forEach(m => mapa.removeLayer(m));
+    marcadores = {};
+
+    establecimientos.forEach(e => {
+        if (!e.latitud || !e.longitud) return;
+
+        const icono = L.divIcon({
+            className: '',
+            html: `<div style="font-size:22px;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.4));">🏪</div>`,
+            iconAnchor: [11, 22]
+        });
+
+        const m = L.marker([e.latitud, e.longitud], { icon: icono })
+            .addTo(mapa)
+            .bindPopup(`
+                <b>${e.nombre}</b><br>
+                ${e.colonia}<br>
+                Zona: ${e.zona_nombre}<br>
+                Tel: ${e.telefono}<br>
+                <button onclick="abrirEditar(${e.id})" style="margin-top:6px;padding:4px 10px;background:#1a237e;color:white;border:none;border-radius:4px;font-size:11px;cursor:pointer;">
+                    Editar
+                </button>
+            `)
+            .on('click', () => seleccionar(e));
+
+        marcadores[e.id] = m;
+    });
+}
+
+function seleccionar(e) {
+    // Desactivar anterior
+    if (itemActivo) {
+        document.getElementById(`item-${itemActivo}`)?.classList.remove('activo');
+    }
+    itemActivo = e.id;
+    document.getElementById(`item-${e.id}`)?.classList.add('activo');
+    document.getElementById(`item-${e.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    // Zoom en el mapa
+    if (e.latitud && e.longitud) {
+        mapa.setView([e.latitud, e.longitud], 16);
+        marcadores[e.id]?.openPopup();
+    }
+}
+
+function abrirEditar(estId) {
+    const est = todosLosEstablecimientos.find(e => e.id === estId);
+    if (!est) return;
+
+    document.getElementById('edit-id').value = est.id;
+    document.getElementById('edit-nombre').value = est.nombre;
+    document.getElementById('edit-colonia').value = est.colonia;
+    document.getElementById('edit-estado').value = est.estado === 'Activo' ? 'EST001' : 'EST002';
+
+    const selectZona = document.getElementById('edit-zona');
+    selectZona.innerHTML = '';
+    todasLasZonas.forEach(z => {
+        const opt = document.createElement('option');
+        opt.value = z.id;
+        opt.innerText = z.nombre;
+        if (z.id === est.zona_id) opt.selected = true;
+        selectZona.appendChild(opt);
+    });
+
+    document.getElementById('modal-titulo').innerText = `Editar: ${est.nombre}`;
+    document.getElementById('modal-overlay').classList.add('visible');
+}
+
+function guardarEstablecimiento() {
+    const id = document.getElementById('edit-id').value;
+    const zona = document.getElementById('edit-zona').value;
+    const estado = document.getElementById('edit-estado').value;
+
+    fetch(`/api/rutas/establecimientos/${id}/actualizar/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ zona, estado })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.error) { alert('Error: ' + data.error); return; }
+        cerrarModal();
+        mostrarToast('✓ Establecimiento actualizado');
+        cargarDatos();
+    })
+    .catch(() => alert('Error de conexión'));
+}
+
+function cerrarModal() {
+    document.getElementById('modal-overlay').classList.remove('visible');
+}
+
+function cerrarModalClick(e) {
+    if (e.target === document.getElementById('modal-overlay')) cerrarModal();
+}
+
+function mostrarToast(msg) {
+    const toast = document.getElementById('toast');
+    toast.innerText = msg;
+    toast.style.display = 'block';
+    setTimeout(() => toast.style.display = 'none', 3000);
+}
+</script>
+{% endblock %}
