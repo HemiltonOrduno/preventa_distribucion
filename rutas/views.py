@@ -18,79 +18,46 @@ OSRM_URL = "http://127.0.0.1:5000"
 def coordinador(request):
     return render(request, "rutas/coordinador.html")
 
-
 @csrf_exempt
 def calcular_ruta_visita(request):
-    """
-    Calcula la ruta óptima de visita para un vendedor.
-    Recibe una lista de establecimientos y regresa la ruta optimizada.
-    """
     if request.method != "POST":
         return JsonResponse({"error": "Método no permitido"}, status=405)
-
     try:
         body = json.loads(request.body)
         establecimientos = body.get("establecimientos", [])
     except Exception:
         return JsonResponse({"error": "JSON inválido"}, status=400)
-
     if not establecimientos:
         return JsonResponse({"error": "No se proporcionaron establecimientos"}, status=400)
 
     coordenadas = [(ALMACEN["lon"], ALMACEN["lat"])] + [
         (e["lon"], e["lat"]) for e in establecimientos
     ]
-
     coords_str = ";".join(f"{lon},{lat}" for lon, lat in coordenadas)
     url = f"{OSRM_URL}/trip/v1/driving/{coords_str}"
-
     try:
         response = requests.get(url, params={
-            "roundtrip": "false",
-            "source": "first",
-            "destination": "last",
-            "geometries": "geojson",
-            "overview": "full"
+            "roundtrip": "false", "source": "first", "destination": "last",
+            "geometries": "geojson", "overview": "full"
         }, timeout=10)
         data = response.json()
     except requests.exceptions.ConnectionError:
         return JsonResponse({"error": "No se pudo conectar al servidor OSRM"}, status=500)
-
     if data.get("code") != "Ok":
-        return JsonResponse({"error": "OSRM no pudo calcular la ruta", "detalle": data}, status=400)
+        return JsonResponse({"error": "OSRM no pudo calcular la ruta"}, status=400)
 
     trip = data["trips"][0]
     waypoints = data["waypoints"]
-
     orden = [wp["waypoint_index"] for wp in waypoints]
     paradas = []
     for i, (lon, lat) in enumerate(coordenadas):
         if i == 0:
-            paradas.append({
-                "lon": lon,
-                "lat": lat,
-                "nombre": ALMACEN["nombre"],
-                "tipo": "almacen",
-                "orden": 0
-            })
+            paradas.append({"lon": lon, "lat": lat, "nombre": ALMACEN["nombre"], "tipo": "almacen", "orden": 0})
         else:
             est = establecimientos[i - 1]
-            paradas.append({
-                "lon": lon,
-                "lat": lat,
-                "nombre": est.get("nombre", f"Establecimiento {i}"),
-                "tipo": "establecimiento",
-                "orden": orden[i],
-                "establecimiento_id": est.get("id")
-            })
+            paradas.append({"lon": lon, "lat": lat, "nombre": est.get("nombre"), "tipo": "establecimiento", "orden": orden[i], "establecimiento_id": est.get("id")})
 
-    return JsonResponse({
-        "distancia_total_km": round(trip["distance"] / 1000, 2),
-        "duracion_total_min": round(trip["duration"] / 60, 2),
-        "geometria": trip["geometry"],
-        "paradas": paradas
-    }, json_dumps_params={'ensure_ascii': False})
-
+    return JsonResponse({"distancia_total_km": round(trip["distance"] / 1000, 2), "duracion_total_min": round(trip["duration"] / 60, 2), "geometria": trip["geometry"], "paradas": paradas}, json_dumps_params={'ensure_ascii': False})
 
 @csrf_exempt
 def calcular_ruta_entrega(request):
@@ -478,27 +445,30 @@ def asignar_vendedor_ruta(request, ruta_id):
     
 @csrf_exempt
 def calcular_ruta_visita_coordinador(request, ruta_id):
-    """
-    Calcula la ruta óptima de visita para una ruta específica.
-    """
     with connection.cursor() as cursor:
         cursor.execute("""
-            SELECT DISTINCT
-                e.numero AS id,
-                e.nombre AS nombre,
-                e.latitud AS lat,
-                e.longitud AS lon,
-                e.estColonia AS colonia
-            FROM establecimiento e
-            INNER JOIN zona z ON z.num = e.zona
-            INNER JOIN ruta_visita rv ON rv.zona = z.num
-            WHERE rv.numero = %s
-            AND e.edo_establecimiento = 'EST001'
+            SELECT e.numero AS id, e.nombre, e.latitud AS lat, e.longitud AS lon,
+                   e.estColonia AS colonia, rvo.orden
+            FROM ruta_visita_orden rvo
+            INNER JOIN establecimiento e ON e.numero = rvo.establecimiento
+            WHERE rvo.ruta_visita = %s ORDER BY rvo.orden
         """, [ruta_id])
-
         columns = [col[0] for col in cursor.description]
-        rows = cursor.fetchall()
-        establecimientos = [dict(zip(columns, row)) for row in rows]
+        establecimientos = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+        tiene_orden = len(establecimientos) > 0
+
+        if not tiene_orden:
+            cursor.execute("""
+                SELECT DISTINCT e.numero AS id, e.nombre, e.latitud AS lat, e.longitud AS lon,
+                       e.estColonia AS colonia
+                FROM establecimiento e
+                INNER JOIN zona z ON z.num = e.zona
+                INNER JOIN ruta_visita rv ON rv.zona = z.num
+                WHERE rv.numero = %s AND e.edo_establecimiento = 'EST001'
+            """, [ruta_id])
+            columns = [col[0] for col in cursor.description]
+            establecimientos = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
     if not establecimientos:
         return JsonResponse({"error": "No se encontraron establecimientos"}, status=404)
@@ -506,47 +476,49 @@ def calcular_ruta_visita_coordinador(request, ruta_id):
     coordenadas = [(ALMACEN["lon"], ALMACEN["lat"])] + [
         (float(e["lon"]), float(e["lat"])) for e in establecimientos
     ]
-
     coords_str = ";".join(f"{lon},{lat}" for lon, lat in coordenadas)
-    url = f"{OSRM_URL}/trip/v1/driving/{coords_str}"
 
     try:
-        response = requests.get(url, params={
-            "roundtrip": "false",
-            "source": "first",
-            "destination": "last",
-            "geometries": "geojson",
-            "overview": "full"
-        }, timeout=10)
-        data = response.json()
+        if tiene_orden:
+            # Respetar el orden definido por el coordinador
+            url = f"{OSRM_URL}/route/v1/driving/{coords_str}"
+            response = requests.get(url, params={
+                "geometries": "geojson", "overview": "full"
+            }, timeout=10)
+            data = response.json()
+            if data.get("code") != "Ok":
+                return JsonResponse({"error": "OSRM no pudo calcular la ruta"}, status=400)
+            trip = data["routes"][0]
+            paradas = []
+            for i, (lon, lat) in enumerate(coordenadas):
+                if i == 0:
+                    paradas.append({"lon": lon, "lat": lat, "nombre": ALMACEN["nombre"], "tipo": "almacen", "orden": 0})
+                else:
+                    est = establecimientos[i - 1]
+                    paradas.append({"lon": lon, "lat": lat, "nombre": est["nombre"], "tipo": "establecimiento", "orden": i, "establecimiento_id": est["id"], "colonia": est["colonia"]})
+        else:
+            # Sin orden guardado, OSRM optimiza
+            url = f"{OSRM_URL}/trip/v1/driving/{coords_str}"
+            response = requests.get(url, params={
+                "roundtrip": "false", "source": "first", "destination": "last",
+                "geometries": "geojson", "overview": "full"
+            }, timeout=10)
+            data = response.json()
+            if data.get("code") != "Ok":
+                return JsonResponse({"error": "OSRM no pudo calcular la ruta"}, status=400)
+            trip = data["trips"][0]
+            waypoints = data["waypoints"]
+            orden_osrm = [wp["waypoint_index"] for wp in waypoints]
+            paradas = []
+            for i, (lon, lat) in enumerate(coordenadas):
+                if i == 0:
+                    paradas.append({"lon": lon, "lat": lat, "nombre": ALMACEN["nombre"], "tipo": "almacen", "orden": 0})
+                else:
+                    est = establecimientos[i - 1]
+                    paradas.append({"lon": lon, "lat": lat, "nombre": est["nombre"], "tipo": "establecimiento", "orden": orden_osrm[i], "establecimiento_id": est["id"], "colonia": est["colonia"]})
+
     except requests.exceptions.ConnectionError:
         return JsonResponse({"error": "No se pudo conectar al servidor OSRM"}, status=500)
-
-    if data.get("code") != "Ok":
-        return JsonResponse({"error": "OSRM no pudo calcular la ruta"}, status=400)
-
-    trip = data["trips"][0]
-    waypoints = data["waypoints"]
-    orden = [wp["waypoint_index"] for wp in waypoints]
-
-    paradas = []
-    for i, (lon, lat) in enumerate(coordenadas):
-        if i == 0:
-            paradas.append({
-                "lon": lon, "lat": lat,
-                "nombre": ALMACEN["nombre"],
-                "tipo": "almacen", "orden": 0
-            })
-        else:
-            est = establecimientos[i - 1]
-            paradas.append({
-                "lon": lon, "lat": lat,
-                "nombre": est["nombre"],
-                "tipo": "establecimiento",
-                "orden": orden[i],
-                "establecimiento_id": est["id"],
-                "colonia": est["colonia"]
-            })
 
     return JsonResponse({
         "ruta_id": ruta_id,
@@ -728,3 +700,134 @@ def actualizar_establecimiento(request, est_id):
         """, [body.get('zona'), body.get('estado'), est_id])
 
     return JsonResponse({"mensaje": "Establecimiento actualizado"}, json_dumps_params={'ensure_ascii': False})
+
+@csrf_exempt
+def crear_ruta_visita(request):
+    if request.method != 'POST':
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+
+    try:
+        body = json.loads(request.body)
+    except Exception:
+        return JsonResponse({"error": "JSON inválido"}, status=400)
+
+    nombre = body.get('nombre')
+    dia = body.get('dia')
+    descripcion = body.get('descripcion', '')
+    zona_id = body.get('zona_id')
+    establecimientos = body.get('establecimientos', [])
+
+    if not nombre or not dia or not zona_id:
+        return JsonResponse({"error": "Faltan datos requeridos"}, status=400)
+
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT COALESCE(MAX(numero), 0) + 1 FROM ruta_visita")
+        nuevo_num = cursor.fetchone()[0]
+
+        cursor.execute("""
+            SELECT em.num FROM empleado em
+            INNER JOIN rol r ON r.codigo = em.rol
+            WHERE r.nombre = 'Vendedor'
+            AND em.edo_empleado = 'EE001'
+            LIMIT 1
+        """)
+        vendedor = cursor.fetchone()
+        vendedor_id = vendedor[0] if vendedor else None
+
+        cursor.execute("""
+            INSERT INTO ruta_visita (numero, nombre, descripcion, dia, zona, empleado, edo_ruta_visita)
+            VALUES (%s, %s, %s, %s, %s, %s, 'ERV001')
+        """, [nuevo_num, nombre, descripcion, dia, zona_id, vendedor_id])
+
+        # Guardar orden en ruta_visita_orden
+        for i, est_id in enumerate(establecimientos):
+            cursor.execute("""
+                INSERT INTO ruta_visita_orden (ruta_visita, establecimiento, orden)
+                VALUES (%s, %s, %s)
+            """, [nuevo_num, est_id, i + 1])
+
+    return JsonResponse({
+        "mensaje": "Ruta creada correctamente",
+        "ruta_id": nuevo_num
+    }, json_dumps_params={'ensure_ascii': False})
+    
+    
+def ruta_visita_datos(request, ruta_id):
+    """
+    Regresa los datos de una ruta de visita para edición.
+    """
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT rv.numero AS id, rv.nombre, rv.dia, rv.descripcion,
+                   rv.zona AS zona_id, z.nombre AS zona_nombre,
+                   erv.nombre AS estado, rv.empleado AS vendedor_id
+            FROM ruta_visita rv
+            INNER JOIN zona z ON z.num = rv.zona
+            INNER JOIN edo_ruta_visita erv ON erv.codigo = rv.edo_ruta_visita
+            WHERE rv.numero = %s
+        """, [ruta_id])
+        columns = [col[0] for col in cursor.description]
+        ruta = dict(zip(columns, cursor.fetchone()))
+
+        # Obtener establecimientos en orden
+        cursor.execute("""
+            SELECT e.numero AS id, e.nombre, e.latitud, e.longitud,
+                   e.estColonia AS colonia, rvo.orden
+            FROM ruta_visita_orden rvo
+            INNER JOIN establecimiento e ON e.numero = rvo.establecimiento
+            WHERE rvo.ruta_visita = %s
+            ORDER BY rvo.orden
+        """, [ruta_id])
+        columns = [col[0] for col in cursor.description]
+        establecimientos = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+        for e in establecimientos:
+            e['latitud'] = float(e['latitud']) if e['latitud'] else None
+            e['longitud'] = float(e['longitud']) if e['longitud'] else None
+
+    return JsonResponse({
+        "ruta": ruta,
+        "establecimientos": establecimientos
+    }, json_dumps_params={'ensure_ascii': False})
+
+
+@csrf_exempt
+def editar_ruta_visita(request, ruta_id):
+    """
+    Edita una ruta de visita existente.
+    """
+    if request.method != 'POST':
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+
+    try:
+        body = json.loads(request.body)
+    except Exception:
+        return JsonResponse({"error": "JSON inválido"}, status=400)
+
+    nombre = body.get('nombre')
+    dia = body.get('dia')
+    descripcion = body.get('descripcion', '')
+    zona_id = body.get('zona_id')
+    establecimientos = body.get('establecimientos', [])
+
+    if not nombre or not dia or not zona_id:
+        return JsonResponse({"error": "Faltan datos requeridos"}, status=400)
+
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            UPDATE ruta_visita SET nombre=%s, dia=%s, descripcion=%s, zona=%s
+            WHERE numero=%s
+        """, [nombre, dia, descripcion, zona_id, ruta_id])
+
+        # Actualizar orden
+        cursor.execute("DELETE FROM ruta_visita_orden WHERE ruta_visita = %s", [ruta_id])
+        for i, est_id in enumerate(establecimientos):
+            cursor.execute("""
+                INSERT INTO ruta_visita_orden (ruta_visita, establecimiento, orden)
+                VALUES (%s, %s, %s)
+            """, [ruta_id, est_id, i + 1])
+
+    return JsonResponse({
+        "mensaje": "Ruta actualizada correctamente",
+        "ruta_id": ruta_id
+    }, json_dumps_params={'ensure_ascii': False})

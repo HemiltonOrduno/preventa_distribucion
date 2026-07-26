@@ -22,4 +22,7 @@ urlpatterns = [
     path('zonas/<int:zona_id>/actualizar/', views.actualizar_zona, name='actualizar_zona'),
     path('establecimientos/', views.establecimientos, name='establecimientos'),
     path('establecimientos/<int:est_id>/actualizar/', views.actualizar_establecimiento, name='actualizar_establecimiento'),
+    path('ruta-visita/crear/', views.crear_ruta_visita, name='crear_ruta_visita'),
+    path('ruta-visita/<int:ruta_id>/datos/', views.ruta_visita_datos, name='ruta_visita_datos'),
+    path('ruta-visita/<int:ruta_id>/editar/', views.editar_ruta_visita, name='editar_ruta_visita'),
 ]

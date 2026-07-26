@@ -396,3 +396,12 @@ INSERT INTO zona (num, nombre, descripcion, empleado, lat_min, lat_max, lon_min,
 
 SELECT num, nombre, lat_min, lat_max, lon_min, lon_max FROM zona WHERE num IN (7, 10, 12, 13);
 SELECT num, nombre, lon_min, lon_max FROM zona WHERE num IN (3,6,7,11,12,13);
+
+CREATE TABLE ruta_visita_orden (
+    ruta_visita INT NOT NULL,
+    establecimiento INT NOT NULL,
+    orden INT NOT NULL,
+    PRIMARY KEY (ruta_visita, establecimiento),
+    FOREIGN KEY (ruta_visita) REFERENCES ruta_visita(numero),
+    FOREIGN KEY (establecimiento) REFERENCES establecimiento(numero)
+);
