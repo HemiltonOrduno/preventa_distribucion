@@ -1,0 +1,75 @@
+{% extends 'establecimientos/base_vendedor.html' %}
+{% load static %}
+
+{% block title %}Nuevo cliente{% endblock %}
+{% block nav_clientes_d %}active{% endblock %}
+{% block nav_clientes_m %}active{% endblock %}
+
+{% block content %}
+
+<div class="page__eyebrow">
+    <i class='bx bx-user-plus'></i> NUEVO CLIENTE
+</div>
+
+<form id="formCliente" onsubmit="return continuarARegistroEstablecimiento(event)">
+
+    <div class="form__div">
+        <div class="form__icon"><i class='bx bx-user'></i></div>
+        <div class="form__div-input">
+            <label class="form__label">Nombre de pila</label>
+            <input type="text" id="nombre_de_pila" class="form__input" required>
+        </div>
+    </div>
+
+    <div class="form__div">
+        <div class="form__icon"><i class='bx bx-user'></i></div>
+        <div class="form__div-input">
+            <label class="form__label">Apellido paterno</label>
+            <input type="text" id="apellido_paterno" class="form__input" required>
+        </div>
+    </div>
+
+    <div class="form__div">
+        <div class="form__icon"><i class='bx bx-user'></i></div>
+        <div class="form__div-input">
+            <label class="form__label">Apellido materno</label>
+            <input type="text" id="apellido_materno" class="form__input">
+        </div>
+    </div>
+
+    <div class="form__div">
+        <div class="form__icon"><i class='bx bx-id-card'></i></div>
+        <div class="form__div-input">
+            <label class="form__label">RFC</label>
+            <input type="text" id="rfc" class="form__input" maxlength="13" required>
+        </div>
+    </div>
+
+    <div class="form__div">
+        <div class="form__icon"><i class='bx bx-phone'></i></div>
+        <div class="form__div-input">
+            <label class="form__label">Teléfono</label>
+            <input type="tel" id="telefono" class="form__input" required>
+        </div>
+    </div>
+
+    <div class="form__div">
+        <div class="form__icon"><i class='bx bx-envelope'></i></div>
+        <div class="form__div-input">
+            <label class="form__label">Email</label>
+            <input type="email" id="email" class="form__input" required>
+        </div>
+    </div>
+
+    <button type="submit" class="btn btn--primary">
+        Continuar
+        <i class='bx bx-right-arrow-alt'></i>
+    </button>
+
+</form>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'establecimientos/js/registro_cliente.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,38 @@
+{% extends 'establecimientos/base_vendedor.html' %}
+{% load static %}
+
+{% block title %}Establecimiento cerrado{% endblock %}
+{% block nav_ruta_d %}active{% endblock %}
+{% block nav_ruta_m %}active{% endblock %}
+
+{% block content %}
+
+<div class="page__eyebrow">
+    <i class='bx bx-lock-alt'></i> ESTABLECIMIENTO CERRADO
+</div>
+
+<div class="card">
+    <div class="card__row">
+        <i class='bx bx-store'></i>
+        <span class="card__title">Abarrotes Lupita</span>
+    </div>
+</div>
+
+<div class="form__div">
+    <div class="form__icon"><i class='bx bx-note'></i></div>
+    <div class="form__div-input">
+        <label class="form__label">Motivo de la observación</label>
+        <textarea id="motivo" class="form__textarea"></textarea>
+    </div>
+</div>
+
+<button class="btn btn--danger" onclick="completarVisitaSinPedido()">
+    Completar visita
+    <i class='bx bx-check'></i>
+</button>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'visitas/js/visita_sin_pedido.js' %}"></script>
+{% endblock %}

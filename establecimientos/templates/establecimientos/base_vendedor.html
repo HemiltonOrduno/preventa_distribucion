@@ -1,0 +1,82 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/boxicons@2.0.5/css/boxicons.min.css" rel="stylesheet">
+
+    <link rel="stylesheet" href="{% static 'establecimientos/css/vendedor.css' %}">
+    {% block extra_styles %}{% endblock %}
+
+    <title>{% block title %}Vendedor{% endblock %} - INPREDISROUTE</title>
+</head>
+<body>
+
+<!-- MENU SUPERIOR: solo visible en escritorio -->
+<nav class="top-nav">
+    <div class="top-nav__brand">
+        <i class='bx bx-package'></i> INPREDISROUTE
+    </div>
+    <div class="top-nav__links">
+        <a href="{% url 'ruta_del_dia' %}" class="top-nav__link {% block nav_ruta_d %}{% endblock %}">
+            <i class='bx bx-map-alt'></i> Ruta del día
+        </a>
+        <a href="#" class="top-nav__link {% block nav_pedidos_d %}{% endblock %}">
+            <i class='bx bx-cart'></i> Pedidos
+        </a>
+        <a href="{% url 'registro_cliente' %}" class="top-nav__link {% block nav_clientes_d %}{% endblock %}">
+            <i class='bx bx-store'></i> Clientes
+        </a>
+    </div>
+    <div class="top-nav__avatar"><i class='bx bx-user'></i></div>
+</nav>
+
+<div class="page {% block page_class %}{% endblock %}">
+    {% block content %}{% endblock %}
+</div>
+
+<!-- MENU INFERIOR: solo visible en móvil -->
+<nav class="bottom-nav">
+    <a href="{% url 'ruta_del_dia' %}" class="bottom-nav__item {% block nav_ruta_m %}{% endblock %}">
+        <i class='bx bx-map-alt'></i>
+        <span>Ruta</span>
+    </a>
+    <a href="#" class="bottom-nav__item {% block nav_pedidos_m %}{% endblock %}">
+        <i class='bx bx-cart'></i>
+        <span>Pedidos</span>
+    </a>
+    <a href="{% url 'registro_cliente' %}" class="bottom-nav__item {% block nav_clientes_m %}{% endblock %}">
+        <i class='bx bx-store'></i>
+        <span>Clientes</span>
+    </a>
+    <a href="#" class="bottom-nav__item">
+        <i class='bx bx-user-circle'></i>
+        <span>Perfil</span>
+    </a>
+</nav>
+
+
+<script>
+    /* Manejo de foco compartido para los labels flotantes (form__div) */
+    document.querySelectorAll(".form__input, .form__textarea").forEach(function(input){
+        input.addEventListener("focus", function(){
+            this.closest(".form__div").classList.add("focus");
+        });
+        input.addEventListener("blur", function(){
+            if (this.value === ""){
+                this.closest(".form__div").classList.remove("focus");
+            }
+        });
+        if (input.value !== ""){
+            input.closest(".form__div").classList.add("focus");
+        }
+    });
+</script>
+
+{% block extra_scripts %}{% endblock %}
+</body>
+</html>

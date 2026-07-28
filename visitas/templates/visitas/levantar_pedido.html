@@ -1,0 +1,65 @@
+{% extends 'establecimientos/base_vendedor.html' %}
+{% load static %}
+
+{% block title %}Levantar pedido{% endblock %}
+{% block nav_ruta_d %}active{% endblock %}
+{% block nav_ruta_m %}active{% endblock %}
+
+{% block content %}
+
+<div class="page__eyebrow">
+    <i class='bx bx-cart'></i> LEVANTAR PEDIDO
+</div>
+
+<div class="card">
+    <div class="card__row">
+        <i class='bx bx-store'></i>
+        <span class="card__title">Abarrotes Lupita</span>
+    </div>
+</div>
+
+<!-- Este listado se llenará con el catálogo real de productos (RF04).
+     El sistema NO valida stock aquí, según RF05 -->
+<div class="card" id="listaProductos">
+    <div class="product-item">
+        <div>
+            <span class="product-item__name">Papas sabritas</span><br>
+            <span class="product-item__price">$18.50</span>
+        </div>
+        <div class="qty">
+            <button type="button" class="qty__btn" onclick="cambiarCantidad(this,-1)">-</button>
+            <span class="qty__value">0</span>
+            <button type="button" class="qty__btn" onclick="cambiarCantidad(this,1)">+</button>
+        </div>
+    </div>
+    <div class="product-item">
+        <div>
+            <span class="product-item__name">Coca cola 600ml</span><br>
+            <span class="product-item__price">$22.00</span>
+        </div>
+        <div class="qty">
+            <button type="button" class="qty__btn" onclick="cambiarCantidad(this,-1)">-</button>
+            <span class="qty__value">0</span>
+            <button type="button" class="qty__btn" onclick="cambiarCantidad(this,1)">+</button>
+        </div>
+    </div>
+</div>
+
+<div class="form__div">
+    <div class="form__icon"><i class='bx bx-note'></i></div>
+    <div class="form__div-input">
+        <label class="form__label">Observaciones</label>
+        <textarea id="observaciones" class="form__textarea"></textarea>
+    </div>
+</div>
+
+<button class="btn btn--primary" onclick="confirmarPedido()">
+    Confirmar pedido
+    <i class='bx bx-check'></i>
+</button>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'visitas/js/levantar_pedido.js' %}"></script>
+{% endblock %}
