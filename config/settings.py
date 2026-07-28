@@ -101,3 +101,12 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ],
 }
+
+from django.db.backends.base.base import BaseDatabaseWrapper
+from django.db.backends.mysql.features import DatabaseFeatures
+
+# Desactiva la verificación de versión de MariaDB
+BaseDatabaseWrapper.check_database_version_supported = lambda self: None
+
+# Desactiva la sintaxis RETURNING para MariaDB 10.4
+DatabaseFeatures.can_return_columns_from_insert = False

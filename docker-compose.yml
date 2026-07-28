@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  osrm:
+    image: ghcr.io/project-osrm/osrm-backend
+    container_name: osrm_tijuana
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./osrm-data:/data
+    command: osrm-routed --algorithm mld /data/baja_california-latest.osrm
+    restart: unless-stopped

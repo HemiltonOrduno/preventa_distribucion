@@ -1,0 +1,41 @@
+{% extends 'establecimientos/base_vendedor.html' %}
+{% load static %}
+
+{% block title %}Ruta del día{% endblock %}
+{% block nav_ruta_d %}active{% endblock %}
+{% block nav_ruta_m %}active{% endblock %}
+{% block page_class %}page--split{% endblock %}
+
+{% block content %}
+
+<div>
+    <div class="page__eyebrow">
+        <i class='bx bx-route'></i> RUTA DE HOY
+    </div>
+
+    <!-- Este bloque se llenará con los datos reales del primer destino
+         (RF07) una vez que exista el endpoint de rutas/visitas -->
+    <div class="card">
+        <div class="card__row">
+            <i class='bx bx-store'></i>
+            <span class="card__title">Abarrotes Lupita</span>
+        </div>
+        <p class="card__sub">Calle 5 de mayo 123, Zona centro</p>
+        <span class="badge badge--info">Zona centro</span>
+    </div>
+
+    <button class="btn btn--primary" onclick="iniciarVisita()">
+        Iniciar visita
+        <i class='bx bx-right-arrow-alt'></i>
+    </button>
+</div>
+
+<div class="map-box">
+    <i class='bx bx-map-alt'></i>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'visitas/js/ruta_del_dia.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,935 @@
+{% extends 'rutas/base_coordinador.html' %}
+
+{% block title %}Gestionar Rutas de Visita{% endblock %}
+{% block nav_rutas_visita %}active{% endblock %}
+{% block page_icon %}🗓️{% endblock %}
+{% block page_title %}Gestionar Rutas de Visita{% endblock %}
+
+{% block extra_styles %}
+#layout {
+    display: flex;
+    gap: 16px;
+    height: calc(100vh - 60px);
+    overflow: hidden;
+}
+
+#panel-rutas {
+    width: 300px;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+#panel-rutas-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.btn-nueva-ruta {
+    padding: 7px 14px;
+    background: #1a237e;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.btn-nueva-ruta:hover { background: #283593; }
+
+.filtro-dia {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+}
+
+.filtro-dia button {
+    padding: 4px 10px;
+    border: 1px solid #dee2e6;
+    border-radius: 14px;
+    background: white;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.filtro-dia button.active {
+    background: #1a237e;
+    color: white;
+    border-color: #1a237e;
+}
+
+#lista-rutas { flex: 1; overflow-y: auto; }
+
+.ruta-card {
+    background: white;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 8px;
+    border: 2px solid #dee2e6;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.ruta-card:hover { border-color: #1a237e; }
+.ruta-card.activa { border-color: #c62828; background: #fff5f5; }
+
+.ruta-nombre {
+    font-weight: bold;
+    font-size: 13px;
+    color: #333;
+    margin-bottom: 4px;
+}
+
+.ruta-info {
+    font-size: 11px;
+    color: #888;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+}
+
+.badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: bold;
+}
+
+.badge-activa { background: #e8f5e9; color: #2e7d32; }
+.badge-completada { background: #e3f2fd; color: #1565c0; }
+.badge-pausada { background: #fff3e0; color: #e65100; }
+
+.progress-bar {
+    height: 4px;
+    background: #dee2e6;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.progress-bar .fill {
+    height: 100%;
+    background: #c62828;
+    border-radius: 2px;
+}
+
+.asignar-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-top: 8px;
+}
+
+.asignar-row select {
+    flex: 1;
+    padding: 5px 8px;
+    border: 1px solid #dee2e6;
+    border-radius: 5px;
+    font-size: 11px;
+}
+
+.btn-asignar {
+    padding: 5px 10px;
+    background: #1a237e;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+#mapa-rutas {
+    flex: 1;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #dee2e6;
+}
+
+/* MODAL CREAR RUTA */
+#modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.6);
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+}
+
+#modal-overlay.visible { display: flex; }
+
+#modal {
+    background: white;
+    border-radius: 12px;
+    width: 90vw;
+    height: 85vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
+
+#modal-header {
+    background: #1a237e;
+    color: white;
+    padding: 12px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+#modal-header h3 { font-size: 14px; }
+#modal-header button { background: none; border: none; color: white; font-size: 20px; cursor: pointer; }
+
+#modal-body {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+#modal-form {
+    width: 280px;
+    padding: 16px;
+    border-right: 1px solid #dee2e6;
+    overflow-y: auto;
+    flex-shrink: 0;
+}
+
+.form-group { margin-bottom: 12px; }
+.form-group label { display: block; font-size: 12px; color: #888; margin-bottom: 4px; }
+.form-group input, .form-group select, .form-group textarea {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    font-size: 13px;
+}
+
+.form-group textarea { resize: none; height: 60px; }
+
+#modal-mapa { flex: 1; }
+
+#modal-paradas {
+    width: 220px;
+    border-left: 1px solid #dee2e6;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+#modal-paradas-header {
+    padding: 10px 12px;
+    font-size: 12px;
+    font-weight: bold;
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    color: #333;
+}
+
+#modal-paradas-header span {
+    font-size: 11px;
+    color: #888;
+    font-weight: normal;
+    display: block;
+    margin-top: 2px;
+}
+
+#lista-paradas-modal {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+}
+
+.parada-modal-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 8px;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    margin-bottom: 5px;
+    font-size: 12px;
+}
+
+.parada-num-modal {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #c62828;
+    color: white;
+    font-size: 11px;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.parada-nombre-modal {
+    flex: 1;
+    color: #333;
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.btn-quitar {
+    background: none;
+    border: none;
+    color: #c62828;
+    cursor: pointer;
+    font-size: 14px;
+    flex-shrink: 0;
+    padding: 0;
+}
+
+#modal-footer {
+    padding: 12px 20px;
+    border-top: 1px solid #dee2e6;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.btn-cancelar { padding: 8px 16px; background: #f0f2f5; color: #555; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; }
+.btn-crear { padding: 8px 20px; background: #1a237e; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; font-weight: bold; }
+
+.toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: #2e7d32;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    display: none;
+    z-index: 3000;
+}
+{% endblock %}
+
+{% block content %}
+<div id="layout">
+    <div id="panel-rutas">
+        <div id="panel-rutas-header">
+            <div style="font-size:13px;font-weight:bold;color:#333;">Rutas de visita</div>
+            <button class="btn-nueva-ruta" onclick="abrirCrearRuta()">+ Nueva ruta</button>
+        </div>
+
+        <div class="filtro-dia" id="filtro-dia">
+            <button class="active" onclick="filtrarDia('hoy', this)">Hoy</button>
+            <button onclick="filtrarDia('Lunes', this)">Lun</button>
+            <button onclick="filtrarDia('Martes', this)">Mar</button>
+            <button onclick="filtrarDia('Miércoles', this)">Mié</button>
+            <button onclick="filtrarDia('Jueves', this)">Jue</button>
+            <button onclick="filtrarDia('Viernes', this)">Vie</button>
+            <button onclick="filtrarDia('Sábado', this)">Sáb</button>
+        </div>
+
+        <div id="lista-rutas">Cargando...</div>
+    </div>
+
+    <div id="mapa-rutas"></div>
+</div>
+
+<!-- MODAL CREAR RUTA -->
+<div id="modal-overlay" onclick="cerrarModalClick(event)">
+    <div id="modal">
+        <div id="modal-header">
+            <h3>Nueva ruta de visita</h3>
+            <button onclick="cerrarModal()">×</button>
+        </div>
+        <div id="modal-body">
+            <div id="modal-form">
+                <div class="form-group">
+                    <label>Nombre de la ruta *</label>
+                    <input type="text" id="ruta-nombre" placeholder="Ej: Ruta Playas Lunes">
+                </div>
+                <div class="form-group">
+                    <label>Día *</label>
+                    <select id="ruta-dia">
+                        <option value="Lunes">Lunes</option>
+                        <option value="Martes">Martes</option>
+                        <option value="Miércoles">Miércoles</option>
+                        <option value="Jueves">Jueves</option>
+                        <option value="Viernes">Viernes</option>
+                        <option value="Sábado">Sábado</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Zona *</label>
+                    <select id="ruta-zona" onchange="cargarEstablecimientosZona()">
+                        <option value="">Selecciona una zona...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Descripción (opcional)</label>
+                    <textarea id="ruta-descripcion" placeholder="Descripción de la ruta..."></textarea>
+                </div>
+                <p style="font-size:11px;color:#888;margin-top:8px;">
+                    Selecciona una zona y luego haz clic en los establecimientos del mapa en el orden que deseas visitarlos.
+                </p>
+            </div>
+
+            <div id="modal-mapa"></div>
+
+            <div id="modal-paradas">
+                <div id="modal-paradas-header">
+                    Paradas seleccionadas
+                    <span id="contador-paradas">0 establecimientos</span>
+                </div>
+                <div id="lista-paradas-modal"></div>
+            </div>
+        </div>
+        <div id="modal-footer">
+            <button class="btn-cancelar" onclick="cerrarModal()">Cancelar</button>
+            <button class="btn-crear" onclick="crearRuta()">✓ Crear ruta</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<script>
+let todasLasRutas = [];
+let vendedoresDisponibles = [];
+let zonas = [];
+let establecimientos = [];
+let diaHoy = '';
+
+// Mapa principal
+let mapaRutas = null;
+let rutaLayerActual = null;
+let marcadoresRuta = [];
+
+// Mapa modal
+let mapaModal = null;
+let marcadoresModal = {};
+let paradasSeleccionadas = [];
+let marcadorAlmacen = null;
+
+const ALMACEN = { lat: 32.4700, lon: -116.9400, nombre: 'Almacén Sabritas - El Florido' };
+
+window.addEventListener('load', () => {
+    inicializarMapaRutas();
+    cargarDatos();
+});
+
+function inicializarMapaRutas() {
+    mapaRutas = L.map('mapa-rutas', {
+        center: [32.505, -117.010],
+        zoom: 12
+    });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(mapaRutas);
+}
+
+function cargarDatos() {
+    Promise.all([
+        fetch('/api/rutas/rutas-visita-todas/').then(r => r.json()),
+        fetch('/api/rutas/rutas-visita-hoy/').then(r => r.json()),
+        fetch('/api/rutas/zonas/').then(r => r.json()),
+        fetch('/api/rutas/establecimientos/').then(r => r.json())
+    ]).then(([rutasData, hoyData, zonasData, estData]) => {
+        todasLasRutas = rutasData.rutas;
+        vendedoresDisponibles = hoyData.vendedores_disponibles;
+        diaHoy = hoyData.dia_hoy;
+        zonas = zonasData.zonas;
+        establecimientos = estData.establecimientos;
+
+        // Llenar select de zonas en modal
+        const selectZona = document.getElementById('ruta-zona');
+        zonas.forEach(z => {
+            const opt = document.createElement('option');
+            opt.value = z.id;
+            opt.innerText = z.nombre;
+            selectZona.appendChild(opt);
+        });
+
+        filtrarDia('hoy', document.querySelector('.filtro-dia button.active'));
+    });
+}
+
+function filtrarDia(dia, btn) {
+    document.querySelectorAll('.filtro-dia button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    let filtradas;
+    if (dia === 'hoy') {
+        filtradas = todasLasRutas.filter(r => r.dia === diaHoy);
+    } else {
+        filtradas = todasLasRutas.filter(r => r.dia === dia);
+    }
+    renderizarRutas(filtradas);
+}
+
+function getBadgeClass(estado) {
+    if (estado === 'Completada') return 'badge-completada';
+    if (estado === 'Pausada') return 'badge-pausada';
+    return 'badge-activa';
+}
+
+function renderizarRutas(rutas) {
+    const lista = document.getElementById('lista-rutas');
+    lista.innerHTML = '';
+
+    if (rutas.length === 0) {
+        lista.innerHTML = '<p style="text-align:center;color:#888;padding:20px;font-size:12px;">No hay rutas para este día</p>';
+        return;
+    }
+
+    rutas.forEach(r => {
+        const total = r.total_establecimientos || 0;
+        const completadas = r.completadas || 0;
+        const progreso = total > 0 ? Math.round((completadas / total) * 100) : 0;
+
+        let optionsHTML = vendedoresDisponibles.map(v =>
+            `<option value="${v.id}" ${v.id == r.vendedor_id ? 'selected' : ''}>${v.nombre}</option>`
+        ).join('');
+
+        const div = document.createElement('div');
+        div.className = 'ruta-card';
+        div.id = `ruta-card-${r.id}`;
+        div.onclick = (e) => {
+            if (!e.target.closest('select') && !e.target.closest('button')) {
+                verRutaEnMapa(r);
+            }
+        };
+
+        div.innerHTML = `
+    <div class="ruta-nombre">${r.nombre}</div>
+    <div class="ruta-info">
+        <span>📍 ${r.zona}</span>
+        <span>📅 ${r.dia}</span>
+        <span class="badge ${getBadgeClass(r.estado)}">${r.estado}</span>
+    </div>
+    <div style="font-size:11px;color:#888;margin-bottom:4px;">${completadas}/${total} visitas (${progreso}%)</div>
+    <div class="progress-bar"><div class="fill" style="width:${progreso}%"></div></div>
+    <div class="asignar-row" onclick="event.stopPropagation()">
+        <select id="sel-${r.id}">${optionsHTML}</select>
+        <button class="btn-asignar" onclick="asignarVendedor(${r.id})">Asignar</button>
+    </div>
+    <button onclick="event.stopPropagation(); abrirEditarRuta(${r.id})" 
+        style="margin-top:8px;width:100%;padding:6px;background:#f0f2f5;border:1px solid #dee2e6;border-radius:6px;font-size:11px;cursor:pointer;color:#555;">
+        ✏️ Editar ruta
+    </button>
+`;
+        lista.appendChild(div);
+    });
+}
+
+function verRutaEnMapa(ruta) {
+    // Limpiar mapa
+    if (rutaLayerActual) { mapaRutas.removeLayer(rutaLayerActual); rutaLayerActual = null; }
+    marcadoresRuta.forEach(m => mapaRutas.removeLayer(m));
+    marcadoresRuta = [];
+
+    document.querySelectorAll('.ruta-card').forEach(c => c.classList.remove('activa'));
+    document.getElementById(`ruta-card-${ruta.id}`)?.classList.add('activa');
+
+    fetch(`/api/rutas/ruta-visita/${ruta.id}/ruta/`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) return;
+
+            const coords = data.geometria.coordinates.map(c => [c[1], c[0]]);
+            rutaLayerActual = L.polyline(coords, { color: '#c62828', weight: 4, opacity: 0.8 }).addTo(mapaRutas);
+
+            data.paradas.forEach((p, i) => {
+                const color = p.tipo === 'almacen' ? '#7b1fa2' : '#c62828';
+                const icono = L.divIcon({
+                    className: '',
+                    html: `<div style="background:${color};color:white;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:bold;border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.4);">${i}</div>`,
+                    iconAnchor: [12, 12]
+                });
+                const m = L.marker([p.lat, p.lon], { icon: icono })
+                    .addTo(mapaRutas)
+                    .bindPopup(`<b>${p.nombre}</b>${p.tipo !== 'almacen' ? '<br>' + p.colonia : ''}`);
+                marcadoresRuta.push(m);
+            });
+
+            mapaRutas.fitBounds(rutaLayerActual.getBounds(), { padding: [30, 30] });
+        });
+}
+
+function asignarVendedor(rutaId) {
+    const select = document.getElementById(`sel-${rutaId}`);
+    const vendedorId = select.value;
+    const vendedorNombre = select.options[select.selectedIndex].text;
+
+    fetch(`/api/rutas/ruta-visita/${rutaId}/asignar-vendedor/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vendedor_id: vendedorId })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.error) { alert('Error: ' + data.error); return; }
+        mostrarToast(`✓ ${vendedorNombre} asignado`);
+    });
+}
+
+// ===== MODAL CREAR RUTA =====
+function abrirCrearRuta() {
+    paradasSeleccionadas = [];
+    document.getElementById('ruta-nombre').value = '';
+    document.getElementById('ruta-descripcion').value = '';
+    document.getElementById('ruta-zona').value = '';
+    document.getElementById('lista-paradas-modal').innerHTML = '';
+    document.getElementById('contador-paradas').innerText = '0 establecimientos';
+    document.getElementById('modal-overlay').classList.add('visible');
+
+    setTimeout(() => {
+        if (mapaModal) { mapaModal.remove(); mapaModal = null; }
+        Object.values(marcadoresModal).forEach(m => m && m.remove && m.remove());
+        marcadoresModal = {};
+
+        mapaModal = L.map('modal-mapa', {
+            center: [32.505, -117.010],
+            zoom: 12
+        });
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(mapaModal);
+
+        // Marcador del almacén
+        const iconoAlmacen = L.divIcon({
+            className: '',
+            html: `<div style="background:#7b1fa2;color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.4);">🏭</div>`,
+            iconAnchor: [14, 14]
+        });
+        marcadorAlmacen = L.marker([ALMACEN.lat, ALMACEN.lon], { icon: iconoAlmacen })
+            .addTo(mapaModal)
+            .bindPopup(`<b>${ALMACEN.nombre}</b><br>Punto de salida`);
+    }, 100);
+}
+
+function cargarEstablecimientosZona() {
+    const zonaId = parseInt(document.getElementById('ruta-zona').value);
+    if (!zonaId) return;
+
+    // Limpiar marcadores de establecimientos anteriores
+    Object.entries(marcadoresModal).forEach(([id, m]) => {
+        if (id !== 'almacen' && m) { mapaModal.removeLayer(m); }
+    });
+    marcadoresModal = {};
+    paradasSeleccionadas = [];
+    document.getElementById('lista-paradas-modal').innerHTML = '';
+    document.getElementById('contador-paradas').innerText = '0 establecimientos';
+
+    const estsZona = establecimientos.filter(e => e.zona_id === zonaId);
+    const zona = zonas.find(z => z.id === zonaId);
+
+    estsZona.forEach(e => {
+        if (!e.latitud || !e.longitud) return;
+
+        const icono = L.divIcon({
+            className: '',
+            html: `<div style="font-size:22px;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.3));">🏪</div>`,
+            iconAnchor: [11, 22]
+        });
+
+        const m = L.marker([e.latitud, e.longitud], { icon: icono })
+            .addTo(mapaModal)
+            .bindPopup(`<b>${e.nombre}</b><br>${e.colonia}`)
+            .on('click', () => toggleParada(e, m));
+
+        marcadoresModal[e.id] = m;
+    });
+
+    // Zoom a la zona
+    if (zona && zona.lat_min && zona.lat_max) {
+        mapaModal.fitBounds([[zona.lat_min, zona.lon_min], [zona.lat_max, zona.lon_max]], { padding: [30, 30] });
+    }
+}
+
+function toggleParada(est, marker) {
+    const index = paradasSeleccionadas.findIndex(p => p.id === est.id);
+
+    if (index !== -1) {
+        // Quitar parada
+        paradasSeleccionadas.splice(index, 1);
+        const icono = L.divIcon({
+            className: '',
+            html: `<div style="font-size:22px;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.3));">🏪</div>`,
+            iconAnchor: [11, 22]
+        });
+        marker.setIcon(icono);
+    } else {
+        // Agregar parada
+        paradasSeleccionadas.push(est);
+        const num = paradasSeleccionadas.length;
+        const icono = L.divIcon({
+            className: '',
+            html: `<div style="position:relative;font-size:22px;">🏪<div style="position:absolute;top:-6px;right:-6px;background:#c62828;color:white;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:bold;border:1px solid white;">${num}</div></div>`,
+            iconAnchor: [11, 22]
+        });
+        marker.setIcon(icono);
+    }
+
+    actualizarListaParadas();
+}
+
+let sortableParadas = null;
+
+function actualizarListaParadas() {
+    const lista = document.getElementById('lista-paradas-modal');
+    lista.innerHTML = '';
+    document.getElementById('contador-paradas').innerText = `${paradasSeleccionadas.length} establecimientos`;
+
+    paradasSeleccionadas.forEach((p, i) => {
+        const div = document.createElement('div');
+        div.className = 'parada-modal-item';
+        div.dataset.id = p.id;
+        div.innerHTML = `
+            <span style="color:#ccc;cursor:grab;font-size:14px;">⠿</span>
+            <div class="parada-num-modal">${i + 1}</div>
+            <div class="parada-nombre-modal">${p.nombre}</div>
+            <button class="btn-quitar" onclick="quitarParada(${p.id})">×</button>
+        `;
+        lista.appendChild(div);
+    });
+
+    if (sortableParadas) sortableParadas.destroy();
+    sortableParadas = new Sortable(lista, {
+        animation: 150,
+        handle: 'span',
+        onEnd: () => {
+            const items = lista.querySelectorAll('.parada-modal-item');
+            const nuevasParadas = [];
+            items.forEach(item => {
+                const id = parseInt(item.dataset.id);
+                const est = paradasSeleccionadas.find(p => p.id === id);
+                if (est) nuevasParadas.push(est);
+            });
+            paradasSeleccionadas = nuevasParadas;
+            actualizarNumerosEnMarcadores();
+            actualizarListaParadas();
+        }
+    });
+}
+
+function actualizarNumerosEnMarcadores() {
+    Object.entries(marcadoresModal).forEach(([id, m]) => {
+        if (!m) return;
+        const idx = paradasSeleccionadas.findIndex(p => p.id === parseInt(id));
+        if (idx !== -1) {
+            const icono = L.divIcon({
+                className: '',
+                html: `<div style="position:relative;font-size:22px;">🏪<div style="position:absolute;top:-6px;right:-6px;background:#c62828;color:white;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:bold;border:1px solid white;">${idx + 1}</div></div>`,
+                iconAnchor: [11, 22]
+            });
+            m.setIcon(icono);
+        } else {
+            const icono = L.divIcon({
+                className: '',
+                html: `<div style="font-size:22px;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.3));">🏪</div>`,
+                iconAnchor: [11, 22]
+            });
+            m.setIcon(icono);
+        }
+    });
+}
+
+function quitarParada(estId) {
+    paradasSeleccionadas = paradasSeleccionadas.filter(p => p.id !== estId);
+    actualizarNumerosEnMarcadores();
+    actualizarListaParadas();
+}
+
+
+function crearRuta() {
+    const nombre = document.getElementById('ruta-nombre').value.trim();
+    const dia = document.getElementById('ruta-dia').value;
+    const zonaId = document.getElementById('ruta-zona').value;
+    const descripcion = document.getElementById('ruta-descripcion').value.trim();
+
+    if (!nombre) { alert('El nombre de la ruta es requerido'); return; }
+    if (!zonaId) { alert('Selecciona una zona'); return; }
+    if (paradasSeleccionadas.length === 0) { alert('Selecciona al menos un establecimiento'); return; }
+
+    fetch('/api/rutas/ruta-visita/crear/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            nombre,
+            dia,
+            descripcion,
+            zona_id: parseInt(zonaId),
+            establecimientos: paradasSeleccionadas.map(p => p.id)
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.error) { alert('Error: ' + data.error); return; }
+        cerrarModal();
+        mostrarToast('✓ Ruta creada correctamente');
+        cargarDatos();
+    })
+    .catch(() => alert('Error de conexión'));
+}
+
+
+function abrirEditarRuta(rutaId) {
+    fetch(`/api/rutas/ruta-visita/${rutaId}/datos/`)
+        .then(res => res.json())
+        .then(data => {
+            const ruta = data.ruta;
+            const ests = data.establecimientos;
+
+            // Guardar paradas antes de que cargarEstablecimientosZona las resetee
+            const paradasGuardadas = ests.map(e => ({
+                id: e.id,
+                nombre: e.nombre,
+                latitud: e.latitud,
+                longitud: e.longitud,
+                colonia: e.colonia,
+                zona_id: ruta.zona_id
+            }));
+
+            document.getElementById('ruta-nombre').value = ruta.nombre;
+            document.getElementById('ruta-dia').value = ruta.dia;
+            document.getElementById('ruta-zona').value = ruta.zona_id;
+            document.getElementById('ruta-descripcion').value = ruta.descripcion || '';
+
+            document.getElementById('modal-header').querySelector('h3').innerText = 'Editar ruta de visita';
+            document.querySelector('.btn-crear').innerText = '✓ Guardar cambios';
+            document.querySelector('.btn-crear').onclick = () => guardarEdicionRuta(rutaId);
+
+            document.getElementById('modal-overlay').classList.add('visible');
+
+            setTimeout(() => {
+                if (mapaModal) { mapaModal.remove(); mapaModal = null; }
+                Object.values(marcadoresModal).forEach(m => m && m.remove && m.remove());
+                marcadoresModal = {};
+                paradasSeleccionadas = [];
+
+                mapaModal = L.map('modal-mapa', {
+                    center: [32.505, -117.010],
+                    zoom: 12
+                });
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; OpenStreetMap contributors'
+                }).addTo(mapaModal);
+
+                const iconoAlmacen = L.divIcon({
+                    className: '',
+                    html: `<div style="background:#7b1fa2;color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.4);">🏭</div>`,
+                    iconAnchor: [14, 14]
+                });
+                L.marker([ALMACEN.lat, ALMACEN.lon], { icon: iconoAlmacen })
+                    .addTo(mapaModal)
+                    .bindPopup(`<b>${ALMACEN.nombre}</b>`);
+
+                // Cargar establecimientos de la zona
+                const zonaId = parseInt(ruta.zona_id);
+                const estsZona = establecimientos.filter(e => e.zona_id === zonaId);
+                const zona = zonas.find(z => z.id === zonaId);
+
+                estsZona.forEach(e => {
+                    if (!e.latitud || !e.longitud) return;
+                    const icono = L.divIcon({
+                        className: '',
+                        html: `<div style="font-size:22px;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.3));">🏪</div>`,
+                        iconAnchor: [11, 22]
+                    });
+                    const m = L.marker([e.latitud, e.longitud], { icon: icono })
+                        .addTo(mapaModal)
+                        .bindPopup(`<b>${e.nombre}</b><br>${e.colonia}`)
+                        .on('click', () => toggleParada(e, m));
+                    marcadoresModal[e.id] = m;
+                });
+
+                if (zona && zona.lat_min && zona.lat_max) {
+                    mapaModal.fitBounds([[zona.lat_min, zona.lon_min], [zona.lat_max, zona.lon_max]], { padding: [30, 30] });
+                }
+
+                // Ahora marcar los establecimientos ya seleccionados en orden
+                paradasSeleccionadas = paradasGuardadas;
+                paradasSeleccionadas.forEach((p, i) => {
+                    const m = marcadoresModal[p.id];
+                    if (m) {
+                        const icono = L.divIcon({
+                            className: '',
+                            html: `<div style="position:relative;font-size:22px;">🏪<div style="position:absolute;top:-6px;right:-6px;background:#c62828;color:white;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:bold;border:1px solid white;">${i + 1}</div></div>`,
+                            iconAnchor: [11, 22]
+                        });
+                        m.setIcon(icono);
+                        // Sobreescribir el evento click para que funcione toggle correctamente
+                        m.off('click');
+                        const est = establecimientos.find(e => e.id === p.id);
+                        if (est) m.on('click', () => toggleParada(est, m));
+                    }
+                });
+                actualizarListaParadas();
+
+            }, 100);
+        });
+}
+
+function guardarEdicionRuta(rutaId) {
+    const nombre = document.getElementById('ruta-nombre').value.trim();
+    const dia = document.getElementById('ruta-dia').value;
+    const zonaId = document.getElementById('ruta-zona').value;
+    const descripcion = document.getElementById('ruta-descripcion').value.trim();
+
+    if (!nombre) { alert('El nombre es requerido'); return; }
+    if (!zonaId) { alert('Selecciona una zona'); return; }
+    if (paradasSeleccionadas.length === 0) { alert('Selecciona al menos un establecimiento'); return; }
+
+    fetch(`/api/rutas/ruta-visita/${rutaId}/editar/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            nombre, dia, descripcion,
+            zona_id: parseInt(zonaId),
+            establecimientos: paradasSeleccionadas.map(p => p.id)
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.error) { alert('Error: ' + data.error); return; }
+        cerrarModal();
+        mostrarToast('✓ Ruta actualizada correctamente');
+        // Restaurar botón crear
+        document.querySelector('.btn-crear').innerText = '✓ Crear ruta';
+        document.querySelector('.btn-crear').onclick = crearRuta;
+        cargarDatos();
+    })
+    .catch(() => alert('Error de conexión'));
+}
+
+
+function cerrarModal() {
+    document.getElementById('modal-overlay').classList.remove('visible');
+    if (mapaModal) { mapaModal.remove(); mapaModal = null; }
+}
+
+function cerrarModalClick(e) {
+    if (e.target === document.getElementById('modal-overlay')) cerrarModal();
+}
+
+function mostrarToast(msg) {
+    const toast = document.getElementById('toast');
+    toast.innerText = msg;
+    toast.style.display = 'block';
+    setTimeout(() => toast.style.display = 'none', 3000);
+}
+</script>
+{% endblock %}

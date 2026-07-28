@@ -354,3 +354,54 @@ CREATE TABLE DETALLE_MOVIMIENTO(
     FOREIGN KEY (cod_movimientos) REFERENCES MOVIMIENTOS(codigo),
     FOREIGN KEY (cod_producto) REFERENCES PRODUCTO(codigo)
 );
+
+ALTER TABLE ruta_visita ADD COLUMN dia VARCHAR(10) NOT NULL DEFAULT 'Lunes';
+
+UPDATE ruta_visita SET dia = 'Lunes' WHERE numero IN (1, 2);
+UPDATE ruta_visita SET dia = 'Martes' WHERE numero IN (3, 4);
+UPDATE ruta_visita SET dia = 'Miércoles' WHERE numero IN (5, 6);
+UPDATE ruta_visita SET dia = 'Jueves' WHERE numero IN (7, 8);
+UPDATE ruta_visita SET dia = 'Viernes' WHERE numero IN (9, 10);
+
+CREATE TABLE ruta_entrega_orden (
+    ruta_entrega INT NOT NULL,
+    establecimiento INT NOT NULL,
+    orden INT NOT NULL,
+    PRIMARY KEY (ruta_entrega, establecimiento),
+    FOREIGN KEY (ruta_entrega) REFERENCES ruta_entrega(numero),
+    FOREIGN KEY (establecimiento) REFERENCES establecimiento(numero)
+);
+
+ALTER TABLE zona ADD COLUMN lat_min DECIMAL(10,6);
+ALTER TABLE zona ADD COLUMN lat_max DECIMAL(10,6);
+ALTER TABLE zona ADD COLUMN lon_min DECIMAL(10,6);
+ALTER TABLE zona ADD COLUMN lon_max DECIMAL(10,6);
+
+UPDATE zona SET lat_min=32.50, lat_max=32.62, lon_min=-117.15, lon_max=-117.05 WHERE num=1; -- Noroeste
+UPDATE zona SET lat_min=32.50, lat_max=32.62, lon_min=-117.05, lon_max=-116.98 WHERE num=2; -- Norte 1
+UPDATE zona SET lat_min=32.50, lat_max=32.62, lon_min=-116.98, lon_max=-116.88 WHERE num=3; -- Norte 2
+UPDATE zona SET lat_min=32.45, lat_max=32.50, lon_min=-117.15, lon_max=-117.05 WHERE num=4; -- Poniente
+UPDATE zona SET lat_min=32.45, lat_max=32.50, lon_min=-117.05, lon_max=-116.98 WHERE num=5; -- Centro
+UPDATE zona SET lat_min=32.45, lat_max=32.50, lon_min=-116.98, lon_max=-116.88 WHERE num=6; -- Oriente 1
+UPDATE zona SET lat_min=32.40, lat_max=32.45, lon_min=-116.98, lon_max=-116.88 WHERE num=7; -- Oriente 2
+UPDATE zona SET lat_min=32.40, lat_max=32.45, lon_min=-117.15, lon_max=-117.05 WHERE num=8; -- Sureste 1
+UPDATE zona SET lat_min=32.40, lat_max=32.45, lon_min=-117.05, lon_max=-116.98 WHERE num=9; -- Sureste 2
+UPDATE zona SET lat_min=32.38, lat_max=32.40, lon_min=-117.15, lon_max=-116.88 WHERE num=10; -- Sur
+
+INSERT INTO zona (num, nombre, descripcion, empleado, lat_min, lat_max, lon_min, lon_max) VALUES
+(11, 'Norte 2B', 'Zona que cubre el área norte oriente de Tijuana', 2, 32.508, 32.560, -116.870, -116.820),
+(12, 'Oriente 1B', 'Zona que cubre el área oriente de Tijuana lado sur', 2, 32.470, 32.508, -116.870, -116.820),
+(13, 'Oriente 2B', 'Zona que cubre el área oriente de Tijuana parte baja', 2, 32.430, 32.470, -116.870, -116.820);
+
+
+SELECT num, nombre, lat_min, lat_max, lon_min, lon_max FROM zona WHERE num IN (7, 10, 12, 13);
+SELECT num, nombre, lon_min, lon_max FROM zona WHERE num IN (3,6,7,11,12,13);
+
+CREATE TABLE ruta_visita_orden (
+    ruta_visita INT NOT NULL,
+    establecimiento INT NOT NULL,
+    orden INT NOT NULL,
+    PRIMARY KEY (ruta_visita, establecimiento),
+    FOREIGN KEY (ruta_visita) REFERENCES ruta_visita(numero),
+    FOREIGN KEY (establecimiento) REFERENCES establecimiento(numero)
+);

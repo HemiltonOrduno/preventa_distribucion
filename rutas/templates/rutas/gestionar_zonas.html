@@ -1,0 +1,462 @@
+{% extends 'rutas/base_coordinador.html' %}
+
+{% block title %}Gestionar Zonas{% endblock %}
+{% block nav_zonas %}active{% endblock %}
+{% block page_icon %}📍{% endblock %}
+{% block page_title %}Gestionar Zonas{% endblock %}
+
+{% block extra_styles %}
+#layout {
+    display: flex;
+    gap: 16px;
+    height: calc(100vh - 60px);
+    overflow: hidden;
+}
+
+#panel-zonas {
+    width: 280px;
+    overflow-y: auto;
+    flex-shrink: 0;
+}
+
+#mapa-zonas {
+    flex: 1;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #dee2e6;
+    min-width: 0;
+}
+
+#panel-establecimientos {
+    width: 260px;
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+#panel-est-header {
+    background: #1a237e;
+    color: white;
+    padding: 12px 15px;
+    font-size: 13px;
+    font-weight: bold;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#panel-est-header button {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 18px;
+    cursor: pointer;
+    line-height: 1;
+}
+
+#panel-est-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+}
+
+.est-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    margin-bottom: 6px;
+    border: 1px solid #dee2e6;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 12px;
+}
+
+.est-item:hover { border-color: #1a237e; background: #f0f4ff; }
+.est-icono { font-size: 16px; flex-shrink: 0; }
+.est-nombre { font-weight: bold; color: #333; }
+.est-colonia { font-size: 11px; color: #888; margin-top: 1px; }
+
+.zona-card {
+    background: white;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 10px;
+    border: 2px solid #dee2e6;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.zona-card:hover { border-color: #1a237e; }
+.zona-card.activa { border-color: #1a237e; background: #f0f4ff; }
+
+.zona-nombre {
+    font-weight: bold;
+    font-size: 13px;
+    color: #1a237e;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.zona-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+.zona-info { font-size: 11px; color: #888; margin-bottom: 8px; }
+
+.zona-coords {
+    font-size: 11px;
+    color: #555;
+    background: #f8f9fa;
+    border-radius: 4px;
+    padding: 6px 8px;
+    margin-bottom: 8px;
+    display: none;
+}
+
+.zona-card.activa .zona-coords { display: block; }
+
+.coord-row { display: flex; gap: 6px; margin-bottom: 4px; }
+
+.coord-input { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.coord-input label { font-size: 10px; color: #888; }
+.coord-input input {
+    padding: 4px 6px;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    font-size: 11px;
+    width: 100%;
+}
+
+.zona-botones {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.btn-guardar-zona {
+    flex: 1;
+    padding: 7px;
+    background: #1a237e;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.btn-guardar-zona:hover { background: #283593; }
+
+.btn-ver-est {
+    flex: 1;
+    padding: 7px;
+    background: #e3f2fd;
+    color: #1565c0;
+    border: 1px solid #1565c0;
+    border-radius: 6px;
+    font-size: 11px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.btn-ver-est:hover { background: #1565c0; color: white; }
+
+.toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: #2e7d32;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    display: none;
+    z-index: 3000;
+}
+{% endblock %}
+
+{% block content %}
+<div id="layout">
+    <div id="panel-zonas">
+        <p style="font-size:12px;color:#888;margin-bottom:12px;">
+            Selecciona una zona para ver sus límites y establecimientos.
+        </p>
+        <div id="lista-zonas">Cargando zonas...</div>
+    </div>
+
+    <div id="mapa-zonas"></div>
+
+    <div id="panel-establecimientos">
+        <div id="panel-est-header">
+            <span id="panel-est-titulo">Establecimientos</span>
+            <button onclick="cerrarPanelEst()">×</button>
+        </div>
+        <div id="panel-est-body"></div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const COLORES = [
+    '#e53935','#8e24aa','#1e88e5','#00897b',
+    '#43a047','#fb8c00','#6d4c41','#546e7a',
+    '#d81b60','#3949ab','#00acc1','#7cb342','#f4511e'
+];
+
+let mapa = null;
+let zonas = [];
+let establecimientos = [];
+let capasZonas = {};
+let marcadoresEst = {};
+let zonaSeleccionada = null;
+
+window.addEventListener('load', () => {
+    inicializarMapa();
+    cargarDatos();
+});
+
+function inicializarMapa() {
+    mapa = L.map('mapa-zonas', {
+        center: [32.505, -117.010],
+        zoom: 12
+    });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(mapa);
+}
+
+function cargarDatos() {
+    Promise.all([
+        fetch('/api/rutas/zonas/').then(r => r.json()),
+        fetch('/api/rutas/establecimientos/').then(r => r.json())
+    ]).then(([zonasData, estData]) => {
+        zonas = zonasData.zonas;
+        establecimientos = estData.establecimientos;
+        renderizarZonas();
+        dibujarZonasEnMapa();
+    });
+}
+
+function renderizarZonas() {
+    const lista = document.getElementById('lista-zonas');
+    lista.innerHTML = '';
+
+    zonas.forEach((z, idx) => {
+        const color = COLORES[idx % COLORES.length];
+        const div = document.createElement('div');
+        div.className = 'zona-card';
+        div.id = `zona-card-${z.id}`;
+        div.onclick = (e) => {
+            if (!e.target.closest('input') && !e.target.closest('button')) {
+                seleccionarZona(z.id);
+            }
+        };
+
+        div.innerHTML = `
+            <div class="zona-nombre">
+                <div class="zona-color" style="background:${color};"></div>
+                ${z.nombre}
+            </div>
+            <div class="zona-info">${z.total_establecimientos} establecimiento${z.total_establecimientos !== 1 ? 's' : ''}</div>
+            <div class="zona-coords">
+                <div class="coord-row">
+                    <div class="coord-input">
+                        <label>Lat mín</label>
+                        <input type="number" step="0.000001" id="lat_min_${z.id}" value="${z.lat_min || ''}" placeholder="32.38">
+                    </div>
+                    <div class="coord-input">
+                        <label>Lat máx</label>
+                        <input type="number" step="0.000001" id="lat_max_${z.id}" value="${z.lat_max || ''}" placeholder="32.56">
+                    </div>
+                </div>
+                <div class="coord-row">
+                    <div class="coord-input">
+                        <label>Lon mín</label>
+                        <input type="number" step="0.000001" id="lon_min_${z.id}" value="${z.lon_min || ''}" placeholder="-117.13">
+                    </div>
+                    <div class="coord-input">
+                        <label>Lon máx</label>
+                        <input type="number" step="0.000001" id="lon_max_${z.id}" value="${z.lon_max || ''}" placeholder="-116.82">
+                    </div>
+                </div>
+                <div class="zona-botones">
+                    <button class="btn-ver-est" onclick="verEstablecimientos(${z.id}, '${z.nombre}', event)">
+                        🏪 Ver establecimientos
+                    </button>
+                    <button class="btn-guardar-zona" onclick="guardarZona(${z.id}, event)">
+                        💾 Guardar
+                    </button>
+                </div>
+            </div>
+        `;
+        lista.appendChild(div);
+    });
+}
+
+function dibujarZonasEnMapa() {
+    Object.values(capasZonas).forEach(c => mapa.removeLayer(c));
+    capasZonas = {};
+
+    zonas.forEach((z, idx) => {
+        if (!z.lat_min || !z.lat_max || !z.lon_min || !z.lon_max) return;
+
+        const color = COLORES[idx % COLORES.length];
+        const bounds = [[z.lat_min, z.lon_min], [z.lat_max, z.lon_max]];
+
+        const rect = L.rectangle(bounds, {
+            color: color,
+            weight: 2,
+            fillColor: color,
+            fillOpacity: 0.15
+        }).addTo(mapa)
+        .bindTooltip(`<b>${z.nombre}</b><br>${z.total_establecimientos} establecimientos`, {
+            permanent: false,
+            direction: 'center'
+        })
+        .on('click', () => seleccionarZona(z.id));
+
+        capasZonas[z.id] = rect;
+    });
+}
+
+function seleccionarZona(zonaId) {
+    if (zonaSeleccionada) {
+        document.getElementById(`zona-card-${zonaSeleccionada}`)?.classList.remove('activa');
+        if (capasZonas[zonaSeleccionada]) {
+            capasZonas[zonaSeleccionada].setStyle({ fillOpacity: 0.15, weight: 2 });
+        }
+    }
+
+    zonaSeleccionada = zonaId;
+    document.getElementById(`zona-card-${zonaId}`)?.classList.add('activa');
+    document.getElementById(`zona-card-${zonaId}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    if (capasZonas[zonaId]) {
+        capasZonas[zonaId].setStyle({ fillOpacity: 0.35, weight: 3 });
+        mapa.fitBounds(capasZonas[zonaId].getBounds(), { padding: [40, 40] });
+    }
+}
+
+function verEstablecimientos(zonaId, zonaNombre, event) {
+    event.stopPropagation();
+
+    // Limpiar marcadores anteriores
+    Object.values(marcadoresEst).forEach(m => mapa.removeLayer(m));
+    marcadoresEst = {};
+
+    const estsZona = establecimientos.filter(e => e.zona_id === zonaId);
+
+    // Mostrar panel derecho
+    const panel = document.getElementById('panel-establecimientos');
+    panel.style.display = 'flex';
+    document.getElementById('panel-est-titulo').innerText = `${zonaNombre} (${estsZona.length})`;
+
+    const body = document.getElementById('panel-est-body');
+    body.innerHTML = '';
+
+    if (estsZona.length === 0) {
+        body.innerHTML = '<p style="text-align:center;color:#888;padding:20px;font-size:12px;">No hay establecimientos en esta zona</p>';
+        return;
+    }
+
+    estsZona.forEach(e => {
+        // Marcador en mapa
+        if (e.latitud && e.longitud) {
+            const icono = L.divIcon({
+                className: '',
+                html: `<div style="font-size:22px;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.4));">🏪</div>`,
+                iconAnchor: [11, 22]
+            });
+            const m = L.marker([e.latitud, e.longitud], { icon: icono })
+                .addTo(mapa)
+                .bindPopup(`<b>${e.nombre}</b><br>${e.colonia}<br>Tel: ${e.telefono}`);
+            marcadoresEst[e.id] = m;
+        }
+
+        // Item en lista
+        const div = document.createElement('div');
+        div.className = 'est-item';
+        div.innerHTML = `
+            <div class="est-icono">🏪</div>
+            <div>
+                <div class="est-nombre">${e.nombre}</div>
+                <div class="est-colonia">${e.colonia} · ${e.telefono}</div>
+            </div>
+        `;
+        div.onclick = () => {
+            if (e.latitud && e.longitud) {
+                mapa.setView([e.latitud, e.longitud], 17);
+                marcadoresEst[e.id]?.openPopup();
+            }
+        };
+        body.appendChild(div);
+    });
+
+    // Forzar resize del mapa
+    setTimeout(() => mapa.invalidateSize(), 100);
+}
+
+function cerrarPanelEst() {
+    document.getElementById('panel-establecimientos').style.display = 'none';
+    Object.values(marcadoresEst).forEach(m => mapa.removeLayer(m));
+    marcadoresEst = {};
+    setTimeout(() => mapa.invalidateSize(), 100);
+}
+
+function guardarZona(zonaId, event) {
+    event.stopPropagation();
+
+    const lat_min = parseFloat(document.getElementById(`lat_min_${zonaId}`).value);
+    const lat_max = parseFloat(document.getElementById(`lat_max_${zonaId}`).value);
+    const lon_min = parseFloat(document.getElementById(`lon_min_${zonaId}`).value);
+    const lon_max = parseFloat(document.getElementById(`lon_max_${zonaId}`).value);
+
+    if (isNaN(lat_min) || isNaN(lat_max) || isNaN(lon_min) || isNaN(lon_max)) {
+        alert('Por favor ingresa coordenadas válidas');
+        return;
+    }
+
+    fetch(`/api/rutas/zonas/${zonaId}/actualizar/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lat_min, lat_max, lon_min, lon_max })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.error) { alert('Error: ' + data.error); return; }
+        const zona = zonas.find(z => z.id === zonaId);
+        if (zona) {
+            zona.lat_min = lat_min;
+            zona.lat_max = lat_max;
+            zona.lon_min = lon_min;
+            zona.lon_max = lon_max;
+        }
+        dibujarZonasEnMapa();
+        seleccionarZona(zonaId);
+        mostrarToast('✓ Zona actualizada correctamente');
+    })
+    .catch(() => alert('Error de conexión'));
+}
+
+function mostrarToast(msg) {
+    const toast = document.getElementById('toast');
+    toast.innerText = msg;
+    toast.style.display = 'block';
+    setTimeout(() => toast.style.display = 'none', 3000);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,38 @@
+{% extends 'establecimientos/base_vendedor.html' %}
+{% load static %}
+
+{% block title %}Visita en proceso{% endblock %}
+{% block nav_ruta_d %}active{% endblock %}
+{% block nav_ruta_m %}active{% endblock %}
+
+{% block content %}
+
+<div class="page__eyebrow">
+    <i class='bx bx-map-pin'></i> VISITA EN PROCESO
+</div>
+
+<!-- Este bloque se llenará con los datos reales del establecimiento
+     y el estado de la visita (RF08, RF09, RF10) -->
+<div class="card">
+    <div class="card__row">
+        <i class='bx bx-store'></i>
+        <span class="card__title">Abarrotes Lupita</span>
+    </div>
+    <span class="badge badge--success">En proceso</span>
+</div>
+
+<button class="btn btn--primary" onclick="irALevantarPedido()">
+    Levantar pedido
+    <i class='bx bx-cart-add'></i>
+</button>
+
+<button class="btn btn--danger" onclick="irAVisitaSinPedido()">
+    Establecimiento cerrado
+    <i class='bx bx-x-circle'></i>
+</button>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'visitas/js/visita.js' %}"></script>
+{% endblock %}

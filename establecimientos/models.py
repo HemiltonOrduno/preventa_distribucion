@@ -3,6 +3,11 @@ from django.db import models
 class Zona(models.Model):
     nombre = models.CharField(max_length=100)
     descripcion = models.CharField(max_length=200)
+    empleado = models.ForeignKey('usuarios.Empleado', on_delete=models.PROTECT, null=True, blank=True)
+    lat_min = models.DecimalField(max_digits=10, decimal_places=6, null=True, blank=True)
+    lat_max = models.DecimalField(max_digits=10, decimal_places=6, null=True, blank=True)
+    lon_min = models.DecimalField(max_digits=10, decimal_places=6, null=True, blank=True)
+    lon_max = models.DecimalField(max_digits=10, decimal_places=6, null=True, blank=True)
 
     class Meta:
         db_table = 'zona'

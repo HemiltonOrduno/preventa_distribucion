@@ -1,0 +1,70 @@
+{% extends 'establecimientos/base_vendedor.html' %}
+{% load static %}
+
+{% block title %}Nuevo establecimiento{% endblock %}
+{% block nav_clientes_d %}active{% endblock %}
+{% block nav_clientes_m %}active{% endblock %}
+
+{% block content %}
+
+<div class="page__eyebrow">
+    <i class='bx bx-store-alt'></i> NUEVO ESTABLECIMIENTO
+</div>
+
+<form id="formEstablecimiento" onsubmit="return guardarEstablecimiento(event)">
+
+    <div class="form__div">
+        <div class="form__icon"><i class='bx bx-store'></i></div>
+        <div class="form__div-input">
+            <label class="form__label">Nombre del establecimiento</label>
+            <input type="text" id="nombre" class="form__input" required>
+        </div>
+    </div>
+
+    <div class="form__div">
+        <div class="form__icon"><i class='bx bx-map'></i></div>
+        <div class="form__div-input">
+            <label class="form__label">Calle</label>
+            <input type="text" id="calle" class="form__input" required>
+        </div>
+    </div>
+
+    <div class="form__div">
+        <div class="form__icon"><i class='bx bx-hash'></i></div>
+        <div class="form__div-input">
+            <label class="form__label">Número</label>
+            <input type="text" id="numero" class="form__input" required>
+        </div>
+    </div>
+
+    <div class="form__div">
+        <div class="form__icon"><i class='bx bx-map-pin'></i></div>
+        <div class="form__div-input">
+            <label class="form__label">Colonia</label>
+            <input type="text" id="colonia" class="form__input" required>
+        </div>
+    </div>
+
+    <!-- RF03: la zona y el estado "Activo" los asigna el sistema
+         automáticamente, no se capturan aquí -->
+    <div class="card" style="background: var(--color-info-bg); box-shadow:none; border:none;">
+        <div class="card__row" style="margin-bottom:0;">
+            <i class='bx bx-info-circle' style="color: var(--color-info-text);"></i>
+            <span style="font-size:12px; color: var(--color-info-text);">
+                La zona y el estado se asignan automáticamente según la ubicación
+            </span>
+        </div>
+    </div>
+
+    <button type="submit" class="btn btn--primary">
+        Guardar establecimiento
+        <i class='bx bx-check'></i>
+    </button>
+
+</form>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'establecimientos/js/registro_establecimiento.js' %}"></script>
+{% endblock %}
