@@ -1,6 +1,7 @@
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.db import connection, transaction
+from django.shortcuts import render  
 import json
 
 
@@ -20,7 +21,7 @@ def vehiculos_disponibles(request):
             FROM vehiculo v
             INNER JOIN modelo m ON m.numero = v.modelo
             INNER JOIN edo_vehiculo ev ON ev.codigo = v.edo_vehiculo
-            WHERE v.edo_vehiculo = 'EV001'
+            WHERE v.edo_vehiculo = 'EV001' AND m.capacidad > 0
         """)
         columns = [col[0] for col in cursor.description]
         vehiculos = [dict(zip(columns, row)) for row in cursor.fetchall()]
@@ -46,7 +47,7 @@ def pedidos_validados_por_zona(request):
                 z.nombre AS zona_nombre,
                 e.nombre AS establecimiento_nombre,
                 COALESCE((
-                    SELECT SUM(dp.cantidad * pr.peso)
+                    SELECT SUM(dp.cantidad * pr.peso) / 1000
                     FROM detalle_pedido dp
                     INNER JOIN producto pr ON pr.codigo = dp.cod_producto
                     WHERE dp.num_pedido = p.num
@@ -58,6 +59,19 @@ def pedidos_validados_por_zona(request):
             WHERE p.edo_pedido = 'EPD003'
             ORDER BY z.nombre, p.num
         """)
+        cursor.execute("""
+            SELECT
+                v.numero AS vehiculo_id,
+                v.placas,
+                m.nombre AS modelo_nombre,
+                m.capacidad,
+                ev.nombre AS estado
+            FROM vehiculo v
+            INNER JOIN modelo m ON m.numero = v.modelo
+            INNER JOIN edo_vehiculo ev ON ev.codigo = v.edo_vehiculo
+            WHERE v.edo_vehiculo = 'EV001' AND m.capacidad > 0
+        """)
+        
         columns = [col[0] for col in cursor.description]
         pedidos = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
@@ -127,3 +141,6 @@ def crear_entrega(request):
         "vehiculo": vehiculo_id,
         "pedidos_incluidos": pedidos_ids
     }, status=201, json_dumps_params={'ensure_ascii': False})
+
+def almacenista_cargar_camion_view(request):
+    return render(request, 'entregas/cargar_camion.html')

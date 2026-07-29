@@ -2,7 +2,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.db import connection, transaction
 import json
-
+from django.shortcuts import render  # agrégalo al import existente
 
 TIPOS_SALIDA = ('TM002', 'TM003')  # Salida por pedido, Salida por merma
 
@@ -87,3 +87,6 @@ def consultar_stock(request, cod_producto):
     return JsonResponse({
         "producto": row[0], "nombre": row[1], "stock": row[2]
     }, json_dumps_params={'ensure_ascii': False})
+
+def almacenista_movimientos_view(request):
+    return render(request, 'inventario/movimientos.html')

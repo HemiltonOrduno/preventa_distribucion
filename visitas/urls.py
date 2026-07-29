@@ -1,4 +1,5 @@
 from django.urls import path
+
 from .views import (
     ruta_del_dia_view,
     visita_view,
@@ -8,6 +9,8 @@ from .views import (
     pedido_detalle,
     ajustar_cantidad_pedido,
     cancelar_producto_pedido,
+    almacenista_pedidos_view  # agrégalo al import existente
+
 )
 
 urlpatterns = [
@@ -19,4 +22,6 @@ urlpatterns = [
     path('pedidos/<int:pedido_id>/detalle/', pedido_detalle, name='pedido_detalle'),
     path('pedidos/<int:pedido_id>/detalle/<str:cod_producto>/ajustar/', ajustar_cantidad_pedido, name='ajustar_cantidad_pedido'),
     path('pedidos/<int:pedido_id>/detalle/<str:cod_producto>/cancelar/', cancelar_producto_pedido, name='cancelar_producto_pedido'),
+    path('almacenista/pedidos/', almacenista_pedidos_view, name='almacenista_pedidos'),
+
 ]

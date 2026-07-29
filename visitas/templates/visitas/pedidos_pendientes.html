@@ -1,0 +1,125 @@
+{% extends "almacenista/base_almacenista.html" %}
+
+{% block title %}Pedidos Pendientes{% endblock %}
+{% block nav_pedidos %}active{% endblock %}
+{% block page_icon %}📋{% endblock %}
+{% block page_title %}Pedidos Pendientes de Validación{% endblock %}
+
+{% block content %}
+<div id="lista-pedidos">Cargando pedidos...</div>
+
+<div id="modal-detalle" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); z-index:200; align-items:center; justify-content:center;">
+    <div style="background:white; border-radius:10px; padding:24px; width:500px; max-height:80vh; overflow-y:auto;">
+        <div id="detalle-contenido">Cargando...</div>
+        <div style="margin-top:16px; text-align:right;">
+            <button class="btn btn-secondary" onclick="cerrarModal()">Cerrar</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    async function cargarPedidos() {
+        const cont = document.getElementById('lista-pedidos');
+        try {
+            const res = await fetch('/api/visitas/pedidos-pendientes/');
+            const data = await res.json();
+
+            if (data.pedidos.length === 0) {
+                cont.innerHTML = '<div class="card">No hay pedidos pendientes de validación por ahora.</div>';
+                return;
+            }
+
+            cont.innerHTML = data.pedidos.map(p => `
+                <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <strong>Pedido #${p.pedido_id}</strong> — ${p.establecimiento_nombre}
+                        <div style="font-size:12px; color:#666;">Zona: ${p.zona_nombre} · Total: $${p.total.toFixed(2)}</div>
+                    </div>
+                    <button class="btn btn-primary" onclick="verDetalle(${p.pedido_id})">Validar</button>
+                </div>
+            `).join('');
+        } catch (e) {
+            cont.innerHTML = '<div class="card">No se pudo cargar la lista. Revisa que el servidor esté corriendo.</div>';
+        }
+    }
+
+    async function verDetalle(pedidoId) {
+        const modal = document.getElementById('modal-detalle');
+        const cont = document.getElementById('detalle-contenido');
+        modal.style.display = 'flex';
+        cont.innerHTML = 'Cargando...';
+
+        const res = await fetch(`/api/visitas/pedidos/${pedidoId}/detalle/`);
+        const p = await res.json();
+
+        cont.innerHTML = `
+            <h3>Pedido #${p.pedido_id} — ${p.establecimiento_nombre}</h3>
+            <p style="font-size:12px; color:#666;">Estado: ${p.estado}</p>
+            <table style="width:100%; margin-top:12px; font-size:13px; border-collapse:collapse;">
+                <tr style="text-align:left; border-bottom:1px solid #ddd;">
+                    <th>Producto</th><th>Cant.</th><th>Stock</th><th>Importe</th><th></th>
+                </tr>
+                ${p.detalle.map(d => `
+                    <tr style="border-bottom:1px solid #eee;">
+                        <td>${d.producto_nombre}</td>
+                        <td>
+                            <input type="number" id="cant-${d.cod_producto}" value="${d.cantidad}" min="1"
+                                   style="width:60px; padding:4px;">
+                        </td>
+                        <td>${d.stock_disponible}</td>
+                        <td>$${d.importe.toFixed(2)}</td>
+                        <td>
+                            <button class="btn btn-primary" style="padding:4px 8px; font-size:11px;"
+                                onclick="ajustarCantidad(${p.pedido_id}, '${d.cod_producto}')">Ajustar</button>
+                            <button class="btn btn-danger" style="padding:4px 8px; font-size:11px;"
+                                onclick="cancelarProducto(${p.pedido_id}, '${d.cod_producto}')">Cancelar</button>
+                        </td>
+                    </tr>
+                `).join('')}
+            </table>
+            <p style="margin-top:12px; font-weight:bold;">Total: $${p.total.toFixed(2)}</p>
+        `;
+    }
+
+    async function ajustarCantidad(pedidoId, codProducto) {
+        const nuevaCantidad = document.getElementById(`cant-${codProducto}`).value;
+        const res = await fetch(`/api/visitas/pedidos/${pedidoId}/detalle/${codProducto}/ajustar/`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cantidad: parseInt(nuevaCantidad) })
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+            mostrarToast(data.mensaje, 'success');
+            verDetalle(pedidoId);
+        } else {
+            mostrarToast(data.error, 'error');
+        }
+    }
+
+    async function cancelarProducto(pedidoId, codProducto) {
+        if (!confirm('¿Cancelar este producto del pedido?')) return;
+        const res = await fetch(`/api/visitas/pedidos/${pedidoId}/detalle/${codProducto}/cancelar/`, {
+            method: 'DELETE'
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+            mostrarToast(data.mensaje, 'success');
+            verDetalle(pedidoId);
+        } else {
+            mostrarToast(data.error, 'error');
+        }
+    }
+
+    function cerrarModal() {
+        document.getElementById('modal-detalle').style.display = 'none';
+        cargarPedidos();
+    }
+
+    cargarPedidos();
+</script>
+{% endblock %}

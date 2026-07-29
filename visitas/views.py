@@ -190,3 +190,6 @@ def cancelar_producto_pedido(request, pedido_id, cod_producto):
         "pedido_id": pedido_id,
         "cod_producto": cod_producto
     }, json_dumps_params={'ensure_ascii': False})
+
+def almacenista_pedidos_view(request):
+    return render(request, 'visitas/pedidos_pendientes.html')
