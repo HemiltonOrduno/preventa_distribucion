@@ -217,7 +217,7 @@ class Pedido(models.Model):
     )
     entrega = models.ForeignKey(
         Entrega, models.DO_NOTHING, db_column='entrega',
-        related_name='+', blank=True, null=True,
+        related_name='pedidos', blank=True, null=True,
     )
     edo_pedido = models.ForeignKey(
         EdoPedido, models.DO_NOTHING, db_column='edo_pedido', related_name='+',
@@ -281,7 +281,7 @@ class RutaEntrega(models.Model):
     )
     entrega = models.ForeignKey(
         Entrega, models.DO_NOTHING, db_column='entrega',
-        related_name='+', blank=True, null=True,
+        related_name='rutas', blank=True, null=True,
     )
     edo_ruta_entrega_id = models.CharField(
         db_column='edo_ruta_entrega', max_length=10, blank=True, null=True,
@@ -315,7 +315,7 @@ class Pago(models.Model):
         db_column='establecimiento', related_name='+',
     )
     pedido = models.ForeignKey(
-        Pedido, models.DO_NOTHING, db_column='pedido', related_name='+',
+        Pedido, models.DO_NOTHING, db_column='pedido', related_name='pagos',
     )
 
     class Meta:
@@ -334,7 +334,7 @@ class Devolucion(models.Model):
     descripcion = models.CharField(max_length=255, blank=True, null=True)
     entrega = models.ForeignKey(
         Entrega, models.DO_NOTHING, db_column='entrega',
-        related_name='+', blank=True, null=True,
+        related_name='devoluciones', blank=True, null=True,
     )
 
     class Meta:
@@ -427,3 +427,6 @@ class VistaReporteVentasAdmin(models.Model):
     class Meta:
         managed = False
         db_table = 'vta_reporte_ventas_admin'
+
+
+        

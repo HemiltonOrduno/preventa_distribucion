@@ -23,6 +23,18 @@ urlpatterns = [
         views.PedidoDetalleAPIView.as_view(),
         name='api-pedido-detalle',
     ),
+    # GET /api/reportes/entregas/
+    path(
+        'entregas/',
+        views.HistorialEntregasAPIView.as_view(),
+        name='api-historial-entregas',
+    ),
+    # GET /api/reportes/entregas/7/
+    path(
+        'entregas/<int:numero>/',
+        views.EntregaDetalleAPIView.as_view(),
+        name='api-entrega-detalle',
+    ),
     # GET /api/reportes/catalogos/
     path(
         'catalogos/',

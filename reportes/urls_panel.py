@@ -20,5 +20,10 @@ urlpatterns = [
         views.HistorialPedidosPantalla.as_view(),
         name='historial-pedidos',
     ),
+    # GET /panel/entregas/
+    path(
+        'entregas/',
+        views.HistorialEntregasPantalla.as_view(),
+        name='historial-entregas',
+    ),
 ]
-

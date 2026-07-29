@@ -1,0 +1,390 @@
+{% load static %}<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block titulo %}Panel del Administrador{% endblock %} | Sabritas Tijuana</title>
+<style>
+:root{
+  --primario:#2A2640;
+  --primario-claro:#3A3556;
+  --exito:#10B981;
+  --alerta:#F78A00;
+  --peligro:#991B1B;
+  --fondo:#F4F5F7;
+  --superficie:#FFFFFF;
+  --borde:#E3E5EA;
+  --texto:#1F2430;
+  --texto-tenue:#5C6377;
+  --radio:10px;
+  --sombra:0 1px 3px rgba(42,38,64,.08), 0 1px 2px rgba(42,38,64,.06);
+  --ancho-menu:246px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;
+  background:var(--fondo);color:var(--texto);
+  font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;
+}
+
+/* ---------- Menu lateral ---------- */
+.menu{
+  position:fixed;inset:0 auto 0 0;width:var(--ancho-menu);
+  background:var(--primario);color:#fff;display:flex;flex-direction:column;
+  z-index:40;overflow-y:auto;
+}
+.menu-marca{padding:20px 18px 16px;border-bottom:1px solid rgba(255,255,255,.1)}
+.menu-marca strong{display:block;font-size:16px;letter-spacing:.2px}
+.menu-marca span{font-size:12.5px;color:rgba(255,255,255,.62)}
+.menu-grupo{padding:16px 18px 6px;font-size:11px;letter-spacing:.9px;
+  text-transform:uppercase;color:rgba(255,255,255,.45)}
+.menu a{
+  display:flex;align-items:center;gap:10px;min-height:44px;padding:9px 18px;
+  color:rgba(255,255,255,.82);text-decoration:none;font-size:14px;
+  border-left:3px solid transparent;transition:background .15s,color .15s;
+}
+.menu a:hover{background:var(--primario-claro);color:#fff}
+.menu a.activo{background:var(--primario-claro);color:#fff;
+  border-left-color:var(--alerta);font-weight:600}
+.menu a.pendiente{opacity:.45;cursor:not-allowed}
+.menu a:focus-visible{outline:2px solid var(--alerta);outline-offset:-2px}
+.icono{width:18px;text-align:center;flex-shrink:0}
+
+/* ---------- Estructura ---------- */
+.lienzo{margin-left:var(--ancho-menu);min-height:100vh;display:flex;flex-direction:column}
+.barra-superior{
+  background:var(--superficie);border-bottom:1px solid var(--borde);
+  padding:14px 26px;display:flex;justify-content:space-between;
+  align-items:center;gap:16px;flex-wrap:wrap;position:sticky;top:0;z-index:20;
+}
+.barra-superior h1{font-size:19px;font-weight:650}
+.barra-superior p{font-size:12.5px;color:var(--texto-tenue)}
+.identidad{display:flex;align-items:center;gap:10px}
+.avatar{width:34px;height:34px;border-radius:50%;background:var(--primario);
+  color:#fff;display:grid;place-items:center;font-size:13px;font-weight:600}
+.identidad small{display:block;color:var(--texto-tenue);font-size:12px}
+.contenido{padding:22px 26px 40px;flex:1}
+
+/* ---------- Filtros ---------- */
+.panel{background:var(--superficie);border:1px solid var(--borde);
+  border-radius:var(--radio);box-shadow:var(--sombra)}
+.filtros{padding:18px 20px;margin-bottom:20px}
+.filtros-titulo{font-size:13px;font-weight:650;text-transform:uppercase;
+  letter-spacing:.6px;color:var(--texto-tenue);margin-bottom:14px}
+.rejilla{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(178px,1fr))}
+.campo{display:flex;flex-direction:column;gap:5px}
+.campo label{font-size:12.5px;font-weight:600;color:var(--texto-tenue)}
+.campo input,.campo select{
+  min-height:44px;padding:9px 11px;border:1px solid var(--borde);
+  border-radius:8px;font-size:14.5px;font-family:inherit;color:var(--texto);
+  background:var(--superficie);
+}
+.campo input:focus,.campo select:focus{outline:2px solid var(--primario);
+  outline-offset:-1px;border-color:var(--primario)}
+.acciones{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+.boton{
+  min-height:44px;padding:10px 20px;border:1px solid transparent;
+  border-radius:8px;font-size:14.5px;font-weight:600;font-family:inherit;
+  cursor:pointer;transition:filter .15s,background .15s;
+}
+.boton:focus-visible{outline:2px solid var(--primario);outline-offset:2px}
+.boton-principal{background:var(--primario);color:#fff}
+.boton-principal:hover{filter:brightness(1.22)}
+.boton-neutro{background:var(--superficie);color:var(--texto);border-color:var(--borde)}
+.boton-neutro:hover{background:var(--fondo)}
+.boton:disabled{opacity:.5;cursor:not-allowed}
+
+/* ---------- Tarjetas KPI ---------- */
+.indicadores{display:grid;gap:16px;margin-bottom:20px;
+  grid-template-columns:repeat(auto-fit,minmax(212px,1fr))}
+.indicador{padding:16px 18px;border-left:4px solid var(--primario);
+  background:var(--superficie);border-radius:var(--radio);
+  border-top:1px solid var(--borde);border-right:1px solid var(--borde);
+  border-bottom:1px solid var(--borde);box-shadow:var(--sombra)}
+.indicador.verde{border-left-color:var(--exito)}
+.indicador.ambar{border-left-color:var(--alerta)}
+.indicador.rojo{border-left-color:var(--peligro)}
+.indicador span{display:block;font-size:12px;font-weight:600;
+  text-transform:uppercase;letter-spacing:.7px;color:var(--texto-tenue)}
+.indicador strong{display:block;margin-top:6px;font-size:26px;
+  font-weight:680;letter-spacing:-.4px;font-variant-numeric:tabular-nums}
+
+/* ---------- Tabla ---------- */
+.envoltura-tabla{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px;min-width:940px}
+caption{text-align:left;padding:16px 20px 0;font-size:13px;
+  font-weight:650;text-transform:uppercase;letter-spacing:.6px;
+  color:var(--texto-tenue)}
+th{background:var(--primario);color:#fff;text-align:left;padding:12px 14px;
+  font-size:12.5px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;
+  white-space:nowrap;position:sticky;top:0}
+td{padding:12px 14px;border-bottom:1px solid var(--borde);vertical-align:middle}
+tbody tr:nth-child(even){background:#FAFBFC}
+tbody tr:hover{background:#F0F1F5}
+tbody tr[data-clave]{cursor:pointer}
+tbody tr:focus-visible{outline:2px solid var(--primario);outline-offset:-2px}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.folio{font-weight:650;color:var(--primario)}
+
+.etiqueta{display:inline-block;padding:4px 11px;border-radius:999px;
+  font-size:12px;font-weight:650;white-space:nowrap;border:1px solid transparent}
+.etiqueta.verde{background:#E7F8F1;color:#0A6E4C;border-color:#BCEBD9}
+.etiqueta.ambar{background:#FEF2E0;color:#8A4D00;border-color:#F8DDB4}
+.etiqueta.rojo{background:#FBEAEA;color:var(--peligro);border-color:#F0C7C7}
+.etiqueta.gris{background:#EEF0F4;color:#414A5E;border-color:#DCE0E8}
+
+/* ---------- Estados de la vista ---------- */
+.aviso{padding:44px 20px;text-align:center;color:var(--texto-tenue)}
+.aviso strong{display:block;font-size:15.5px;color:var(--texto);margin-bottom:5px}
+.aviso.error{color:var(--peligro)}
+.aviso.error strong{color:var(--peligro)}
+.girando{display:inline-block;width:22px;height:22px;border:3px solid var(--borde);
+  border-top-color:var(--primario);border-radius:50%;animation:giro .8s linear infinite}
+@keyframes giro{to{transform:rotate(360deg)}}
+
+.paginacion{display:flex;justify-content:space-between;align-items:center;
+  gap:14px;padding:14px 20px;border-top:1px solid var(--borde);flex-wrap:wrap}
+.paginacion p{font-size:13px;color:var(--texto-tenue)}
+
+/* ---------- Modal de detalle ---------- */
+.telon{position:fixed;inset:0;background:rgba(31,36,48,.55);display:none;
+  align-items:center;justify-content:center;padding:18px;z-index:60}
+.telon.visible{display:flex}
+.modal{background:var(--superficie);border-radius:12px;width:min(760px,100%);
+  max-height:88vh;overflow-y:auto;box-shadow:0 18px 46px rgba(31,36,48,.28)}
+.modal-encabezado{background:var(--primario);color:#fff;padding:16px 22px;
+  display:flex;justify-content:space-between;align-items:center;gap:14px;
+  position:sticky;top:0}
+.modal-encabezado h2{font-size:16.5px;font-weight:650}
+.modal-encabezado small{color:rgba(255,255,255,.68);font-size:12.5px}
+.cerrar{background:transparent;border:0;color:#fff;font-size:26px;
+  line-height:1;cursor:pointer;min-width:44px;min-height:44px;border-radius:8px}
+.cerrar:hover{background:rgba(255,255,255,.14)}
+.cerrar:focus-visible{outline:2px solid var(--alerta)}
+.modal-cuerpo{padding:20px 22px 24px}
+.ficha{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));
+  margin-bottom:20px}
+.ficha div span{display:block;font-size:11.5px;font-weight:650;
+  text-transform:uppercase;letter-spacing:.6px;color:var(--texto-tenue)}
+.ficha div strong{display:block;margin-top:3px;font-size:14.5px;font-weight:600}
+.modal table{min-width:0}
+.modal th{position:static}
+.subtitulo{font-size:12.5px;font-weight:650;text-transform:uppercase;
+  letter-spacing:.6px;color:var(--texto-tenue);margin:18px 0 8px}
+.totales{margin-top:16px;padding-top:14px;border-top:2px solid var(--borde);
+  display:flex;flex-direction:column;gap:7px;align-items:flex-end}
+.totales div{display:flex;gap:26px;font-size:14px}
+.totales div span{color:var(--texto-tenue)}
+.totales div strong{min-width:106px;text-align:right;
+  font-variant-numeric:tabular-nums}
+.totales .final{font-size:17px;color:var(--primario)}
+
+/* ---------- Adaptable ---------- */
+.abrir-menu{display:none;background:transparent;border:1px solid var(--borde);
+  border-radius:8px;min-width:44px;min-height:44px;font-size:19px;cursor:pointer}
+@media (max-width:980px){
+  .menu{transform:translateX(-100%);transition:transform .22s ease}
+  .menu.desplegado{transform:translateX(0)}
+  .lienzo{margin-left:0}
+  .abrir-menu{display:block}
+  .contenido{padding:18px 15px 34px}
+  .barra-superior{padding:12px 15px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms !important;transition-duration:.01ms !important}
+}
+{% block estilos %}{% endblock %}
+</style>
+</head>
+<body>
+
+<nav class="menu" id="menu" aria-label="Navegación del panel">
+  <div class="menu-marca">
+    <strong>Sabritas Tijuana</strong>
+    <span>Panel del Administrador</span>
+  </div>
+
+  <p class="menu-grupo">Reportes y seguimiento</p>
+  <a href="{% url 'panel_admin:historial-pedidos' %}"
+     class="{% if seccion == 'pedidos' %}activo{% endif %}"
+     {% if seccion == 'pedidos' %}aria-current="page"{% endif %}>
+     <i class="icono">📋</i> Historial de pedidos</a>
+  <a href="{% url 'panel_admin:historial-entregas' %}"
+     class="{% if seccion == 'entregas' %}activo{% endif %}"
+     {% if seccion == 'entregas' %}aria-current="page"{% endif %}>
+     <i class="icono">🚚</i> Historial de entregas</a>
+  <a href="#" class="pendiente"><i class="icono">💵</i> Historial de cobros</a>
+  <a href="#" class="pendiente"><i class="icono">↩️</i> Historial de devoluciones</a>
+  <a href="#" class="pendiente"><i class="icono">📦</i> Movimientos de inventario</a>
+  <a href="#" class="pendiente"><i class="icono">🕐</i> Pedidos activos</a>
+  <a href="#" class="pendiente"><i class="icono">📊</i> Reportes de venta</a>
+
+  <p class="menu-grupo">Gestión de usuarios</p>
+  <a href="#" class="pendiente"><i class="icono">👥</i> Usuarios</a>
+  <a href="#" class="pendiente"><i class="icono">🪪</i> Licencias</a>
+</nav>
+
+<div class="lienzo">
+  <header class="barra-superior">
+    <div style="display:flex;align-items:center;gap:12px">
+      <button class="abrir-menu" id="alternarMenu" aria-label="Mostrar navegación">☰</button>
+      <div>
+        <h1>{% block encabezado %}Panel{% endblock %}</h1>
+        <p>{% block subtitulo %}{% endblock %}</p>
+      </div>
+    </div>
+    <div class="identidad">
+      <div class="avatar">AD</div>
+      <div>
+        <strong style="font-size:13.5px">Administrador</strong>
+        <small>Sucursal Tijuana</small>
+      </div>
+    </div>
+  </header>
+
+  <main class="contenido">
+    {% block contenido %}{% endblock %}
+  </main>
+</div>
+
+<div class="telon" id="telon" role="dialog" aria-modal="true" aria-labelledby="tituloModal">
+  <div class="modal">
+    <div class="modal-encabezado">
+      <div>
+        <h2 id="tituloModal">{% block titulo_modal %}Detalle{% endblock %}</h2>
+        <small id="subtituloModal"></small>
+      </div>
+      <button class="cerrar" id="btnCerrar" aria-label="Cerrar detalle">&times;</button>
+    </div>
+    <div class="modal-cuerpo" id="cuerpoModal"></div>
+  </div>
+</div>
+
+<script>
+/* Utilidades compartidas por todas las pantallas del panel. */
+var Panel = (function () {
+  "use strict";
+
+  var API = "/api/reportes";
+
+  // TEMPORAL: identidad del administrador mientras el modulo de login
+  // (RF01-RF03) no expone un token. Sustituir por el token de sesion.
+  var ID_ADMIN = 63;
+
+  var dinero = new Intl.NumberFormat("es-MX", {
+    style: "currency", currency: "MXN"
+  });
+  var fechaCorta = new Intl.DateTimeFormat("es-MX", {
+    day: "2-digit", month: "short", year: "numeric"
+  });
+  var fechaHora = new Intl.DateTimeFormat("es-MX", {
+    day: "2-digit", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit"
+  });
+
+  function $(id) { return document.getElementById(id); }
+
+  function pedir(ruta) {
+    return fetch(API + ruta, {
+      headers: { "X-Empleado-Id": String(ID_ADMIN), "Accept": "application/json" }
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (cuerpo) {
+        if (!r.ok) {
+          throw new Error(cuerpo.error || cuerpo.detail ||
+            "La consulta no se pudo completar (código " + r.status + ").");
+        }
+        return cuerpo;
+      });
+    });
+  }
+
+  function escapar(txt) {
+    var d = document.createElement("div");
+    d.textContent = txt === null || txt === undefined ? "" : txt;
+    return d.innerHTML;
+  }
+
+  function aFecha(iso) {
+    if (!iso) { return "—"; }
+    var d = new Date(iso);
+    return isNaN(d) ? iso : fechaCorta.format(d);
+  }
+
+  function aFechaHora(iso) {
+    if (!iso) { return "—"; }
+    var d = new Date(iso);
+    return isNaN(d) ? iso : fechaHora.format(d);
+  }
+
+  /* El tono lo decide el backend (reportes/catalogos.py). */
+  function etiqueta(nombre, tono) {
+    return '<span class="etiqueta ' + (tono || "gris") + '">' +
+      escapar(nombre || "—") + "</span>";
+  }
+
+  function parametros(campos, pagina) {
+    var p = new URLSearchParams();
+    Object.keys(campos).forEach(function (k) {
+      var v = campos[k];
+      if (v !== null && v !== undefined && String(v).trim() !== "") {
+        p.append(k, String(v).trim());
+      }
+    });
+    p.append("page", pagina || 1);
+    return p.toString();
+  }
+
+  function llenarSelect(id, opciones, etiquetaTodos) {
+    $(id).innerHTML = '<option value="">' + etiquetaTodos + "</option>" +
+      (opciones || []).map(function (o) {
+        return '<option value="' + escapar(o.id) + '">' +
+          escapar(o.nombre) + "</option>";
+      }).join("");
+  }
+
+  function cargando(idCuerpo, columnas) {
+    $(idCuerpo).innerHTML = '<tr><td colspan="' + columnas +
+      '" class="aviso"><span class="girando"></span></td></tr>';
+  }
+
+  function mensaje(idCuerpo, columnas, titulo, detalle, esError) {
+    $(idCuerpo).innerHTML = '<tr><td colspan="' + columnas + '" class="aviso' +
+      (esError ? " error" : "") + '"><strong>' + escapar(titulo) + "</strong>" +
+      escapar(detalle || "") + "</td></tr>";
+  }
+
+  function abrirModal(subtitulo) {
+    $("subtituloModal").textContent = subtitulo || "";
+    $("cuerpoModal").innerHTML = '<p class="aviso"><span class="girando"></span></p>';
+    $("telon").classList.add("visible");
+    $("btnCerrar").focus();
+  }
+
+  function cerrarModal() { $("telon").classList.remove("visible"); }
+
+  document.addEventListener("DOMContentLoaded", function () {
+    $("btnCerrar").addEventListener("click", cerrarModal);
+    $("telon").addEventListener("click", function (e) {
+      if (e.target === $("telon")) { cerrarModal(); }
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") { cerrarModal(); }
+    });
+    $("alternarMenu").addEventListener("click", function () {
+      $("menu").classList.toggle("desplegado");
+    });
+  });
+
+  return {
+    $: $, pedir: pedir, escapar: escapar, dinero: dinero,
+    aFecha: aFecha, aFechaHora: aFechaHora, etiqueta: etiqueta,
+    parametros: parametros, llenarSelect: llenarSelect,
+    cargando: cargando, mensaje: mensaje,
+    abrirModal: abrirModal, cerrarModal: cerrarModal
+  };
+})();
+</script>
+
+{% block script %}{% endblock %}
+</body>
+</html>
