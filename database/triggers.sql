@@ -44,10 +44,9 @@ BEGIN
         END IF;
 
         SELECT m.capacidad INTO capacidad_vehiculo
-        FROM entrega en
-        INNER JOIN vehiculo v ON v.numero = en.vehiculo
+        FROM vehiculo v
         INNER JOIN modelo m ON m.numero = v.modelo
-        WHERE en.numero = NEW.entrega;
+        WHERE v.entrega = NEW.entrega;
 
         IF capacidad_vehiculo > 0 THEN
 
