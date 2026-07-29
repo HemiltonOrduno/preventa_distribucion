@@ -1,0 +1,96 @@
+{% extends "almacenista/base_almacenista.html" %}
+
+{% block title %}Cargar Camión{% endblock %}
+{% block nav_entregas %}active{% endblock %}
+{% block page_icon %}🚚{% endblock %}
+{% block page_title %}Cargar Camión y Crear Entrega{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width:700px;">
+    <label style="font-size:13px; font-weight:600;">Vehículo</label>
+    <select id="vehiculo" style="width:100%; padding:8px; margin:6px 0 14px; border-radius:6px; border:1px solid #ccc;">
+        <option value="">Cargando vehículos...</option>
+    </select>
+
+    <label style="font-size:13px; font-weight:600;">Número de empleado</label>
+    <input type="number" id="empleado" placeholder="Ej. 4" style="width:100%; padding:8px; margin:6px 0 14px; border-radius:6px; border:1px solid #ccc;">
+</div>
+
+<div class="card" style="max-width:700px;">
+    <strong>Pedidos validados</strong>
+    <p style="font-size:12px; color:#666; margin:4px 0 12px;">Selecciona solo pedidos de la MISMA zona — el sistema rechaza mezclas.</p>
+    <div id="lista-pedidos-validados">Cargando...</div>
+</div>
+
+<div style="max-width:700px; text-align:right; margin-top:12px;">
+    <button class="btn btn-primary" onclick="crearEntrega()">Crear entrega</button>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    async function cargarVehiculos() {
+        const select = document.getElementById('vehiculo');
+        const res = await fetch('/api/entregas/vehiculos-disponibles/');
+        const data = await res.json();
+
+        if (data.vehiculos.length === 0) {
+            select.innerHTML = '<option value="">No hay vehículos disponibles</option>';
+            return;
+        }
+
+        select.innerHTML = data.vehiculos.map(v =>
+            `<option value="${v.vehiculo_id}">${v.placas} — ${v.modelo_nombre} (capacidad: ${v.capacidad} kg)</option>`
+        ).join('');
+    }
+
+    async function cargarPedidosValidados() {
+        const cont = document.getElementById('lista-pedidos-validados');
+        const res = await fetch('/api/entregas/pedidos-validados/');
+        const data = await res.json();
+
+        if (data.pedidos.length === 0) {
+            cont.innerHTML = '<p style="font-size:13px; color:#666;">No hay pedidos validados esperando entrega.</p>';
+            return;
+        }
+
+        cont.innerHTML = data.pedidos.map(p => `
+            <label style="display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #eee; font-size:13px;">
+                <input type="checkbox" class="pedido-check" value="${p.pedido_id}">
+                <span><strong>#${p.pedido_id}</strong> — ${p.establecimiento_nombre}
+                    <span style="color:#666;"> · Zona: ${p.zona_nombre} · Peso: ${p.peso_estimado} kg · $${p.total.toFixed(2)}</span>
+                </span>
+            </label>
+        `).join('');
+    }
+
+    async function crearEntrega() {
+        const vehiculo = document.getElementById('vehiculo').value;
+        const empleado = document.getElementById('empleado').value;
+        const pedidos = Array.from(document.querySelectorAll('.pedido-check:checked')).map(c => parseInt(c.value));
+
+        if (!vehiculo || !empleado || pedidos.length === 0) {
+            mostrarToast('Selecciona vehículo, empleado y al menos un pedido', 'error');
+            return;
+        }
+
+        const res = await fetch('/api/entregas/entregas/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ vehiculo: parseInt(vehiculo), empleado: parseInt(empleado), pedidos })
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+            mostrarToast(`Entrega #${data.entrega_id} creada correctamente`, 'success');
+            cargarPedidosValidados();
+            cargarVehiculos();
+        } else {
+            mostrarToast(data.error, 'error');
+        }
+    }
+
+    cargarVehiculos();
+    cargarPedidosValidados();
+</script>
+{% endblock %}

@@ -1,3 +1,4 @@
+-- Active: 1785279407257@@127.0.0.1@3306@inpredis_db
 #################
 #####TRIGGERS####
 #################
@@ -43,20 +44,19 @@ BEGIN
         END IF;
 
         SELECT m.capacidad INTO capacidad_vehiculo
-        FROM entrega en
-        INNER JOIN vehiculo v ON v.numero = en.vehiculo
+        FROM vehiculo v
         INNER JOIN modelo m ON m.numero = v.modelo
-        WHERE en.numero = NEW.entrega;
+        WHERE v.entrega = NEW.entrega;
 
         IF capacidad_vehiculo > 0 THEN
 
-            SELECT COALESCE(SUM(dp.cantidad * pr.peso), 0) INTO peso_actual
+            SELECT COALESCE(SUM(dp.cantidad * pr.peso) / 1000, 0) INTO peso_actual
             FROM pedido p
             INNER JOIN detalle_pedido dp ON dp.num_pedido = p.num
             INNER JOIN producto pr ON pr.codigo = dp.cod_producto
             WHERE p.entrega = NEW.entrega;
 
-            SELECT COALESCE(SUM(dp.cantidad * pr.peso), 0) INTO peso_nuevo_pedido
+            SELECT COALESCE(SUM(dp.cantidad * pr.peso) / 1000, 0) INTO peso_nuevo_pedido
             FROM detalle_pedido dp
             INNER JOIN producto pr ON pr.codigo = dp.cod_producto
             WHERE dp.num_pedido = NEW.num;
@@ -112,5 +112,65 @@ BEGIN
         SET stock = stock - NEW.cantidad
         WHERE codigo = NEW.cod_producto;
     END IF;
+END$$
+DELIMITER ;
+
+-- NUEVOS TRIGGERS 
+
+DELIMITER $$
+CREATE OR REPLACE TRIGGER tg_recalcular_importe_detalle
+BEFORE UPDATE ON detalle_pedido
+FOR EACH ROW
+BEGIN
+    -- Por qué: el importe de cada línea (cantidad * precio) se guarda
+    -- como columna física, no se calcula al leer. Si el almacenista
+    -- ajusta la cantidad (RF19) con un UPDATE directo, el importe se
+    -- quedaría desactualizado a menos que alguien lo recalcule a mano.
+    -- Este trigger lo hace automáticamente ANTES de guardar el UPDATE,
+    -- así ninguna vista futura puede "olvidarse" de hacerlo.
+    SET NEW.importe = NEW.cantidad * NEW.precioUnitario;
+END$$
+DELIMITER ;
+
+-- Triggers correridos y actualizados
+DELIMITER $$
+CREATE OR REPLACE TRIGGER tg_campos_calculados_pedido_update
+AFTER UPDATE ON detalle_pedido
+FOR EACH ROW
+BEGIN
+    DECLARE nuevo_total DECIMAL(10,2);
+
+    IF NEW.importe <> OLD.importe THEN
+        -- Calculamos el total nuevo UNA sola vez, en una variable,
+        -- y esa misma variable se usa en las tres asignaciones de abajo.
+        -- Así evitamos que la 2da/3ra línea del SET vean un "total"
+        -- que la 1ra línea ya modificó (el bug de arriba).
+        SET nuevo_total = (SELECT total FROM pedido WHERE num = NEW.num_pedido) - OLD.importe + NEW.importe;
+
+        UPDATE pedido
+        SET total = nuevo_total,
+            subtotal = (nuevo_total / 1.16),
+            iva = ((nuevo_total / 1.16) * 0.16)
+        WHERE num = NEW.num_pedido;
+    END IF;
+END$$
+DELIMITER ;
+
+
+DELIMITER $$
+CREATE OR REPLACE TRIGGER tg_campos_calculados_pedido_delete
+AFTER DELETE ON detalle_pedido
+FOR EACH ROW
+BEGIN
+    DECLARE nuevo_total DECIMAL(10,2);
+
+    -- Mismo motivo que arriba.
+    SET nuevo_total = (SELECT total FROM pedido WHERE num = OLD.num_pedido) - OLD.importe;
+
+    UPDATE pedido
+    SET total = nuevo_total,
+        subtotal = (nuevo_total / 1.16),
+        iva = ((nuevo_total / 1.16) * 0.16)
+    WHERE num = OLD.num_pedido;
 END$$
 DELIMITER ;

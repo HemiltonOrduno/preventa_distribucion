@@ -1,0 +1,88 @@
+{% extends "almacenista/base_almacenista.html" %}
+
+{% block title %}Inventario{% endblock %}
+{% block nav_inventario %}active{% endblock %}
+{% block page_icon %}📦{% endblock %}
+{% block page_title %}Registrar Movimiento de Inventario{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width:600px;">
+    <label style="font-size:13px; font-weight:600;">Tipo de movimiento</label>
+    <select id="tipo-movimiento" style="width:100%; padding:8px; margin:6px 0 14px; border-radius:6px; border:1px solid #ccc;">
+        <option value="TM001">Entrada</option>
+        <option value="TM003">Salida por merma</option>
+    </select>
+
+    <label style="font-size:13px; font-weight:600;">Número de empleado</label>
+    <input type="number" id="empleado" placeholder="Ej. 4" style="width:100%; padding:8px; margin:6px 0 14px; border-radius:6px; border:1px solid #ccc;">
+
+    <label style="font-size:13px; font-weight:600;">Observaciones</label>
+    <input type="text" id="observaciones" placeholder="Ej. Entrada de mercancía planta Toluca" style="width:100%; padding:8px; margin:6px 0 14px; border-radius:6px; border:1px solid #ccc;">
+
+    <label style="font-size:13px; font-weight:600;">Productos</label>
+    <div id="lineas-detalle" style="margin-top:8px;"></div>
+    <button class="btn btn-secondary" style="margin-top:8px;" onclick="agregarLinea()">+ Agregar producto</button>
+
+    <div style="margin-top:20px; text-align:right;">
+        <button class="btn btn-primary" onclick="registrarMovimiento()">Registrar movimiento</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    let contadorLineas = 0;
+
+    function agregarLinea() {
+        contadorLineas++;
+        const div = document.createElement('div');
+        div.id = `linea-${contadorLineas}`;
+        div.style = 'display:flex; gap:8px; margin-bottom:8px;';
+        div.innerHTML = `
+            <input type="text" placeholder="Código (ej. P007)" class="prod-codigo" style="flex:1; padding:6px; border-radius:6px; border:1px solid #ccc;">
+            <input type="number" placeholder="Cantidad" class="prod-cantidad" style="width:100px; padding:6px; border-radius:6px; border:1px solid #ccc;">
+            <input type="number" placeholder="Precio unitario" class="prod-precio" step="0.01" style="width:130px; padding:6px; border-radius:6px; border:1px solid #ccc;">
+            <button class="btn btn-danger" style="padding:6px 10px;" onclick="document.getElementById('linea-${contadorLineas}').remove()">✕</button>
+        `;
+        document.getElementById('lineas-detalle').appendChild(div);
+    }
+
+    async function registrarMovimiento() {
+        const tipo_movimiento = document.getElementById('tipo-movimiento').value;
+        const empleado = document.getElementById('empleado').value;
+        const observaciones = document.getElementById('observaciones').value;
+
+        const detalle = [];
+        document.querySelectorAll('#lineas-detalle > div').forEach(linea => {
+            const producto = linea.querySelector('.prod-codigo').value;
+            const cantidad = parseInt(linea.querySelector('.prod-cantidad').value);
+            const precio_unitario = parseFloat(linea.querySelector('.prod-precio').value);
+            if (producto && cantidad && precio_unitario) {
+                detalle.push({ producto, cantidad, precio_unitario });
+            }
+        });
+
+        if (!empleado || detalle.length === 0) {
+            mostrarToast('Falta el número de empleado o agregar al menos un producto', 'error');
+            return;
+        }
+
+        const res = await fetch('/api/inventario/movimientos/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tipo_movimiento, empleado: parseInt(empleado), observaciones, detalle })
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+            mostrarToast(`Movimiento #${data.movimiento_id} registrado correctamente`, 'success');
+            document.getElementById('lineas-detalle').innerHTML = '';
+            document.getElementById('observaciones').value = '';
+        } else {
+            mostrarToast(data.error, 'error');
+        }
+    }
+
+    agregarLinea(); // arranca con una línea vacía lista para llenar
+</script>
+{% endblock %}
