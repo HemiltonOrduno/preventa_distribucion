@@ -37,11 +37,11 @@ class LoginView(APIView):
             return Response({'detail': 'Usuario o contraseña incorrectos'}, status=status.HTTP_401_UNAUTHORIZED)
 
         request.session['usuario_num'] = usuario.num
+        request.session['empleado_num'] = usuario.empleado.num
         request.session['rol'] = usuario.empleado.rol.nombre
 
         data = UsuarioDataSerializer(usuario).data
         return Response(data, status=status.HTTP_200_OK)
-
 
 
 class UsuarioListCreate:

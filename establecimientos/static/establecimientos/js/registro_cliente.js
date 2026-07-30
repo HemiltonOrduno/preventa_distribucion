@@ -1,8 +1,8 @@
 /*
-  Falta: el fetch que envíe los datos reales del cliente (RF01)
-  antes de redirigir al registro del establecimiento.
+  RF01: envía el cliente nuevo y continúa al registro del
+  establecimiento con el id del cliente ya creado.
 */
-function continuarARegistroEstablecimiento(event){
+async function continuarARegistroEstablecimiento(event){
     event.preventDefault();
 
     const datos = {
@@ -14,7 +14,18 @@ function continuarARegistroEstablecimiento(event){
         email: document.getElementById("email").value
     };
 
-    console.log("Pendiente: enviar datos del cliente:", datos);
-    window.location.href = '/api/establecimientos/registro-establecimiento/';
+    const res = await fetch('/api/establecimientos/clientes/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(datos)
+    });
+    const data = await res.json();
+
+    if (!res.ok){
+        alert(data.error || 'No se pudo registrar el cliente');
+        return false;
+    }
+
+    window.location.href = `/api/establecimientos/registro-establecimiento/?rep_establecimiento_id=${data.rep_establecimiento_id}`;
     return false;
 }

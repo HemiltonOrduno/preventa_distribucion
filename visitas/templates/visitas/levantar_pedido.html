@@ -11,38 +11,9 @@
     <i class='bx bx-cart'></i> LEVANTAR PEDIDO
 </div>
 
-<div class="card">
-    <div class="card__row">
-        <i class='bx bx-store'></i>
-        <span class="card__title">Abarrotes Lupita</span>
-    </div>
-</div>
-
-<!-- Este listado se llenará con el catálogo real de productos (RF04).
-     El sistema NO valida stock aquí, según RF05 -->
+<!-- RF04: catálogo real de productos, RF05: sin verificar stock aquí -->
 <div class="card" id="listaProductos">
-    <div class="product-item">
-        <div>
-            <span class="product-item__name">Papas sabritas</span><br>
-            <span class="product-item__price">$18.50</span>
-        </div>
-        <div class="qty">
-            <button type="button" class="qty__btn" onclick="cambiarCantidad(this,-1)">-</button>
-            <span class="qty__value">0</span>
-            <button type="button" class="qty__btn" onclick="cambiarCantidad(this,1)">+</button>
-        </div>
-    </div>
-    <div class="product-item">
-        <div>
-            <span class="product-item__name">Coca cola 600ml</span><br>
-            <span class="product-item__price">$22.00</span>
-        </div>
-        <div class="qty">
-            <button type="button" class="qty__btn" onclick="cambiarCantidad(this,-1)">-</button>
-            <span class="qty__value">0</span>
-            <button type="button" class="qty__btn" onclick="cambiarCantidad(this,1)">+</button>
-        </div>
-    </div>
+    <p style="font-size:13px;color:var(--color-text-muted)">Cargando productos...</p>
 </div>
 
 <div class="form__div">

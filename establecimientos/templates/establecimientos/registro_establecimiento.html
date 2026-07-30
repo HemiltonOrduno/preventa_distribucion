@@ -45,13 +45,22 @@
         </div>
     </div>
 
+    <div class="form__div">
+        <div class="form__icon"><i class='bx bx-phone'></i></div>
+        <div class="form__div-input">
+            <label class="form__label">Teléfono</label>
+            <input type="tel" id="telefono" class="form__input">
+        </div>
+    </div>
+
     <!-- RF03: la zona y el estado "Activo" los asigna el sistema
-         automáticamente, no se capturan aquí -->
-    <div class="card" style="background: var(--color-info-bg); box-shadow:none; border:none;">
+         automáticamente según la ubicación (RFN-25: geolocalización
+         del navegador) -->
+    <div class="card" id="estadoUbicacion" style="background: var(--color-info-bg); box-shadow:none; border:none;">
         <div class="card__row" style="margin-bottom:0;">
-            <i class='bx bx-info-circle' style="color: var(--color-info-text);"></i>
+            <i class='bx bx-loader-alt' style="color: var(--color-info-text);"></i>
             <span style="font-size:12px; color: var(--color-info-text);">
-                La zona y el estado se asignan automáticamente según la ubicación
+                Obteniendo tu ubicación para asignar la zona...
             </span>
         </div>
     </div>
