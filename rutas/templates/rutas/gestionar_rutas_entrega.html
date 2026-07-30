@@ -2,8 +2,6 @@
 
 {% block title %}Gestionar Rutas de Entrega{% endblock %}
 {% block nav_rutas_entrega %}active{% endblock %}
-{% block page_icon %}🚚{% endblock %}
-{% block page_title %}Gestionar Rutas de Entrega{% endblock %}
 
 {% block extra_styles %}
 .card {
@@ -267,42 +265,49 @@
 }
 {% endblock %}
 
-{% block content %}
-<div class="filtro-estado">
-    <button class="active" onclick="filtrar('todas', this)">Todas</button>
-    <button onclick="filtrar('Creada', this)">Creadas</button>
-    <button onclick="filtrar('En camino', this)">En camino</button>
-    <button onclick="filtrar('Pausada', this)">Pausadas</button>
-</div>
-
-<div id="loading">Cargando rutas de entrega...</div>
-<div id="lista-rutas"></div>
-
-<!-- MODAL MAPA -->
-<div id="modal-overlay" onclick="cerrarModalClick(event)">
-    <div id="modal">
-        <div id="modal-header">
-            <h3 id="modal-titulo">Ruta de entrega</h3>
-            <button onclick="cerrarModal()">×</button>
+{% block main_content %}
+<div id="contenido">
+    <div id="page-header">
+        🚚 Gestionar Rutas de Entrega
+    </div>
+    <div id="page-body">
+        <div class="filtro-estado">
+            <button class="active" onclick="filtrar('todas', this)">Todas</button>
+            <button onclick="filtrar('Creada', this)">Creadas</button>
+            <button onclick="filtrar('En camino', this)">En camino</button>
+            <button onclick="filtrar('Pausada', this)">Pausadas</button>
         </div>
-        <div id="modal-body">
-            <div id="modal-map"></div>
-            <div id="modal-paradas">
-                <div id="modal-paradas-header">
-                    Orden de paradas
-                    <span>Arrastra para reordenar</span>
+
+        <div id="loading">Cargando rutas de entrega...</div>
+        <div id="lista-rutas"></div>
+
+        <!-- MODAL MAPA -->
+        <div id="modal-overlay" onclick="cerrarModalClick(event)">
+            <div id="modal">
+                <div id="modal-header">
+                    <h3 id="modal-titulo">Ruta de entrega</h3>
+                    <button onclick="cerrarModal()">×</button>
                 </div>
-                <div id="sortable-paradas"></div>
-                <div id="modal-footer">
-                    <button class="btn-resetear" onclick="resetearOrden()">↺ Resetear</button>
-                    <button class="btn-guardar" onclick="guardarOrden()">✓ Guardar orden</button>
+                <div id="modal-body">
+                    <div id="modal-map"></div>
+                    <div id="modal-paradas">
+                        <div id="modal-paradas-header">
+                            Orden de paradas
+                            <span>Arrastra para reordenar</span>
+                        </div>
+                        <div id="sortable-paradas"></div>
+                        <div id="modal-footer">
+                            <button class="btn-resetear" onclick="resetearOrden()">↺ Resetear</button>
+                            <button class="btn-guardar" onclick="guardarOrden()">✓ Guardar orden</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
+
+        <div class="toast" id="toast"></div>
     </div>
 </div>
-
-<div class="toast" id="toast"></div>
 {% endblock %}
 
 {% block extra_scripts %}

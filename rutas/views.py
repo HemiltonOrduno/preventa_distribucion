@@ -16,7 +16,7 @@ OSRM_URL = "http://127.0.0.1:5000"
 
 
 def coordinador(request):
-    return render(request, "rutas/coordinador.html")
+    return render(request, "rutas/base_coordinador.html")
 
 @csrf_exempt
 def calcular_ruta_visita(request):
@@ -657,19 +657,17 @@ def establecimientos(request):
     with connection.cursor() as cursor:
         cursor.execute("""
             SELECT
-                e.numero AS id,
-                e.nombre,
-                e.estColonia AS colonia,
-                e.telefono,
-                e.latitud,
-                e.longitud,
-                z.num AS zona_id,
-                z.nombre AS zona_nombre,
-                ee.nombre AS estado
-            FROM establecimiento e
-            INNER JOIN zona z ON z.num = e.zona
-            INNER JOIN edo_establecimiento ee ON ee.codigo = e.edo_establecimiento
-            ORDER BY z.nombre, e.nombre
+                establecimiento_id AS id,
+                establecimiento_nombre AS nombre,
+                colonia,
+                telefono,
+                latitud,
+                longitud,
+                zona_id,
+                zona_nombre,
+                estado_establecimiento AS estado
+            FROM vta_establecimientos_por_zona
+            ORDER BY zona_nombre, establecimiento_nombre
         """)
         columns = [col[0] for col in cursor.description]
         result = [dict(zip(columns, row)) for row in cursor.fetchall()]

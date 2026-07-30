@@ -405,3 +405,4 @@ CREATE TABLE ruta_visita_orden (
     FOREIGN KEY (ruta_visita) REFERENCES ruta_visita(numero),
     FOREIGN KEY (establecimiento) REFERENCES establecimiento(numero)
 );
+

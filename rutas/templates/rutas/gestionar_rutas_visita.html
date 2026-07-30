@@ -2,8 +2,6 @@
 
 {% block title %}Gestionar Rutas de Visita{% endblock %}
 {% block nav_rutas_visita %}active{% endblock %}
-{% block page_icon %}🗓️{% endblock %}
-{% block page_title %}Gestionar Rutas de Visita{% endblock %}
 
 {% block extra_styles %}
 #layout {
@@ -320,87 +318,94 @@
 }
 {% endblock %}
 
-{% block content %}
-<div id="layout">
-    <div id="panel-rutas">
-        <div id="panel-rutas-header">
-            <div style="font-size:13px;font-weight:bold;color:#333;">Rutas de visita</div>
-            <button class="btn-nueva-ruta" onclick="abrirCrearRuta()">+ Nueva ruta</button>
-        </div>
-
-        <div class="filtro-dia" id="filtro-dia">
-            <button class="active" onclick="filtrarDia('hoy', this)">Hoy</button>
-            <button onclick="filtrarDia('Lunes', this)">Lun</button>
-            <button onclick="filtrarDia('Martes', this)">Mar</button>
-            <button onclick="filtrarDia('Miércoles', this)">Mié</button>
-            <button onclick="filtrarDia('Jueves', this)">Jue</button>
-            <button onclick="filtrarDia('Viernes', this)">Vie</button>
-            <button onclick="filtrarDia('Sábado', this)">Sáb</button>
-        </div>
-
-        <div id="lista-rutas">Cargando...</div>
+{% block main_content %}
+<div id="contenido">
+    <div id="page-header">
+        🗓️ Gestionar Rutas de Visita
     </div>
+    <div id="page-body">
+        <div id="layout">
+            <div id="panel-rutas">
+                <div id="panel-rutas-header">
+                    <div style="font-size:13px;font-weight:bold;color:#333;">Rutas de visita</div>
+                    <button class="btn-nueva-ruta" onclick="abrirCrearRuta()">+ Nueva ruta</button>
+                </div>
 
-    <div id="mapa-rutas"></div>
-</div>
+                <div class="filtro-dia" id="filtro-dia">
+                    <button class="active" onclick="filtrarDia('hoy', this)">Hoy</button>
+                    <button onclick="filtrarDia('Lunes', this)">Lun</button>
+                    <button onclick="filtrarDia('Martes', this)">Mar</button>
+                    <button onclick="filtrarDia('Miércoles', this)">Mié</button>
+                    <button onclick="filtrarDia('Jueves', this)">Jue</button>
+                    <button onclick="filtrarDia('Viernes', this)">Vie</button>
+                    <button onclick="filtrarDia('Sábado', this)">Sáb</button>
+                </div>
 
-<!-- MODAL CREAR RUTA -->
-<div id="modal-overlay" onclick="cerrarModalClick(event)">
-    <div id="modal">
-        <div id="modal-header">
-            <h3>Nueva ruta de visita</h3>
-            <button onclick="cerrarModal()">×</button>
-        </div>
-        <div id="modal-body">
-            <div id="modal-form">
-                <div class="form-group">
-                    <label>Nombre de la ruta *</label>
-                    <input type="text" id="ruta-nombre" placeholder="Ej: Ruta Playas Lunes">
-                </div>
-                <div class="form-group">
-                    <label>Día *</label>
-                    <select id="ruta-dia">
-                        <option value="Lunes">Lunes</option>
-                        <option value="Martes">Martes</option>
-                        <option value="Miércoles">Miércoles</option>
-                        <option value="Jueves">Jueves</option>
-                        <option value="Viernes">Viernes</option>
-                        <option value="Sábado">Sábado</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Zona *</label>
-                    <select id="ruta-zona" onchange="cargarEstablecimientosZona()">
-                        <option value="">Selecciona una zona...</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Descripción (opcional)</label>
-                    <textarea id="ruta-descripcion" placeholder="Descripción de la ruta..."></textarea>
-                </div>
-                <p style="font-size:11px;color:#888;margin-top:8px;">
-                    Selecciona una zona y luego haz clic en los establecimientos del mapa en el orden que deseas visitarlos.
-                </p>
+                <div id="lista-rutas">Cargando...</div>
             </div>
 
-            <div id="modal-mapa"></div>
+            <div id="mapa-rutas"></div>
+        </div>
 
-            <div id="modal-paradas">
-                <div id="modal-paradas-header">
-                    Paradas seleccionadas
-                    <span id="contador-paradas">0 establecimientos</span>
+        <!-- MODAL CREAR RUTA -->
+        <div id="modal-overlay" onclick="cerrarModalClick(event)">
+            <div id="modal">
+                <div id="modal-header">
+                    <h3>Nueva ruta de visita</h3>
+                    <button onclick="cerrarModal()">×</button>
                 </div>
-                <div id="lista-paradas-modal"></div>
+                <div id="modal-body">
+                    <div id="modal-form">
+                        <div class="form-group">
+                            <label>Nombre de la ruta *</label>
+                            <input type="text" id="ruta-nombre" placeholder="Ej: Ruta Playas Lunes">
+                        </div>
+                        <div class="form-group">
+                            <label>Día *</label>
+                            <select id="ruta-dia">
+                                <option value="Lunes">Lunes</option>
+                                <option value="Martes">Martes</option>
+                                <option value="Miércoles">Miércoles</option>
+                                <option value="Jueves">Jueves</option>
+                                <option value="Viernes">Viernes</option>
+                                <option value="Sábado">Sábado</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Zona *</label>
+                            <select id="ruta-zona" onchange="cargarEstablecimientosZona()">
+                                <option value="">Selecciona una zona...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Descripción (opcional)</label>
+                            <textarea id="ruta-descripcion" placeholder="Descripción de la ruta..."></textarea>
+                        </div>
+                        <p style="font-size:11px;color:#888;margin-top:8px;">
+                            Selecciona una zona y luego haz clic en los establecimientos del mapa en el orden que deseas visitarlos.
+                        </p>
+                    </div>
+
+                    <div id="modal-mapa"></div>
+
+                    <div id="modal-paradas">
+                        <div id="modal-paradas-header">
+                            Paradas seleccionadas
+                            <span id="contador-paradas">0 establecimientos</span>
+                        </div>s
+                        <div id="lista-paradas-modal"></div>
+                    </div>
+                </div>
+                <div id="modal-footer">
+                    <button class="btn-cancelar" onclick="cerrarModal()">Cancelar</button>
+                    <button class="btn-crear" onclick="crearRuta()">✓ Crear ruta</button>
+                </div>
             </div>
         </div>
-        <div id="modal-footer">
-            <button class="btn-cancelar" onclick="cerrarModal()">Cancelar</button>
-            <button class="btn-crear" onclick="crearRuta()">✓ Crear ruta</button>
-        </div>
+
+        <div class="toast" id="toast"></div>
     </div>
 </div>
-
-<div class="toast" id="toast"></div>
 {% endblock %}
 
 {% block extra_scripts %}

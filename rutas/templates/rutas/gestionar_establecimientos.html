@@ -174,70 +174,73 @@
     z-index: 3000;
 }
 {% endblock %}
-
-{% block page_icon %}🏪{% endblock %}
-{% block page_title %}Gestionar Establecimientos{% endblock %}
-
-{% block content %}
-<div id="layout">
-    <div id="panel-lista">
-        <div class="toolbar">
-            <input type="text" class="search-box" id="buscador" placeholder="🔍 Buscar establecimiento..." oninput="filtrar()">
-            <div class="filtros-row">
-                <select class="filtro-select" id="filtro-zona" onchange="filtrar()">
-                    <option value="">Todas las zonas</option>
-                </select>
-                <select class="filtro-select" id="filtro-estado" onchange="filtrar()">
-                    <option value="">Todos</option>
-                    <option value="Activo">Activo</option>
-                    <option value="Inactivo">Inactivo</option>
-                </select>
-            </div>
-        </div>
-        <div class="resumen" id="resumen"></div>
-        <div id="lista-establecimientos">Cargando...</div>
+{% block main_content %}
+<div id="contenido">
+    <div id="page-header">
+        🏪 Gestionar Establecimientos
     </div>
+    <div id="page-body">
+        <div id="layout">
+            <div id="panel-lista">
+                <div class="toolbar">
+                    <input type="text" class="search-box" id="buscador" placeholder="🔍 Buscar establecimiento..." oninput="filtrar()">
+                    <div class="filtros-row">
+                        <select class="filtro-select" id="filtro-zona" onchange="filtrar()">
+                            <option value="">Todas las zonas</option>
+                        </select>
+                        <select class="filtro-select" id="filtro-estado" onchange="filtrar()">
+                            <option value="">Todos</option>
+                            <option value="Activo">Activo</option>
+                            <option value="Inactivo">Inactivo</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="resumen" id="resumen"></div>
+                <div id="lista-establecimientos">Cargando...</div>
+            </div>
 
-    <div id="mapa-establecimientos"></div>
-</div>
+            <div id="mapa-establecimientos"></div>
+        </div>
 
-<!-- MODAL EDITAR -->
-<div id="modal-overlay" onclick="cerrarModalClick(event)">
-    <div id="modal">
-        <div id="modal-header">
-            <h3 id="modal-titulo">Editar establecimiento</h3>
-            <button onclick="cerrarModal()">×</button>
+        <!-- MODAL EDITAR -->
+        <div id="modal-overlay" onclick="cerrarModalClick(event)">
+            <div id="modal">
+                <div id="modal-header">
+                    <h3 id="modal-titulo">Editar establecimiento</h3>
+                    <button onclick="cerrarModal()">×</button>
+                </div>
+                <div id="modal-body">
+                    <input type="hidden" id="edit-id">
+                    <div class="form-group">
+                        <label>Nombre</label>
+                        <input type="text" id="edit-nombre" readonly style="background:#f8f9fa;">
+                    </div>
+                    <div class="form-group">
+                        <label>Colonia</label>
+                        <input type="text" id="edit-colonia" readonly style="background:#f8f9fa;">
+                    </div>
+                    <div class="form-group">
+                        <label>Zona asignada</label>
+                        <select id="edit-zona"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Estado</label>
+                        <select id="edit-estado">
+                            <option value="EST001">Activo</option>
+                            <option value="EST002">Inactivo</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="modal-footer">
+                    <button class="btn-cancelar" onclick="cerrarModal()">Cancelar</button>
+                    <button class="btn-guardar" onclick="guardarEstablecimiento()">Guardar cambios</button>
+                </div>
+            </div>
         </div>
-        <div id="modal-body">
-            <input type="hidden" id="edit-id">
-            <div class="form-group">
-                <label>Nombre</label>
-                <input type="text" id="edit-nombre" readonly style="background:#f8f9fa;">
-            </div>
-            <div class="form-group">
-                <label>Colonia</label>
-                <input type="text" id="edit-colonia" readonly style="background:#f8f9fa;">
-            </div>
-            <div class="form-group">
-                <label>Zona asignada</label>
-                <select id="edit-zona"></select>
-            </div>
-            <div class="form-group">
-                <label>Estado</label>
-                <select id="edit-estado">
-                    <option value="EST001">Activo</option>
-                    <option value="EST002">Inactivo</option>
-                </select>
-            </div>
-        </div>
-        <div id="modal-footer">
-            <button class="btn-cancelar" onclick="cerrarModal()">Cancelar</button>
-            <button class="btn-guardar" onclick="guardarEstablecimiento()">Guardar cambios</button>
-        </div>
+
+        <div class="toast" id="toast"></div>
     </div>
 </div>
-
-<div class="toast" id="toast"></div>
 {% endblock %}
 
 {% block extra_scripts %}
