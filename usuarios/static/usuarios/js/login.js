@@ -1,13 +1,11 @@
 /*===== FOCUS =====*/
 const inputs = document.querySelectorAll(".form__input")
 
-/*=== Add focus ===*/
 function addfocus(){
     let parent = this.parentNode.parentNode
     parent.classList.add("focus")
 }
 
-/*=== Remove focus ===*/
 function remfocus(){
     let parent = this.parentNode.parentNode
     if(this.value == ""){
@@ -15,43 +13,29 @@ function remfocus(){
     }
 }
 
-/*=== To call function ===*/
 inputs.forEach(input=>{
     input.addEventListener("focus",addfocus)
     input.addEventListener("blur",remfocus)
 })
 
-/*===== LOGIN SUBMIT (placeholder, sin backend aún) =====*/
-document.getElementById('loginForm').addEventListener('submit', function(e){
-    e.preventDefault()
+/*===== LOGIN =====*/
+function getCookie(name) {
+    const match = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)')
+    return match ? match.pop() : ''
+}
 
-    const usuario = document.getElementById('user').value
-    const contraseña = document.getElementById('pass').value
-    const errorMsg = document.getElementById('errorMsg')
-
-    if(usuario === "" || contraseña === ""){
-        errorMsg.textContent = "Completa ambos campos"
-        return
-    }
-
-    errorMsg.textContent = ""
-    document.getElementById('loginForm').addEventListener('submit', async function(e){
+document.getElementById('loginForm').addEventListener('submit', async function(e){
     e.preventDefault()
 
     const usuario = document.getElementById('user').value
     const contrasena = document.getElementById('pass').value
     const errorMsg = document.getElementById('errorMsg')
 
-    if(usuario === "" || contrasena === ""){
+    if (usuario === "" || contrasena === ""){
         errorMsg.textContent = "Completa ambos campos"
         return
     }
     errorMsg.textContent = ""
-
-    function getCookie(name) {
-        const match = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)')
-        return match ? match.pop() : ''
-    }
 
     try {
         const res = await fetch('/api/usuarios/login/', {
@@ -64,7 +48,7 @@ document.getElementById('loginForm').addEventListener('submit', function(e){
         })
         const data = await res.json()
 
-        if(!res.ok){
+        if (!res.ok){
             errorMsg.textContent = data.detail || "Error al iniciar sesión"
             return
         }
@@ -72,5 +56,4 @@ document.getElementById('loginForm').addEventListener('submit', function(e){
     } catch (err) {
         errorMsg.textContent = "No se pudo conectar con el servidor"
     }
-})
 })

@@ -3,18 +3,18 @@ from django.http import HttpResponse
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.permissions import AllowAny
 from django.contrib.auth.hashers import check_password
 from .models import Usuario
 from .serializers import LoginSerializer, UsuarioDataSerializer
 
 
-
 ROL_REDIRECT = {
     'Vendedor': '/api/visitas/ruta-del-dia/',
     'Coordinador': '/api/rutas/coordinador/',
-    'Almacenista': '/api/inventario/almacenista/movimientos/',  # ajusta si eligen otra como "home"
-    'Administrador': '/api/usuarios/panel-admin/',    # placeholder, aún no existe el módulo real
-    'Repartidor': '/api/usuarios/panel-repartidor/',  # placeholder, aún no existe el módulo real
+    'Almacenista': '/api/inventario/almacenista/movimientos/',
+    'Administrador': '/api/usuarios/panel-admin/',
+    'Repartidor': '/api/usuarios/panel-repartidor/',
 }
 
 
@@ -31,6 +31,12 @@ def panel_placeholder(request, nombre_rol):
 
 
 class LoginView(APIView):
+    # El proyecto tiene IsAuthenticated como permiso global (config/settings.py),
+    # pero el login es el único endpoint al que se debe poder entrar SIN estar
+    # logueado todavía, por eso se sobreescribe aquí, no en settings.py.
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -52,6 +58,7 @@ class LoginView(APIView):
             return Response({'detail': 'Usuario o contraseña incorrectos'}, status=status.HTTP_401_UNAUTHORIZED)
 
         request.session['usuario_num'] = usuario.num
+        request.session['empleado_num'] = usuario.empleado.num
         request.session['rol'] = usuario.empleado.rol.nombre
 
         data = UsuarioDataSerializer(usuario).data
