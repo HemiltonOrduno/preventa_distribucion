@@ -1396,3 +1396,4 @@ INSERT INTO EMP_VEHICULO (empleado, vehiculo, fecha_cargo) VALUES
 (31, 28, '2026-07-20'),
 (32, 29, '2026-07-20'),
 (33, 30, '2026-07-20');
+
