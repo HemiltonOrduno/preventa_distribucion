@@ -14,6 +14,8 @@ urlpatterns = [
     path('api/entregas/', include('entregas.urls')),
     path('api/reportes/', include('reportes.urls')),
     path('panel/', include('reportes.urls_panel')),
+    path('api/admin/', include('usuarios.admin_panel.urls')),
+    path('panel/', include('usuarios.admin_panel.urls_panel')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 

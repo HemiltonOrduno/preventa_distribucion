@@ -1,0 +1,608 @@
+{% extends "reportes/base_panel.html" %}
+
+{% block titulo %}Gestión de usuarios{% endblock %}
+{% block encabezado %}Gestión de usuarios{% endblock %}
+{% block subtitulo %}Altas, roles y credenciales del personal — RF56, RF57, RF62{% endblock %}
+{% block titulo_modal %}Registrar nuevo usuario{% endblock %}
+
+{% block estilos %}
+.sesion{padding:14px 18px;margin-bottom:20px;display:flex;
+  justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+.sesion p{font-size:13.5px;color:var(--texto-tenue)}
+.sesion strong{color:var(--texto)}
+.conteos{display:flex;gap:9px;flex-wrap:wrap}
+.pastilla{padding:5px 12px;border-radius:99px;background:var(--fondo);
+  border:1px solid var(--borde);font-size:12.5px;font-weight:600}
+.pastilla b{color:var(--primario)}
+.barra-acciones{display:flex;justify-content:space-between;align-items:flex-end;
+  gap:14px;flex-wrap:wrap;margin-bottom:20px}
+.aviso-linea{padding:12px 16px;border-radius:var(--radio);margin-bottom:16px;
+  font-size:13.5px;display:none}
+.aviso-linea.ok{background:#E7F8F1;color:#0A6E4C;border:1px solid #BCEBD9;display:block}
+.aviso-linea.alerta{background:#FEF2E0;color:#8A4D00;border:1px solid #F8DDB4;display:block}
+.aviso-linea.mal{background:#FBEAEA;color:var(--peligro);border:1px solid #F0C7C7;display:block}
+.campo textarea, .campo .error{color:var(--peligro);font-size:12px;margin-top:3px}
+.campo input.invalido, .campo select.invalido{border-color:var(--peligro)}
+.requerido::after{content:" *";color:var(--peligro)}
+.nota-form{grid-column:1/-1;font-size:12.5px;color:var(--texto-tenue);
+  background:var(--fondo);padding:10px 13px;border-radius:8px}
+tbody tr.inactivo{background:#FBEAEA}
+tbody tr.inactivo:hover{background:#F7DFDF}
+tbody tr.inactivo td{color:var(--texto-tenue)}
+.usuario-cel strong{display:block}
+.usuario-cel small{color:var(--texto-tenue);font-size:12.5px}
+.acciones-fila{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}
+.mini{min-height:34px;padding:5px 11px;border:1px solid var(--borde);
+  border-radius:7px;background:var(--superficie);font-family:inherit;
+  font-size:12.5px;font-weight:600;color:var(--texto);cursor:pointer;
+  white-space:nowrap;transition:background .15s,border-color .15s}
+.mini:hover{background:var(--fondo)}
+.mini:focus-visible{outline:2px solid var(--primario);outline-offset:1px}
+.mini.datos{color:#2A2640;border-color:#C9CBD6;background:#F2F2F6}
+.mini.datos:hover{background:#E7E7EF}
+.mini.credenciales{color:#8A4D00;border-color:#F8DDB4;background:#FEF2E0}
+.mini.credenciales:hover{background:#FBE7C9}
+.mini.licencia{color:#0A5B8A;border-color:#BBDCF0;background:#E8F3FA}
+.mini.licencia:hover{background:#D5E9F6}
+.mini.peligro{color:var(--peligro);border-color:#F0C7C7;background:#FBEAEA}
+.mini.peligro:hover{background:#F6DADA}
+.mini.exito{color:#0A6E4C;border-color:#BCEBD9;background:#E7F8F1}
+.mini.exito:hover{background:#D5F2E6}
+{% endblock %}
+
+{% block contenido %}
+<section class="panel sesion" id="sesion" aria-live="polite">
+  <p>Cargando sesión…</p>
+</section>
+
+<div class="aviso-linea" id="avisoLinea" role="status"></div>
+
+<section class="panel filtros" aria-labelledby="tituloFiltros">
+  <p class="filtros-titulo" id="tituloFiltros">Buscar usuarios</p>
+  <div class="rejilla">
+    <div class="campo">
+      <label for="filtroRol">Rol</label>
+      <select id="filtroRol"><option value="">Todos</option></select>
+    </div>
+    <div class="campo">
+      <label for="filtroEstado">Estado de cuenta</label>
+      <select id="filtroEstado"><option value="">Todos</option></select>
+    </div>
+    <div class="campo">
+      <label for="busqueda">Nombre, usuario o correo</label>
+      <input type="search" id="busqueda" placeholder="Buscar…">
+    </div>
+  </div>
+  <div class="acciones">
+    <button class="boton boton-principal" id="btnBuscar">Buscar</button>
+    <button class="boton boton-neutro" id="btnLimpiar">Limpiar</button>
+  </div>
+</section>
+
+<div class="barra-acciones">
+  <div class="conteos" id="conteos"></div>
+  <button class="boton boton-principal" id="btnNuevo">+ Registrar usuario</button>
+</div>
+
+<section class="panel">
+  <div class="envoltura-tabla">
+    <table>
+      <caption>Usuarios del sistema</caption>
+      <thead>
+        <tr>
+          <th scope="col">Usuario</th>
+          <th scope="col">Nombre</th>
+          <th scope="col">Rol</th>
+          <th scope="col">Correo</th>
+          <th scope="col">Teléfono</th>
+          <th scope="col">Licencia</th>
+          <th scope="col">Cuenta</th>
+          <th scope="col" style="text-align:right">Acciones</th>
+        </tr>
+      </thead>
+      <tbody id="cuerpoTabla">
+        <tr><td colspan="8" class="aviso"><span class="girando"></span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="paginacion">
+    <p id="textoPagina">—</p>
+    <div class="acciones" style="margin:0">
+      <button class="boton boton-neutro" id="btnAnterior" disabled>Anterior</button>
+      <button class="boton boton-neutro" id="btnSiguiente" disabled>Siguiente</button>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block script %}
+<script>
+(function () {
+  "use strict";
+  var P = Panel, $ = P.$;
+  var COLS = 8;
+  var estado = { pagina: 1, siguiente: null };
+  var catalogos = { roles: [], estados_usuario: [], tipos_licencia: [] };
+  /* La pagina actual se conserva en memoria: los formularios de edicion
+     necesitan los valores actuales y el listado ya los trae. */
+  var enPantalla = [];
+
+  function filtros() {
+    return {
+      rol: $("filtroRol").value,
+      estado: $("filtroEstado").value,
+      q: $("busqueda").value
+    };
+  }
+
+  function avisar(texto, clase) {
+    var caja = $("avisoLinea");
+    caja.textContent = texto;
+    caja.className = "aviso-linea " + clase;
+    if (clase === "ok") {
+      setTimeout(function () { caja.className = "aviso-linea"; }, 6000);
+    }
+  }
+
+  function pintarSesion(s) {
+    if (!s.identificado) {
+      $("sesion").innerHTML =
+        "<p>" + P.etiqueta("RBAC en modo desarrollo", "ambar") +
+        " <strong>No se identificó al administrador.</strong> " +
+        "Este modo no debe quedar activo fuera de desarrollo.</p>";
+      return;
+    }
+    $("sesion").innerHTML =
+      "<p>Sesión de <strong>" + P.escapar(s.nombre) + "</strong> · " +
+      P.etiqueta(s.rol, "verde") + " · usuario <strong>" +
+      P.escapar(s.usuario || "sin cuenta") + "</strong></p>" +
+      "<p>Acceso total a los " + (s.roles_administrables || []).length +
+      " roles del sistema</p>";
+  }
+
+  function pintarConteos(r) {
+    var piezas = [
+      '<span class="pastilla">Total <b>' + (r.usuarios || 0) + "</b></span>",
+      '<span class="pastilla">Activos <b>' + (r.activos || 0) + "</b></span>",
+      '<span class="pastilla">Inactivos <b>' + (r.inactivos || 0) + "</b></span>"
+    ];
+    (r.por_rol || []).forEach(function (x) {
+      piezas.push('<span class="pastilla">' + P.escapar(x.rol) +
+        " <b>" + x.usuarios + "</b></span>");
+    });
+    $("conteos").innerHTML = piezas.join("");
+  }
+
+  function celdaLicencia(u) {
+    if (u.licencia_id) {
+      return "<strong>" + P.escapar(u.licencia_num) + "</strong><br>" +
+        '<small style="color:var(--texto-tenue)">' +
+        P.escapar(u.licencia_tipo || "") + " · vence " +
+        P.aFecha(u.licencia_vigencia) + "</small>" + avisoVigencia(u);
+    }
+    return u.requiere_licencia
+      ? P.etiqueta("Requiere licencia", "ambar")
+      : '<span style="color:var(--texto-tenue)">No aplica</span>';
+  }
+
+  /* Vigencia de la licencia: avisa cuando esta por vencer o ya vencio. */
+  function avisoVigencia(u) {
+    if (!u.licencia_vigencia) { return ""; }
+    var dias = Math.ceil(
+      (new Date(u.licencia_vigencia) - new Date()) / 86400000);
+    if (dias < 0) { return " " + P.etiqueta("Vencida", "rojo"); }
+    if (dias <= 30) { return " " + P.etiqueta("Por vencer", "ambar"); }
+    return "";
+  }
+
+  function pintar(lista) {
+    enPantalla = lista;
+    if (!lista.length) {
+      P.mensaje("cuerpoTabla", COLS, "Sin resultados",
+        "Ajusta los filtros de búsqueda.");
+      return;
+    }
+    $("cuerpoTabla").innerHTML = lista.map(function (u) {
+      return "<tr" + (u.activo ? "" : ' class="inactivo"') + ">" +
+        '<td class="usuario-cel"><strong>' + P.escapar(u.usuario) +
+          "</strong><small>#" + u.empleado_id + "</small></td>" +
+        "<td>" + P.escapar(u.nombre) + "</td>" +
+        "<td>" + P.etiqueta(u.rol, "gris") + "</td>" +
+        "<td>" + P.escapar(u.email) + "</td>" +
+        "<td>" + P.escapar(u.telefono) + "</td>" +
+        "<td>" + celdaLicencia(u) + "</td>" +
+        "<td>" + P.etiqueta(u.edo_usuario, u.activo ? "verde" : "rojo") + "</td>" +
+        '<td><div class="acciones-fila">' +
+          '<button class="mini datos" data-accion="datos" data-id="' +
+            u.usuario_id + '">Editar</button>' +
+          '<button class="mini credenciales" data-accion="credenciales" data-id="' +
+            u.usuario_id + '">Credenciales</button>' +
+          (u.requiere_licencia || u.licencia_id
+            ? '<button class="mini licencia" data-accion="licencia" data-id="' +
+              u.usuario_id + '">' +
+              (u.licencia_id ? "Renovar licencia" : "Registrar licencia") +
+              "</button>"
+            : "") +
+          '<button class="mini ' + (u.activo ? "peligro" : "exito") +
+            '" data-accion="estado" data-id="' + u.usuario_id + '">' +
+            (u.activo ? "Desactivar" : "Reactivar") + "</button>" +
+        "</div></td></tr>";
+    }).join("");
+  }
+
+  function cargar() {
+    P.cargando("cuerpoTabla", COLS);
+    P.pedirAdmin("/usuarios/?" + P.parametros(filtros(), estado.pagina))
+      .then(function (d) {
+        pintar(d.results || []);
+        pintarConteos(d.resumen || {});
+        estado.siguiente = d.next;
+        $("btnAnterior").disabled = !d.previous;
+        $("btnSiguiente").disabled = !d.next;
+        var n = (d.results || []).length;
+        $("textoPagina").textContent = n
+          ? "Mostrando " + n + " de " + (d.count || 0) + " usuarios"
+          : "Sin usuarios que coincidan";
+      }).catch(function (e) {
+        P.mensaje("cuerpoTabla", COLS, "No se pudo cargar el listado",
+          e.message, true);
+        $("conteos").innerHTML = "";
+        $("textoPagina").textContent = "—";
+      });
+  }
+
+  /* ---------------- Alta de usuario (RF56 + RF57) ---------------- */
+
+  var CAMPOS = [
+    { id: "nombre_de_pila", etiqueta: "Nombre(s)", tipo: "text", req: true, max: 25 },
+    { id: "apellido_paterno", etiqueta: "Apellido paterno", tipo: "text", req: true, max: 25 },
+    { id: "apellido_materno", etiqueta: "Apellido materno", tipo: "text", req: false, max: 25 },
+    { id: "fecha_nacimiento", etiqueta: "Fecha de nacimiento", tipo: "date", req: true },
+    { id: "telefono", etiqueta: "Teléfono", tipo: "tel", req: true, max: 15 },
+    { id: "email", etiqueta: "Correo electrónico", tipo: "email", req: true, max: 50 }
+  ];
+
+  function formulario() {
+    var campos = CAMPOS.map(function (c) {
+      return '<div class="campo"><label for="f_' + c.id + '"' +
+        (c.req ? ' class="requerido"' : "") + ">" + c.etiqueta + "</label>" +
+        '<input type="' + c.tipo + '" id="f_' + c.id + '"' +
+        (c.max ? ' maxlength="' + c.max + '"' : "") + ">" +
+        '<span class="error" id="e_' + c.id + '"></span></div>';
+    }).join("");
+
+    var roles = catalogos.roles.map(function (r) {
+      return '<option value="' + P.escapar(r.id) + '">' +
+        P.escapar(r.nombre) + "</option>";
+    }).join("");
+
+    return '<div class="rejilla">' + campos +
+      '<div class="campo"><label for="f_rol" class="requerido">Rol</label>' +
+        '<select id="f_rol"><option value="">Selecciona…</option>' + roles +
+        '</select><span class="error" id="e_rol"></span></div>' +
+      '<div class="campo"><label for="f_usuario" class="requerido">Usuario</label>' +
+        '<input type="text" id="f_usuario" maxlength="20" autocomplete="off">' +
+        '<span class="error" id="e_usuario"></span></div>' +
+      '<div class="campo"><label for="f_contrasena" class="requerido">Contraseña</label>' +
+        '<input type="password" id="f_contrasena" autocomplete="new-password">' +
+        '<span class="error" id="e_contrasena"></span></div>' +
+      '<p class="nota-form">La contraseña se almacena cifrada con PBKDF2 y ' +
+        'nunca se guarda en texto plano (RFN-03). Mínimo 8 caracteres. ' +
+        'La licencia del repartidor se registra por separado (RF58).</p>' +
+      "</div>" +
+      '<div class="acciones">' +
+        '<button class="boton boton-principal" id="btnGuardar">Registrar usuario</button>' +
+        '<button class="boton boton-neutro" id="btnCancelar">Cancelar</button>' +
+      "</div>";
+  }
+
+  function limpiarErrores() {
+    CAMPOS.concat([{ id: "rol" }, { id: "usuario" }, { id: "contrasena" }])
+      .forEach(function (c) {
+        var e = $("e_" + c.id), campo = $("f_" + c.id);
+        if (e) { e.textContent = ""; }
+        if (campo) { campo.classList.remove("invalido"); }
+      });
+  }
+
+  function marcarErrores(detalle) {
+    Object.keys(detalle || {}).forEach(function (clave) {
+      var e = $("e_" + clave), campo = $("f_" + clave);
+      var texto = Array.isArray(detalle[clave])
+        ? detalle[clave].join(" ") : String(detalle[clave]);
+      if (e) { e.textContent = texto; }
+      if (campo) { campo.classList.add("invalido"); }
+    });
+  }
+
+  function guardar() {
+    limpiarErrores();
+    var cuerpo = {};
+    CAMPOS.forEach(function (c) { cuerpo[c.id] = $("f_" + c.id).value; });
+    cuerpo.rol = $("f_rol").value;
+    cuerpo.usuario = $("f_usuario").value;
+    cuerpo.contrasena = $("f_contrasena").value;
+
+    $("btnGuardar").disabled = true;
+    P.enviarAdmin("/usuarios/", cuerpo).then(function (creado) {
+      P.cerrarModal();
+      avisar("Usuario " + creado.usuario + " registrado como " + creado.rol +
+        (creado.advertencia ? " — " + creado.advertencia : ""),
+        creado.advertencia ? "alerta" : "ok");
+      estado.pagina = 1;
+      cargar();
+    }).catch(function (e) {
+      $("btnGuardar").disabled = false;
+      if (e.detalle) {
+        marcarErrores(e.detalle);
+        avisar("Revisa los campos marcados.", "mal");
+      } else {
+        avisar(e.message, "mal");
+      }
+    });
+  }
+
+
+  /* ---------------- RF58 a RF61: acciones sobre un usuario ---------------- */
+
+  function buscarEnPantalla(identificador) {
+    var encontrado = null;
+    enPantalla.forEach(function (u) {
+      if (String(u.usuario_id) === String(identificador)) { encontrado = u; }
+    });
+    return encontrado;
+  }
+
+  function selectDe(opciones, seleccionado) {
+    return (opciones || []).map(function (o) {
+      return '<option value="' + P.escapar(o.id) + '"' +
+        (String(o.id) === String(seleccionado) ? " selected" : "") + ">" +
+        P.escapar(o.nombre) + "</option>";
+    }).join("");
+  }
+
+  function campoTexto(id, etiqueta, tipo, valor, extra) {
+    return '<div class="campo"><label for="f_' + id + '" class="requerido">' +
+      etiqueta + '</label><input type="' + tipo + '" id="f_' + id + '"' +
+      (extra || "") + ' value="' + P.escapar(valor === null ||
+        valor === undefined ? "" : valor) + '">' +
+      '<span class="error" id="e_' + id + '"></span></div>';
+  }
+
+  function cerrarConExito(mensaje) {
+    P.cerrarModal();
+    avisar(mensaje, "ok");
+    cargar();
+  }
+
+  function manejarFallo(e, boton) {
+    if (boton) { boton.disabled = false; }
+    if (e.detalle) {
+      marcarErrores(e.detalle);
+      var general = e.detalle.non_field_errors;
+      avisar(general ? general.join(" ") : "Revisa los campos marcados.", "mal");
+    } else {
+      avisar(e.message, "mal");
+    }
+  }
+
+  // --- RF59: datos personales ---
+  function formDatos(u) {
+    P.abrirModal("Editar datos de " + u.nombre);
+    $("tituloModal").textContent = "Datos personales";
+    $("cuerpoModal").innerHTML =
+      '<div class="rejilla">' +
+        campoTexto("nombre_de_pila", "Nombre(s)", "text",
+          u.nombre_de_pila, ' maxlength="25"') +
+        campoTexto("apellido_paterno", "Apellido paterno", "text",
+          u.apellido_paterno, ' maxlength="25"') +
+        '<div class="campo"><label for="f_apellido_materno">Apellido materno</label>' +
+          '<input type="text" id="f_apellido_materno" maxlength="25" value="' +
+          P.escapar(u.apellido_materno || "") + '">' +
+          '<span class="error" id="e_apellido_materno"></span></div>' +
+        campoTexto("fecha_nacimiento", "Fecha de nacimiento", "date",
+          u.fecha_nacimiento) +
+        campoTexto("telefono", "Teléfono", "tel", u.telefono, ' maxlength="15"') +
+        campoTexto("email", "Correo electrónico", "email", u.email,
+          ' maxlength="50"') +
+        '<div class="campo"><label for="f_rol" class="requerido">Rol</label>' +
+          '<select id="f_rol">' + selectDe(catalogos.roles, u.rol_id) +
+          '</select><span class="error" id="e_rol"></span></div>' +
+        '<p class="nota-form">Cambiar el rol modifica a qué módulos tendrá ' +
+          'acceso la persona. Los registros históricos no se ven afectados.</p>' +
+      "</div>" +
+      '<div class="acciones">' +
+        '<button class="boton boton-principal" id="btnGuardar">Guardar cambios</button>' +
+        '<button class="boton boton-neutro" id="btnCancelar">Cancelar</button>' +
+      "</div>";
+
+    $("btnCancelar").addEventListener("click", P.cerrarModal);
+    $("btnGuardar").addEventListener("click", function () {
+      limpiarErrores();
+      var boton = this;
+      boton.disabled = true;
+      P.enviarAdmin("/usuarios/" + u.usuario_id + "/datos/", {
+        nombre_de_pila: $("f_nombre_de_pila").value,
+        apellido_paterno: $("f_apellido_paterno").value,
+        apellido_materno: $("f_apellido_materno").value,
+        fecha_nacimiento: $("f_fecha_nacimiento").value,
+        telefono: $("f_telefono").value,
+        email: $("f_email").value,
+        rol: $("f_rol").value
+      }, "PATCH").then(function (r) {
+        cerrarConExito(r.mensaje || "Datos actualizados.");
+      }).catch(function (e) { manejarFallo(e, boton); });
+    });
+  }
+
+  // --- RF60: credenciales ---
+  function formCredenciales(u) {
+    P.abrirModal("Credenciales de " + u.nombre);
+    $("tituloModal").textContent = "Editar credenciales";
+    $("cuerpoModal").innerHTML =
+      '<div class="rejilla">' +
+        campoTexto("usuario", "Nombre de usuario", "text", u.usuario,
+          ' maxlength="20" autocomplete="off"') +
+        '<div class="campo"><label for="f_contrasena">Nueva contraseña</label>' +
+          '<input type="password" id="f_contrasena" autocomplete="new-password" ' +
+          'placeholder="Dejar vacío para no cambiarla">' +
+          '<span class="error" id="e_contrasena"></span></div>' +
+        '<p class="nota-form">La contraseña se cifra con PBKDF2 antes de ' +
+          'guardarse (RFN-03). Mínimo 8 caracteres. Si dejas el campo vacío ' +
+          'solo se actualiza el nombre de usuario.</p>' +
+      "</div>" +
+      '<div class="acciones">' +
+        '<button class="boton boton-principal" id="btnGuardar">Guardar</button>' +
+        '<button class="boton boton-neutro" id="btnCancelar">Cancelar</button>' +
+      "</div>";
+
+    $("btnCancelar").addEventListener("click", P.cerrarModal);
+    $("btnGuardar").addEventListener("click", function () {
+      limpiarErrores();
+      var boton = this;
+      boton.disabled = true;
+      var cuerpo = { usuario: $("f_usuario").value };
+      if ($("f_contrasena").value) {
+        cuerpo.contrasena = $("f_contrasena").value;
+      }
+      P.enviarAdmin("/usuarios/" + u.usuario_id + "/credenciales/", cuerpo,
+        "PATCH").then(function (r) {
+          cerrarConExito(r.mensaje || "Credenciales actualizadas.");
+        }).catch(function (e) { manejarFallo(e, boton); });
+    });
+  }
+
+  // --- RF58: licencia ---
+  function formLicencia(u) {
+    var renovando = !!u.licencia_id;
+    P.abrirModal((renovando ? "Renovar" : "Registrar") + " licencia de " + u.nombre);
+    $("tituloModal").textContent = renovando ? "Renovar licencia" : "Registrar licencia";
+    $("cuerpoModal").innerHTML =
+      '<div class="rejilla">' +
+        campoTexto("numlicencia", "Número de licencia", "text",
+          u.licencia_num || "", ' maxlength="20"') +
+        '<div class="campo"><label for="f_tipo_licencia" class="requerido">' +
+          "Tipo</label><select id=\"f_tipo_licencia\">" +
+          '<option value="">Selecciona…</option>' +
+          selectDe(catalogos.tipos_licencia, u.licencia_tipo_id) +
+          '</select><span class="error" id="e_tipo_licencia"></span></div>' +
+        campoTexto("vigencia", "Vigencia", "date", u.licencia_vigencia || "") +
+        '<p class="nota-form">La vigencia debe ser una fecha futura. ' +
+          (renovando
+            ? "Se actualizará la licencia ya ligada a este empleado."
+            : "Se generará el código de licencia automáticamente.") +
+        "</p>" +
+      "</div>" +
+      '<div class="acciones">' +
+        '<button class="boton boton-principal" id="btnGuardar">' +
+          (renovando ? "Renovar" : "Registrar") + "</button>" +
+        '<button class="boton boton-neutro" id="btnCancelar">Cancelar</button>' +
+      "</div>";
+
+    $("btnCancelar").addEventListener("click", P.cerrarModal);
+    $("btnGuardar").addEventListener("click", function () {
+      limpiarErrores();
+      var boton = this;
+      boton.disabled = true;
+      P.enviarAdmin("/usuarios/" + u.usuario_id + "/licencia/", {
+        numlicencia: $("f_numlicencia").value,
+        tipo_licencia: $("f_tipo_licencia").value,
+        vigencia: $("f_vigencia").value
+      }, "PUT").then(function (r) {
+        cerrarConExito(r.mensaje || "Licencia guardada.");
+      }).catch(function (e) { manejarFallo(e, boton); });
+    });
+  }
+
+  // --- RF61: activar / desactivar ---
+  function formEstado(u) {
+    var desactivando = u.activo;
+    P.abrirModal(u.nombre);
+    $("tituloModal").textContent = desactivando
+      ? "Desactivar cuenta" : "Reactivar cuenta";
+    $("cuerpoModal").innerHTML =
+      '<p style="font-size:14.5px;margin-bottom:14px">' +
+        (desactivando
+          ? "La cuenta de <strong>" + P.escapar(u.usuario) + "</strong> dejará " +
+            "de poder iniciar sesión. El empleado también quedará marcado como " +
+            "inactivo."
+          : "Se restablecerá el acceso de <strong>" + P.escapar(u.usuario) +
+            "</strong> y el empleado volverá a estado activo.") +
+      "</p>" +
+      '<p class="nota-form" style="margin-bottom:16px">' +
+        "No se elimina ningún registro. Los pedidos, cobros y entregas " +
+        "históricos siguen ligados a esta persona." +
+      "</p>" +
+      '<div class="acciones">' +
+        '<button class="boton ' + (desactivando ? "boton-principal" : "boton-principal") +
+          '" id="btnGuardar">' + (desactivando ? "Sí, desactivar" : "Sí, reactivar") +
+          "</button>" +
+        '<button class="boton boton-neutro" id="btnCancelar">Cancelar</button>' +
+      "</div>";
+
+    $("btnCancelar").addEventListener("click", P.cerrarModal);
+    $("btnGuardar").addEventListener("click", function () {
+      var boton = this;
+      boton.disabled = true;
+      P.enviarAdmin("/usuarios/" + u.usuario_id + "/estado/",
+        { activo: !desactivando }).then(function (r) {
+          cerrarConExito(r.mensaje || "Estado actualizado.");
+        }).catch(function (e) { manejarFallo(e, boton); });
+    });
+  }
+
+  var ACCIONES = {
+    datos: formDatos,
+    credenciales: formCredenciales,
+    licencia: formLicencia,
+    estado: formEstado
+  };
+
+  $("cuerpoTabla").addEventListener("click", function (e) {
+    var boton = e.target.closest("button[data-accion]");
+    if (!boton) { return; }
+    var fila = buscarEnPantalla(boton.dataset.id);
+    if (fila) { ACCIONES[boton.dataset.accion](fila); }
+  });
+
+  $("btnNuevo").addEventListener("click", function () {
+    P.abrirModal("Alta de empleado y cuenta de acceso");
+    $("cuerpoModal").innerHTML = formulario();
+    $("btnGuardar").addEventListener("click", guardar);
+    $("btnCancelar").addEventListener("click", P.cerrarModal);
+    $("f_nombre_de_pila").focus();
+  });
+
+  $("btnBuscar").addEventListener("click", function () {
+    estado.pagina = 1; cargar();
+  });
+  $("btnLimpiar").addEventListener("click", function () {
+    ["filtroRol", "filtroEstado", "busqueda"]
+      .forEach(function (id) { $(id).value = ""; });
+    estado.pagina = 1; cargar();
+  });
+  $("busqueda").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { estado.pagina = 1; cargar(); }
+  });
+  $("btnAnterior").addEventListener("click", function () {
+    if (estado.pagina > 1) { estado.pagina--; cargar(); }
+  });
+  $("btnSiguiente").addEventListener("click", function () {
+    if (estado.siguiente) { estado.pagina++; cargar(); }
+  });
+
+  P.pedirAdmin("/sesion/").then(pintarSesion).catch(function (e) {
+    $("sesion").innerHTML = '<p style="color:var(--peligro)">' +
+      P.escapar(e.message) + "</p>";
+  });
+
+  P.pedirAdmin("/catalogos/").then(function (d) {
+    catalogos = d;
+    P.llenarSelect("filtroRol", d.roles, "Todos");
+    P.llenarSelect("filtroEstado", d.estados_usuario, "Todos");
+  }).catch(function () { /* los filtros quedan en "Todos" */ });
+
+  cargar();
+})();
+</script>
+{% endblock %}

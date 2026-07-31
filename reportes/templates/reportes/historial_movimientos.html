@@ -1,0 +1,259 @@
+{% extends "reportes/base_panel.html" %}
+
+{% block titulo %}Movimientos de inventario{% endblock %}
+{% block encabezado %}Movimientos de inventario{% endblock %}
+{% block subtitulo %}Entradas y salidas registradas en almacén — RF48{% endblock %}
+{% block titulo_modal %}Detalle del movimiento{% endblock %}
+
+{% block estilos %}
+.flecha{font-weight:700;font-size:15px;margin-right:5px}
+.flecha.entrada{color:var(--exito)}
+.flecha.salida{color:var(--peligro)}
+.observacion{max-width:260px;color:var(--texto-tenue);font-size:13px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+{% endblock %}
+
+{% block contenido %}
+<section class="panel filtros" aria-labelledby="tituloFiltros">
+  <p class="filtros-titulo" id="tituloFiltros">Filtros de búsqueda</p>
+  <div class="rejilla">
+    <div class="campo">
+      <label for="fechaInicio">Desde</label>
+      <input type="date" id="fechaInicio">
+    </div>
+    <div class="campo">
+      <label for="fechaFin">Hasta</label>
+      <input type="date" id="fechaFin">
+    </div>
+    <div class="campo">
+      <label for="responsable">Responsable</label>
+      <select id="responsable"><option value="">Todos</option></select>
+    </div>
+    <div class="campo">
+      <label for="tipo">Tipo</label>
+      <select id="tipo"><option value="">Todos</option></select>
+    </div>
+    <div class="campo">
+      <label for="sentido">Sentido</label>
+      <select id="sentido">
+        <option value="">Todos</option>
+        <option value="entrada">Solo entradas</option>
+        <option value="salida">Solo salidas</option>
+      </select>
+    </div>
+    <div class="campo">
+      <label for="producto">Producto</label>
+      <select id="producto"><option value="">Todos</option></select>
+    </div>
+  </div>
+  <div class="acciones">
+    <button class="boton boton-principal" id="btnAplicar">Aplicar filtros</button>
+    <button class="boton boton-neutro" id="btnLimpiar">Limpiar</button>
+  </div>
+</section>
+
+<section class="indicadores" aria-label="Resumen de inventario">
+  <article class="indicador">
+    <span>Movimientos</span><strong id="kpiMovimientos">—</strong>
+  </article>
+  <article class="indicador verde">
+    <span>Unidades ingresadas</span><strong id="kpiEntradas">—</strong>
+  </article>
+  <article class="indicador rojo">
+    <span>Unidades retiradas</span><strong id="kpiSalidas">—</strong>
+  </article>
+  <article class="indicador ambar">
+    <span>Balance neto</span><strong id="kpiNeto">—</strong>
+  </article>
+</section>
+
+<section class="panel">
+  <div class="envoltura-tabla">
+    <table>
+      <caption>Movimientos registrados</caption>
+      <thead>
+        <tr>
+          <th scope="col">Folio</th>
+          <th scope="col">Fecha</th>
+          <th scope="col">Tipo</th>
+          <th scope="col">Responsable</th>
+          <th scope="col">Observaciones</th>
+          <th scope="col" class="num">Productos</th>
+          <th scope="col" class="num">Unidades</th>
+          <th scope="col" class="num">Valor</th>
+          <th scope="col">Devolución</th>
+        </tr>
+      </thead>
+      <tbody id="cuerpoTabla">
+        <tr><td colspan="9" class="aviso"><span class="girando"></span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="paginacion">
+    <p id="textoPagina">—</p>
+    <div class="acciones" style="margin:0">
+      <button class="boton boton-neutro" id="btnAnterior" disabled>Anterior</button>
+      <button class="boton boton-neutro" id="btnSiguiente" disabled>Siguiente</button>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block script %}
+<script>
+(function () {
+  "use strict";
+  var P = Panel, $ = P.$;
+  var COLS = 9;
+  var estado = { pagina: 1, siguiente: null };
+
+  function filtros() {
+    return {
+      fecha_inicio: $("fechaInicio").value,
+      fecha_fin: $("fechaFin").value,
+      responsable: $("responsable").value,
+      tipo: $("tipo").value,
+      sentido: $("sentido").value,
+      producto: $("producto").value
+    };
+  }
+
+  function flecha(sentido) {
+    if (sentido === "entrada") {
+      return '<span class="flecha entrada" aria-label="Entrada">▲</span>';
+    }
+    if (sentido === "salida") {
+      return '<span class="flecha salida" aria-label="Salida">▼</span>';
+    }
+    return "";
+  }
+
+  function pintar(lista) {
+    if (!lista.length) {
+      P.mensaje("cuerpoTabla", COLS, "Sin resultados",
+        "Ajusta los filtros para ampliar la búsqueda.");
+      return;
+    }
+    $("cuerpoTabla").innerHTML = lista.map(function (m) {
+      return '<tr tabindex="0" data-clave="' + m.codigo + '">' +
+        '<td class="folio">#' + m.codigo + "</td>" +
+        "<td>" + P.aFecha(m.fecha) + "</td>" +
+        "<td>" + flecha(m.sentido) + P.etiqueta(m.tipo, m.tipo_tono) + "</td>" +
+        "<td>" + P.escapar(m.responsable || "—") + "</td>" +
+        '<td class="observacion">' + P.escapar(m.observaciones || "—") + "</td>" +
+        '<td class="num">' + (m.productos || 0) + "</td>" +
+        '<td class="num"><strong>' + (m.unidades || 0) + "</strong></td>" +
+        '<td class="num">' + P.dinero.format(m.valor || 0) + "</td>" +
+        '<td class="folio">' +
+          (m.devolucion_num ? "#" + m.devolucion_num : "—") + "</td></tr>";
+    }).join("");
+  }
+
+  function cargar() {
+    P.cargando("cuerpoTabla", COLS);
+    P.pedir("/movimientos/?" + P.parametros(filtros(), estado.pagina))
+      .then(function (d) {
+        pintar(d.results || []);
+        var r = d.resumen || {};
+        $("kpiMovimientos").textContent = r.movimientos || 0;
+        $("kpiEntradas").textContent = r.entradas || 0;
+        $("kpiSalidas").textContent = r.salidas || 0;
+        var neto = r.neto || 0;
+        $("kpiNeto").textContent = (neto > 0 ? "+" : "") + neto;
+
+        estado.siguiente = d.next;
+        $("btnAnterior").disabled = !d.previous;
+        $("btnSiguiente").disabled = !d.next;
+        var n = (d.results || []).length;
+        $("textoPagina").textContent = n
+          ? "Mostrando " + n + " de " + (d.count || 0) + " movimientos"
+          : "Sin movimientos que coincidan";
+      }).catch(function (e) {
+        P.mensaje("cuerpoTabla", COLS, "No se pudo cargar el historial",
+          e.message, true);
+        ["kpiMovimientos", "kpiEntradas", "kpiSalidas", "kpiNeto", "textoPagina"]
+          .forEach(function (id) { $(id).textContent = "—"; });
+      });
+  }
+
+  function detalle(codigo) {
+    P.abrirModal("Folio #" + codigo);
+    P.pedir("/movimientos/" + codigo + "/").then(function (m) {
+      var renglones = (m.detalles || []).map(function (x) {
+        return "<tr><td>" + P.escapar(x.producto) + "</td>" +
+          '<td class="num">' + x.cantidad + "</td>" +
+          '<td class="num">' + P.dinero.format(x.precio_unitario) + "</td>" +
+          '<td class="num">' + P.dinero.format(x.subtotal) + "</td></tr>";
+      }).join("");
+
+      $("cuerpoModal").innerHTML =
+        '<div class="ficha">' +
+          "<div><span>Fecha</span><strong>" + P.aFechaHora(m.fecha) + "</strong></div>" +
+          "<div><span>Tipo</span><strong>" + flecha(m.sentido) +
+            P.etiqueta(m.tipo, m.tipo_tono) + "</strong></div>" +
+          "<div><span>Responsable</span><strong>" +
+            P.escapar(m.responsable || "—") + "</strong></div>" +
+          "<div><span>Devolución</span><strong>" +
+            (m.devolucion_num ? "#" + m.devolucion_num : "No aplica") +
+            "</strong></div>" +
+          (m.devolucion_motivo
+            ? "<div><span>Motivo</span><strong>" +
+              P.escapar(m.devolucion_motivo) + "</strong></div>"
+            : "") +
+        "</div>" +
+        (m.observaciones
+          ? '<p class="subtitulo">Observaciones</p><p style="font-size:14px">' +
+            P.escapar(m.observaciones) + "</p>"
+          : "") +
+        '<p class="subtitulo">Productos afectados</p>' +
+        (renglones
+          ? '<table><thead><tr><th>Producto</th><th class="num">Cant.</th>' +
+            '<th class="num">P. unitario</th><th class="num">Subtotal</th>' +
+            "</tr></thead><tbody>" + renglones + "</tbody></table>"
+          : '<p class="aviso">Este movimiento no tiene renglones de producto.</p>') +
+        '<div class="totales">' +
+          "<div><span>Unidades</span><strong>" +
+            (m.sentido === "salida" ? "−" : m.sentido === "entrada" ? "+" : "") +
+            (m.unidades || 0) + "</strong></div>" +
+          '<div class="final"><span>Valor</span><strong>' +
+            P.dinero.format(m.valor || 0) + "</strong></div>" +
+        "</div>";
+    }).catch(function (e) {
+      $("cuerpoModal").innerHTML =
+        '<p class="aviso error"><strong>No se pudo abrir el movimiento</strong>' +
+        P.escapar(e.message) + "</p>";
+    });
+  }
+
+  $("btnAplicar").addEventListener("click", function () { estado.pagina = 1; cargar(); });
+  $("btnLimpiar").addEventListener("click", function () {
+    ["fechaInicio", "fechaFin", "responsable", "tipo", "sentido", "producto"]
+      .forEach(function (id) { $(id).value = ""; });
+    estado.pagina = 1; cargar();
+  });
+  $("btnAnterior").addEventListener("click", function () {
+    if (estado.pagina > 1) { estado.pagina--; cargar(); }
+  });
+  $("btnSiguiente").addEventListener("click", function () {
+    if (estado.siguiente) { estado.pagina++; cargar(); }
+  });
+  $("cuerpoTabla").addEventListener("click", function (e) {
+    var f = e.target.closest("tr[data-clave]");
+    if (f) { detalle(f.dataset.clave); }
+  });
+  $("cuerpoTabla").addEventListener("keydown", function (e) {
+    if (e.key !== "Enter") { return; }
+    var f = e.target.closest("tr[data-clave]");
+    if (f) { detalle(f.dataset.clave); }
+  });
+
+  P.pedir("/catalogos/").then(function (d) {
+    P.llenarSelect("responsable", d.responsables, "Todos");
+    P.llenarSelect("tipo", d.tipos_movimiento, "Todos");
+    P.llenarSelect("producto", d.productos, "Todos");
+  }).catch(function () { /* los filtros quedan en "Todos" */ });
+
+  cargar();
+})();
+</script>
+{% endblock %}

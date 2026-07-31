@@ -67,3 +67,26 @@ def tono(codigo):
 ENTREGA_COMPLETADA = 'EEN004'
 PEDIDO_ENTREGADO = 'EPD005'
 PEDIDO_CANCELADO = 'EPD006'
+
+# Movimientos que suman o restan existencias. El signo lo determina el
+# tipo, no la cantidad: en DETALLE_MOVIMIENTO todas las cantidades son
+# positivas y el trigger tg_actualizar_stock decide si suma o resta.
+MOVIMIENTOS_ENTRADA = ('TM001', 'TM004')   # Entrada, Entrada por devolucion
+MOVIMIENTOS_SALIDA = ('TM002', 'TM003')    # Salida por pedido, Salida por merma
+
+# Un pedido esta activo mientras no se haya entregado ni cancelado: sigue
+# ocupando inventario, ruta o cobranza. Es el universo del RF49.
+PEDIDOS_ACTIVOS = (
+    'EPD001',   # Pendiente de validacion
+    'EPD002',   # En proceso
+    'EPD003',   # Registrado
+    'EPD004',   # Surtido
+)
+
+# Dias sin avanzar a partir de los cuales un pedido activo se marca como
+# rezagado en el monitor.
+DIAS_PEDIDO_REZAGADO = 3
+
+# Formas de pago diferenciadas por el RF55.
+PAGO_EFECTIVO = 'TP001'
+PAGO_TARJETA = 'TP002'

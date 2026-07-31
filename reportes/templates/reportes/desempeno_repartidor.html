@@ -1,0 +1,251 @@
+{% extends "reportes/base_panel.html" %}
+
+{% block titulo %}Desempeño de repartidores{% endblock %}
+{% block encabezado %}Desempeño de repartidores{% endblock %}
+{% block subtitulo %}Entregas ejecutadas y tiempos de ruta — RF53{% endblock %}
+
+{% block estilos %}
+.ranking{padding:20px 22px 16px;margin-bottom:20px}
+.ranking h2{font-size:15px;font-weight:650;text-transform:uppercase;
+  letter-spacing:.6px;color:var(--texto-tenue);margin-bottom:6px}
+.ranking p.pie{font-size:12.5px;color:var(--texto-tenue);margin-bottom:16px}
+.linea{display:grid;grid-template-columns:26px 1fr 128px;gap:12px;
+  align-items:center;margin-bottom:12px}
+.puesto{width:26px;height:26px;border-radius:50%;background:var(--fondo);
+  color:var(--texto-tenue);display:grid;place-items:center;
+  font-size:12px;font-weight:700}
+.puesto.oro{background:#2A2640;color:#fff}
+.linea-nombre{font-size:13.5px;font-weight:600;margin-bottom:4px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.riel{height:11px;border-radius:99px;background:#EEF0F4;overflow:hidden;
+  display:flex}
+.riel i{display:block;height:100%}
+.riel i.hecho{background:var(--exito)}
+.riel i.resto{background:#D4D8E0}
+.linea-monto{text-align:right;font-weight:650;font-size:13.5px;
+  font-variant-numeric:tabular-nums}
+.linea-monto small{display:block;font-weight:500;font-size:11.5px;
+  color:var(--texto-tenue)}
+.indicador strong.texto{font-size:17px;letter-spacing:0;line-height:1.35}
+.podio{font-weight:700;color:var(--primario)}
+.rango{font-size:11.5px;color:var(--texto-tenue);display:block}
+{% endblock %}
+
+{% block contenido %}
+<section class="panel filtros" aria-labelledby="tituloFiltros">
+  <p class="filtros-titulo" id="tituloFiltros">Parámetros del reporte</p>
+  <div class="rejilla">
+    <div class="campo">
+      <label for="campoFecha">Filtrar por</label>
+      <select id="campoFecha">
+        <option value="creacion">Fecha de creación</option>
+        <option value="entrega">Fecha de entrega</option>
+      </select>
+    </div>
+    <div class="campo">
+      <label for="fechaInicio">Desde</label>
+      <input type="date" id="fechaInicio">
+    </div>
+    <div class="campo">
+      <label for="fechaFin">Hasta</label>
+      <input type="date" id="fechaFin">
+    </div>
+    <div class="campo">
+      <label for="orden">Ordenar por</label>
+      <select id="orden">
+        <option value="entregas">Entregas asignadas</option>
+        <option value="completadas">Entregas completadas</option>
+        <option value="tiempo">Tiempo promedio</option>
+        <option value="monto">Monto distribuido</option>
+        <option value="nombre">Nombre</option>
+      </select>
+    </div>
+  </div>
+  <div class="acciones">
+    <button class="boton boton-principal" id="btnAplicar">Generar reporte</button>
+    <button class="boton boton-neutro" id="btnLimpiar">Limpiar</button>
+  </div>
+</section>
+
+<section class="indicadores" aria-label="Resumen de distribución">
+  <article class="indicador">
+    <span>Repartidores</span><strong id="kpiRepartidores">—</strong>
+  </article>
+  <article class="indicador verde">
+    <span>Entregas completadas</span><strong id="kpiCompletadas">—</strong>
+  </article>
+  <article class="indicador ambar">
+    <span>Tiempo promedio</span><strong id="kpiTiempo">—</strong>
+  </article>
+  <article class="indicador">
+    <span>Más rápido</span>
+    <strong class="texto" id="kpiRapido">—</strong>
+  </article>
+</section>
+
+<section class="panel ranking">
+  <h2>Cumplimiento de entregas</h2>
+  <p class="pie">La porción verde son las entregas completadas sobre el total asignado.</p>
+  <div id="ranking">
+    <p class="aviso"><span class="girando"></span></p>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="envoltura-tabla">
+    <table>
+      <caption>Detalle por repartidor</caption>
+      <thead>
+        <tr>
+          <th scope="col">#</th>
+          <th scope="col">Repartidor</th>
+          <th scope="col" class="num">Entregas</th>
+          <th scope="col" class="num">Completadas</th>
+          <th scope="col" class="num">Cumplimiento</th>
+          <th scope="col" class="num">Pedidos</th>
+          <th scope="col" class="num">Paradas</th>
+          <th scope="col" class="num">Devoluciones</th>
+          <th scope="col" class="num">Tiempo prom.</th>
+          <th scope="col" class="num">Monto</th>
+        </tr>
+      </thead>
+      <tbody id="cuerpoTabla">
+        <tr><td colspan="10" class="aviso"><span class="girando"></span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+
+{% block script %}
+<script>
+(function () {
+  "use strict";
+  var P = Panel, $ = P.$;
+  var COLS = 10;
+
+  function filtros() {
+    return {
+      campo_fecha: $("campoFecha").value,
+      fecha_inicio: $("fechaInicio").value,
+      fecha_fin: $("fechaFin").value,
+      orden: $("orden").value
+    };
+  }
+
+  /* Los tiempos vienen en horas: se muestran en la unidad mas legible. */
+  function duracion(horas) {
+    if (horas === null || horas === undefined) { return "—"; }
+    if (horas < 1) { return Math.round(horas * 60) + " min"; }
+    if (horas < 48) { return horas + " h"; }
+    return Math.round(horas / 24 * 10) / 10 + " días";
+  }
+
+  function pintarRanking(lista) {
+    if (!lista.length) {
+      $("ranking").innerHTML =
+        '<p class="aviso"><strong>Sin datos</strong>' +
+        "No hay entregas en el periodo seleccionado.</p>";
+      return;
+    }
+    var tope = Math.max.apply(null, lista.map(function (r) {
+      return r.entregas || 0;
+    })) || 1;
+
+    $("ranking").innerHTML = lista.map(function (r, indice) {
+      // El ancho total representa las entregas asignadas frente al
+      // repartidor con mas carga; dentro, el verde son las completadas.
+      var anchoTotal = (r.entregas / tope) * 100;
+      var proporcion = r.entregas ? r.completadas / r.entregas : 0;
+      return '<div class="linea">' +
+        '<span class="puesto' + (indice === 0 ? " oro" : "") + '">' +
+          (indice + 1) + "</span>" +
+        "<div>" +
+          '<p class="linea-nombre">' + P.escapar(r.nombre) + "</p>" +
+          '<div class="riel" style="width:' + anchoTotal + '%">' +
+            '<i class="hecho" style="width:' + (proporcion * 100) + '%"></i>' +
+            '<i class="resto" style="width:' + ((1 - proporcion) * 100) + '%"></i>' +
+          "</div>" +
+        "</div>" +
+        '<div class="linea-monto">' + r.completadas + " / " + r.entregas +
+          "<small>" + duracion(r.horas_promedio) + " promedio</small></div>" +
+        "</div>";
+    }).join("");
+  }
+
+  function pintarTabla(lista) {
+    if (!lista.length) {
+      P.mensaje("cuerpoTabla", COLS, "Sin resultados",
+        "No hay entregas en el periodo seleccionado.");
+      return;
+    }
+    $("cuerpoTabla").innerHTML = lista.map(function (r) {
+      var cumpl = r.cumplimiento;
+      var claseCumpl = cumpl >= 80 ? "verde" : cumpl >= 50 ? "ambar" : "rojo";
+      var rango = (r.horas_minimo !== null && r.medidas > 1)
+        ? '<span class="rango">' + duracion(r.horas_minimo) + " a " +
+          duracion(r.horas_maximo) + "</span>"
+        : "";
+      return "<tr>" +
+        '<td class="podio">' + r.posicion + "</td>" +
+        "<td><strong>" + P.escapar(r.nombre) + "</strong></td>" +
+        '<td class="num">' + r.entregas + "</td>" +
+        '<td class="num"><strong>' + r.completadas + "</strong></td>" +
+        '<td class="num">' + P.etiqueta(cumpl + "%", claseCumpl) + "</td>" +
+        '<td class="num">' + r.pedidos + "</td>" +
+        '<td class="num">' + r.paradas + "</td>" +
+        '<td class="num">' +
+          (r.devoluciones ? P.etiqueta(r.devoluciones, "ambar") : "0") + "</td>" +
+        '<td class="num"><strong>' + duracion(r.horas_promedio) + "</strong>" +
+          rango + "</td>" +
+        '<td class="num">' + P.dinero.format(r.monto || 0) + "</td></tr>";
+    }).join("");
+  }
+
+  function cargar() {
+    P.cargando("cuerpoTabla", COLS);
+    $("ranking").innerHTML = '<p class="aviso"><span class="girando"></span></p>';
+
+    P.pedir("/desempeno-repartidor/?" + P.parametros(filtros(), 1))
+      .then(function (d) {
+        var lista = d.repartidores || [];
+        // El ranking siempre se ordena por carga asignada.
+        var porCarga = lista.slice().sort(function (a, b) {
+          return b.entregas - a.entregas;
+        });
+        pintarRanking(porCarga);
+        pintarTabla(lista);
+
+        var r = d.resumen || {};
+        $("kpiRepartidores").textContent = r.repartidores || 0;
+        $("kpiCompletadas").textContent = (r.completadas || 0) +
+          " de " + (r.entregas || 0);
+        $("kpiTiempo").textContent = duracion(r.horas_promedio);
+        $("kpiRapido").textContent = r.rapido_nombre
+          ? r.rapido_nombre + " · " + duracion(r.rapido_horas)
+          : "Sin medición";
+      }).catch(function (e) {
+        P.mensaje("cuerpoTabla", COLS, "No se pudo generar el reporte",
+          e.message, true);
+        $("ranking").innerHTML =
+          '<p class="aviso error"><strong>Sin ranking</strong>' +
+          P.escapar(e.message) + "</p>";
+        ["kpiRepartidores", "kpiCompletadas", "kpiTiempo", "kpiRapido"]
+          .forEach(function (id) { $(id).textContent = "—"; });
+      });
+  }
+
+  $("btnAplicar").addEventListener("click", cargar);
+  $("orden").addEventListener("change", cargar);
+  $("campoFecha").addEventListener("change", cargar);
+  $("btnLimpiar").addEventListener("click", function () {
+    ["fechaInicio", "fechaFin"].forEach(function (id) { $(id).value = ""; });
+    $("campoFecha").value = "creacion";
+    $("orden").value = "entregas";
+    cargar();
+  });
+
+  cargar();
+})();
+</script>
+{% endblock %}

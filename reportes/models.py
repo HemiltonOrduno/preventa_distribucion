@@ -359,7 +359,7 @@ class Movimiento(models.Model):
     )
     devolucion = models.ForeignKey(
         Devolucion, models.DO_NOTHING, db_column='devolucion',
-        related_name='+', blank=True, null=True,
+        related_name='movimientos', blank=True, null=True,
     )
     empleado = models.ForeignKey(
         'usuarios.Empleado', models.DO_NOTHING,
@@ -429,4 +429,91 @@ class VistaReporteVentasAdmin(models.Model):
         db_table = 'vta_reporte_ventas_admin'
 
 
-        
+# ---------------------------------------------------------------------------
+# Catalogos y tablas de personal (Modulo 9 - Gestion de usuarios)
+# ---------------------------------------------------------------------------
+
+class Rol(models.Model):
+    """R001 Administrador, R002 Coordinador, R003 Vendedor,
+    R004 Almacenista, R005 Repartidor."""
+
+    codigo = models.CharField(primary_key=True, max_length=10)
+    nombre = models.CharField(max_length=20, unique=True)
+    descripcion = models.CharField(max_length=100, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'rol'
+
+    def __str__(self):
+        return self.nombre
+
+
+class EdoUsuario(models.Model):
+    """EU001 Activo, EU002 Inactivo."""
+
+    codigo = models.CharField(primary_key=True, max_length=10)
+    nombre = models.CharField(max_length=20, unique=True)
+    descripcion = models.CharField(max_length=100, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'edo_usuario'
+
+    def __str__(self):
+        return self.nombre
+
+
+class EdoEmpleado(models.Model):
+    """EE001 Activo, EE002 Inactivo."""
+
+    codigo = models.CharField(primary_key=True, max_length=10)
+    nombre = models.CharField(max_length=20, unique=True)
+    descripcion = models.CharField(max_length=100, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'edo_empleado'
+
+    def __str__(self):
+        return self.nombre
+
+
+class TipoLicencia(models.Model):
+    """A1 Automovilista, B1 Tipo B, C1 Tipo C, DC1 Montacarguista."""
+
+    codigo = models.CharField(primary_key=True, max_length=10)
+    nombre = models.CharField(max_length=20, unique=True)
+    descripcion = models.CharField(max_length=150, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'tipo_licencia'
+
+    def __str__(self):
+        return self.nombre
+
+
+class Licencia(models.Model):
+    """Licencia de conducir u operacion.
+
+    OJO: la tabla real NO tiene columna 'usuario'. La relacion va en
+    sentido contrario: EMPLEADO.licencia apunta aqui. El modelo de la app
+    usuarios declara un FK 'usuario' que no existe en la base y fallara al
+    consultarse; por eso se declara aqui la version correcta.
+    """
+
+    codigo = models.CharField(primary_key=True, max_length=10)
+    numlicencia = models.CharField(max_length=20, unique=True)
+    vigencia = models.DateField()
+    tipo_licencia = models.ForeignKey(
+        TipoLicencia, models.DO_NOTHING,
+        db_column='tipo_licencia', related_name='+',
+    )
+
+    class Meta:
+        managed = False
+        db_table = 'licencia'
+
+    def __str__(self):
+        return self.numlicencia

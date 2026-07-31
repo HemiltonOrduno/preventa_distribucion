@@ -1,0 +1,258 @@
+{% extends "reportes/base_panel.html" %}
+
+{% block titulo %}Historial de devoluciones{% endblock %}
+{% block encabezado %}Historial de devoluciones{% endblock %}
+{% block subtitulo %}Producto devuelto durante la distribución — RF47{% endblock %}
+{% block titulo_modal %}Detalle de la devolución{% endblock %}
+
+{% block estilos %}
+.motivo{max-width:280px}
+.motivo strong{display:block;font-weight:600}
+.motivo small{display:block;color:var(--texto-tenue);font-size:12.5px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.indicador strong.texto{font-size:18px;letter-spacing:0;line-height:1.35}
+{% endblock %}
+
+{% block contenido %}
+<section class="panel filtros" aria-labelledby="tituloFiltros">
+  <p class="filtros-titulo" id="tituloFiltros">Filtros de búsqueda</p>
+  <div class="rejilla">
+    <div class="campo">
+      <label for="fechaInicio">Desde</label>
+      <input type="date" id="fechaInicio">
+    </div>
+    <div class="campo">
+      <label for="fechaFin">Hasta</label>
+      <input type="date" id="fechaFin">
+    </div>
+    <div class="campo">
+      <label for="repartidor">Repartidor</label>
+      <select id="repartidor"><option value="">Todos</option></select>
+    </div>
+    <div class="campo">
+      <label for="motivo">Motivo</label>
+      <select id="motivo"><option value="">Todos</option></select>
+    </div>
+    <div class="campo">
+      <label for="entrega">Entrega</label>
+      <input type="number" id="entrega" min="1" placeholder="Folio de entrega">
+    </div>
+  </div>
+  <div class="acciones">
+    <button class="boton boton-principal" id="btnAplicar">Aplicar filtros</button>
+    <button class="boton boton-neutro" id="btnLimpiar">Limpiar</button>
+  </div>
+</section>
+
+<section class="indicadores" aria-label="Resumen de devoluciones">
+  <article class="indicador">
+    <span>Devoluciones</span><strong id="kpiDevoluciones">—</strong>
+  </article>
+  <article class="indicador ambar">
+    <span>Unidades devueltas</span><strong id="kpiUnidades">—</strong>
+  </article>
+  <article class="indicador rojo">
+    <span>Valor devuelto</span><strong id="kpiValor">—</strong>
+  </article>
+  <article class="indicador">
+    <span>Motivo más frecuente</span>
+    <strong class="texto" id="kpiMotivo">—</strong>
+  </article>
+</section>
+
+<section class="panel">
+  <div class="envoltura-tabla">
+    <table>
+      <caption>Devoluciones registradas</caption>
+      <thead>
+        <tr>
+          <th scope="col">Folio</th>
+          <th scope="col">Fecha</th>
+          <th scope="col">Motivo</th>
+          <th scope="col">Entrega</th>
+          <th scope="col">Repartidor</th>
+          <th scope="col" class="num">Cantidad</th>
+          <th scope="col" class="num">Productos</th>
+          <th scope="col" class="num">Valor</th>
+          <th scope="col">Estado entrega</th>
+        </tr>
+      </thead>
+      <tbody id="cuerpoTabla">
+        <tr><td colspan="9" class="aviso"><span class="girando"></span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="paginacion">
+    <p id="textoPagina">—</p>
+    <div class="acciones" style="margin:0">
+      <button class="boton boton-neutro" id="btnAnterior" disabled>Anterior</button>
+      <button class="boton boton-neutro" id="btnSiguiente" disabled>Siguiente</button>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block script %}
+<script>
+(function () {
+  "use strict";
+  var P = Panel, $ = P.$;
+  var COLS = 9;
+  var estado = { pagina: 1, siguiente: null };
+
+  function filtros() {
+    return {
+      fecha_inicio: $("fechaInicio").value,
+      fecha_fin: $("fechaFin").value,
+      repartidor: $("repartidor").value,
+      motivo: $("motivo").value,
+      entrega: $("entrega").value
+    };
+  }
+
+  function pintar(lista) {
+    if (!lista.length) {
+      P.mensaje("cuerpoTabla", COLS, "Sin resultados",
+        "Ajusta los filtros para ampliar la búsqueda.");
+      return;
+    }
+    $("cuerpoTabla").innerHTML = lista.map(function (d) {
+      return '<tr tabindex="0" data-clave="' + d.codigo + '">' +
+        '<td class="folio">#' + d.codigo + "</td>" +
+        "<td>" + P.aFecha(d.fecha) + "</td>" +
+        '<td class="motivo"><strong>' + P.escapar(d.motivo || "Sin motivo") +
+          "</strong><small>" + P.escapar(d.descripcion || "") + "</small></td>" +
+        '<td class="folio">' + (d.entrega_num ? "#" + d.entrega_num : "—") + "</td>" +
+        "<td>" + P.escapar(d.repartidor || "—") + "</td>" +
+        '<td class="num">' + (d.cantidad || 0) + "</td>" +
+        '<td class="num">' + (d.productos || 0) + "</td>" +
+        '<td class="num"><strong>' + P.dinero.format(d.valor || 0) + "</strong></td>" +
+        "<td>" + P.etiqueta(d.estado_entrega, d.estado_entrega_tono) + "</td></tr>";
+    }).join("");
+  }
+
+  function cargar() {
+    P.cargando("cuerpoTabla", COLS);
+    P.pedir("/devoluciones/?" + P.parametros(filtros(), estado.pagina))
+      .then(function (d) {
+        pintar(d.results || []);
+        var r = d.resumen || {};
+        $("kpiDevoluciones").textContent = r.devoluciones || 0;
+        $("kpiUnidades").textContent = r.unidades || 0;
+        $("kpiValor").textContent = P.dinero.format(r.valor || 0);
+        $("kpiMotivo").textContent = r.motivo_frecuente
+          ? r.motivo_frecuente + " (" + r.motivo_frecuente_veces + ")"
+          : "Sin datos";
+
+        estado.siguiente = d.next;
+        $("btnAnterior").disabled = !d.previous;
+        $("btnSiguiente").disabled = !d.next;
+        var n = (d.results || []).length;
+        $("textoPagina").textContent = n
+          ? "Mostrando " + n + " de " + (d.count || 0) + " devoluciones"
+          : "Sin devoluciones que coincidan";
+      }).catch(function (e) {
+        P.mensaje("cuerpoTabla", COLS, "No se pudo cargar el historial",
+          e.message, true);
+        ["kpiDevoluciones", "kpiUnidades", "kpiValor", "kpiMotivo", "textoPagina"]
+          .forEach(function (id) { $(id).textContent = "—"; });
+      });
+  }
+
+  function detalle(codigo) {
+    P.abrirModal("Folio #" + codigo);
+    P.pedir("/devoluciones/" + codigo + "/").then(function (d) {
+      var movimientos = (d.movimientos || []).map(function (m) {
+        var renglones = (m.detalles || []).map(function (x) {
+          return "<tr><td>" + P.escapar(x.producto) + "</td>" +
+            '<td class="num">' + x.cantidad + "</td>" +
+            '<td class="num">' + P.dinero.format(x.precio_unitario) + "</td>" +
+            '<td class="num">' + P.dinero.format(x.subtotal) + "</td></tr>";
+        }).join("");
+
+        return '<p class="subtitulo">Movimiento #' + m.codigo + " · " +
+          P.etiqueta(m.tipo, m.tipo_tono) + " · " + P.aFecha(m.fecha) +
+          (m.responsable ? " · " + P.escapar(m.responsable) : "") + "</p>" +
+          (m.observaciones
+            ? '<p style="font-size:13.5px;color:var(--texto-tenue);margin-bottom:8px">' +
+              P.escapar(m.observaciones) + "</p>"
+            : "") +
+          (renglones
+            ? '<table><thead><tr><th>Producto</th><th class="num">Cant.</th>' +
+              '<th class="num">P. unitario</th><th class="num">Subtotal</th>' +
+              "</tr></thead><tbody>" + renglones + "</tbody></table>"
+            : '<p class="aviso">Sin renglones de producto.</p>');
+      }).join("");
+
+      $("cuerpoModal").innerHTML =
+        '<div class="ficha">' +
+          "<div><span>Fecha</span><strong>" + P.aFecha(d.fecha) + "</strong></div>" +
+          "<div><span>Motivo</span><strong>" +
+            P.escapar(d.motivo || "Sin motivo") + "</strong></div>" +
+          "<div><span>Entrega</span><strong>" +
+            (d.entrega_num ? "#" + d.entrega_num : "—") + "</strong></div>" +
+          "<div><span>Repartidor</span><strong>" +
+            P.escapar(d.repartidor || "—") + "</strong></div>" +
+          "<div><span>Estado entrega</span><strong>" +
+            P.etiqueta(d.estado_entrega, d.estado_entrega_tono) + "</strong></div>" +
+          "<div><span>Cantidad reportada</span><strong>" +
+            (d.cantidad || 0) + "</strong></div>" +
+        "</div>" +
+        (d.descripcion
+          ? '<p class="subtitulo">Descripción</p><p style="font-size:14px">' +
+            P.escapar(d.descripcion) + "</p>"
+          : "") +
+        (movimientos
+          ? movimientos
+          : '<p class="aviso">Esta devolución no generó movimientos de inventario.</p>') +
+        '<div class="totales">' +
+          "<div><span>Unidades</span><strong>" + (d.unidades || 0) + "</strong></div>" +
+          '<div class="final"><span>Valor devuelto</span><strong>' +
+            P.dinero.format(d.valor || 0) + "</strong></div>" +
+        "</div>" +
+        (d.unidades && d.cantidad && d.unidades !== d.cantidad
+          ? '<p class="aviso error" style="padding:14px 0 0"><strong>' +
+            "La cantidad reportada no coincide con el inventario</strong>" +
+            "Reportado: " + d.cantidad + " · Movido: " + d.unidades + "</p>"
+          : "");
+    }).catch(function (e) {
+      $("cuerpoModal").innerHTML =
+        '<p class="aviso error"><strong>No se pudo abrir la devolución</strong>' +
+        P.escapar(e.message) + "</p>";
+    });
+  }
+
+  $("btnAplicar").addEventListener("click", function () { estado.pagina = 1; cargar(); });
+  $("btnLimpiar").addEventListener("click", function () {
+    ["fechaInicio", "fechaFin", "repartidor", "motivo", "entrega"]
+      .forEach(function (id) { $(id).value = ""; });
+    estado.pagina = 1; cargar();
+  });
+  $("btnAnterior").addEventListener("click", function () {
+    if (estado.pagina > 1) { estado.pagina--; cargar(); }
+  });
+  $("btnSiguiente").addEventListener("click", function () {
+    if (estado.siguiente) { estado.pagina++; cargar(); }
+  });
+  $("entrega").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { estado.pagina = 1; cargar(); }
+  });
+  $("cuerpoTabla").addEventListener("click", function (e) {
+    var f = e.target.closest("tr[data-clave]");
+    if (f) { detalle(f.dataset.clave); }
+  });
+  $("cuerpoTabla").addEventListener("keydown", function (e) {
+    if (e.key !== "Enter") { return; }
+    var f = e.target.closest("tr[data-clave]");
+    if (f) { detalle(f.dataset.clave); }
+  });
+
+  P.pedir("/catalogos/").then(function (d) {
+    P.llenarSelect("repartidor", d.repartidores, "Todos");
+    P.llenarSelect("motivo", d.motivos, "Todos");
+  }).catch(function () { /* los filtros quedan en "Todos" */ });
+
+  cargar();
+})();
+</script>
+{% endblock %}

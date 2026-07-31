@@ -213,15 +213,58 @@ tbody tr:focus-visible{outline:2px solid var(--primario);outline-offset:-2px}
      class="{% if seccion == 'entregas' %}activo{% endif %}"
      {% if seccion == 'entregas' %}aria-current="page"{% endif %}>
      <i class="icono">🚚</i> Historial de entregas</a>
-  <a href="#" class="pendiente"><i class="icono">💵</i> Historial de cobros</a>
-  <a href="#" class="pendiente"><i class="icono">↩️</i> Historial de devoluciones</a>
-  <a href="#" class="pendiente"><i class="icono">📦</i> Movimientos de inventario</a>
-  <a href="#" class="pendiente"><i class="icono">🕐</i> Pedidos activos</a>
-  <a href="#" class="pendiente"><i class="icono">📊</i> Reportes de venta</a>
+  <a href="{% url 'panel_admin:historial-cobros' %}"
+     class="{% if seccion == 'cobros' %}activo{% endif %}"
+     {% if seccion == 'cobros' %}aria-current="page"{% endif %}>
+     <i class="icono">💵</i> Historial de cobros</a>
+  <a href="{% url 'panel_admin:historial-devoluciones' %}"
+     class="{% if seccion == 'devoluciones' %}activo{% endif %}"
+     {% if seccion == 'devoluciones' %}aria-current="page"{% endif %}>
+     <i class="icono">↩️</i> Historial de devoluciones</a>
+  <a href="{% url 'panel_admin:historial-movimientos' %}"
+     class="{% if seccion == 'movimientos' %}activo{% endif %}"
+     {% if seccion == 'movimientos' %}aria-current="page"{% endif %}>
+     <i class="icono">📦</i> Movimientos de inventario</a>
+  <a href="{% url 'panel_admin:pedidos-activos' %}"
+     class="{% if seccion == 'activos' %}activo{% endif %}"
+     {% if seccion == 'activos' %}aria-current="page"{% endif %}>
+     <i class="icono">🕐</i> Pedidos activos</a>
+
+  <p class="menu-grupo">Reportes de venta</p>
+  <a href="{% url 'panel_admin:volumen-pedidos' %}"
+     class="{% if seccion == 'volumen' %}activo{% endif %}"
+     {% if seccion == 'volumen' %}aria-current="page"{% endif %}>
+     <i class="icono">📊</i> Volumen de pedidos</a>
+  <a href="{% url 'panel_admin:ventas-vendedor' %}"
+     class="{% if seccion == 'ventas_vendedor' %}activo{% endif %}"
+     {% if seccion == 'ventas_vendedor' %}aria-current="page"{% endif %}>
+     <i class="icono">🧑‍💼</i> Ventas por vendedor</a>
+  <a href="{% url 'panel_admin:ventas-cliente' %}"
+     class="{% if seccion == 'ventas_cliente' %}activo{% endif %}"
+     {% if seccion == 'ventas_cliente' %}aria-current="page"{% endif %}>
+     <i class="icono">🏪</i> Ventas por cliente</a>
+  <a href="{% url 'panel_admin:desempeno-repartidor' %}"
+     class="{% if seccion == 'desempeno' %}activo{% endif %}"
+     {% if seccion == 'desempeno' %}aria-current="page"{% endif %}>
+     <i class="icono">🚛</i> Desempeño de repartidores</a>
+  <a href="{% url 'panel_admin:productos-vendidos' %}"
+     class="{% if seccion == 'productos' %}activo{% endif %}"
+     {% if seccion == 'productos' %}aria-current="page"{% endif %}>
+     <i class="icono">🥇</i> Productos más vendidos</a>
+  <a href="{% url 'panel_admin:reporte-cobranza' %}"
+     class="{% if seccion == 'cobranza' %}activo{% endif %}"
+     {% if seccion == 'cobranza' %}aria-current="page"{% endif %}>
+     <i class="icono">💰</i> Reporte de cobranza</a>
 
   <p class="menu-grupo">Gestión de usuarios</p>
-  <a href="#" class="pendiente"><i class="icono">👥</i> Usuarios</a>
-  <a href="#" class="pendiente"><i class="icono">🪪</i> Licencias</a>
+  <a href="{% url 'panel_usuarios:gestion-usuarios' %}"
+     class="{% if seccion == 'usuarios' %}activo{% endif %}"
+     {% if seccion == 'usuarios' %}aria-current="page"{% endif %}>
+     <i class="icono">👥</i> Usuarios</a>
+  <a href="{% url 'panel_usuarios:licencias' %}"
+     class="{% if seccion == 'licencias' %}activo{% endif %}"
+     {% if seccion == 'licencias' %}aria-current="page"{% endif %}>
+     <i class="icono">🪪</i> Licencias</a>
 </nav>
 
 <div class="lienzo">
@@ -266,10 +309,13 @@ var Panel = (function () {
   "use strict";
 
   var API = "/api/reportes";
+  var API_ADMIN = "/api/admin";
 
   // TEMPORAL: identidad del administrador mientras el modulo de login
   // (RF01-RF03) no expone un token. Sustituir por el token de sesion.
-  var ID_ADMIN = 63;
+  // Debe ser un empleado con rol Administrador (R001); de lo contrario el
+  // backend respondera 403 en cuanto se apague RBAC_MODO_DESARROLLO.
+  var ID_ADMIN = 1;
 
   var dinero = new Intl.NumberFormat("es-MX", {
     style: "currency", currency: "MXN"
@@ -284,18 +330,47 @@ var Panel = (function () {
 
   function $(id) { return document.getElementById(id); }
 
+  function leerRespuesta(r) {
+    return r.json().catch(function () { return {}; }).then(function (cuerpo) {
+      if (!r.ok) {
+        var fallo = new Error(cuerpo.error || cuerpo.detail ||
+          "La operación no se pudo completar (código " + r.status + ").");
+        // Errores de validación campo por campo (DRF responde 400 con un
+        // diccionario). Se adjuntan para que el formulario los marque.
+        if (r.status === 400 && !cuerpo.error && !cuerpo.detail) {
+          fallo.detalle = cuerpo;
+          fallo.message = "Hay campos con errores.";
+        }
+        throw fallo;
+      }
+      return cuerpo;
+    });
+  }
+
   function pedir(ruta) {
     return fetch(API + ruta, {
       headers: { "X-Empleado-Id": String(ID_ADMIN), "Accept": "application/json" }
-    }).then(function (r) {
-      return r.json().catch(function () { return {}; }).then(function (cuerpo) {
-        if (!r.ok) {
-          throw new Error(cuerpo.error || cuerpo.detail ||
-            "La consulta no se pudo completar (código " + r.status + ").");
-        }
-        return cuerpo;
-      });
-    });
+    }).then(leerRespuesta);
+  }
+
+  function pedirAdmin(ruta) {
+    return fetch(API_ADMIN + ruta, {
+      headers: { "X-Empleado-Id": String(ID_ADMIN), "Accept": "application/json" }
+    }).then(leerRespuesta);
+  }
+
+  /* POST con JSON. Los endpoints de DRF quedan exentos de CSRF, la
+     identidad viaja en la cabecera igual que en las lecturas. */
+  function enviarAdmin(ruta, cuerpo, metodo) {
+    return fetch(API_ADMIN + ruta, {
+      method: metodo || "POST",
+      headers: {
+        "X-Empleado-Id": String(ID_ADMIN),
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(cuerpo)
+    }).then(leerRespuesta);
   }
 
   function escapar(txt) {
@@ -376,7 +451,8 @@ var Panel = (function () {
   });
 
   return {
-    $: $, pedir: pedir, escapar: escapar, dinero: dinero,
+    $: $, pedir: pedir, pedirAdmin: pedirAdmin, enviarAdmin: enviarAdmin,
+    escapar: escapar, dinero: dinero,
     aFecha: aFecha, aFechaHora: aFechaHora, etiqueta: etiqueta,
     parametros: parametros, llenarSelect: llenarSelect,
     cargando: cargando, mensaje: mensaje,
