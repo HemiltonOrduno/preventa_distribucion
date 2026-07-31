@@ -1,0 +1,132 @@
+{% extends 'entregas/base_repartidor.html' %}
+{% load static %}
+
+{% block title %}Ruta del día{% endblock %}
+{% block nav_ruta %}active{% endblock %}
+{% block nav_ruta_m %}active{% endblock %}
+
+{% block content %}
+<div class="ruta-layout" id="ruta-layout">
+
+    <!-- PANEL IZQUIERDO: Lista de paradas -->
+    <div class="ruta-panel">
+        <div class="ruta-panel__header">
+            <div class="ruta-panel__titulo">🗺️ Ruta del día</div>
+            <button class="btn-iniciar-ruta" id="btn-iniciar" onclick="iniciarRuta()">
+                ▶ Iniciar ruta
+            </button>
+            <button class="btn-finalizar-ruta" id="btn-finalizar" onclick="finalizarRuta()">
+                ✓ Finalizar ruta
+            </button>
+        </div>
+        <div class="ruta-panel__body">
+            <div class="ruta-info-bar" id="info-bar" style="display:none;">
+                <span id="info-distancia">0 km</span>
+                <span>·</span>
+                <span id="info-duracion">0 min</span>
+                <span>·</span>
+                <span id="info-pendientes">0 pendientes</span>
+            </div>
+            <div id="lista-paradas">
+                <p style="text-align:center;color:#888;padding:20px;font-size:13px;">
+                    Cargando ruta...
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAPA -->
+    <div class="ruta-mapa">
+        <div id="map"></div>
+    </div>
+</div>
+
+<!-- MODAL: Detalle de establecimiento -->
+<div class="modal-overlay" id="modal-parada" onclick="cerrarModalParada(event)">
+    <div class="modal">
+        <div class="modal-handle"></div>
+        <div class="modal-titulo" id="modal-est-nombre">Establecimiento</div>
+        <div class="modal-subtitulo" id="modal-est-direccion"></div>
+
+        <div class="pedido-detalle" id="modal-pedido-info"></div>
+
+        <div id="modal-productos"></div>
+
+        <div class="modal-acciones" id="modal-acciones">
+            <button class="btn-cobro" onclick="abrirCobro()">💳 Registrar cobro</button>
+            <button class="btn-devolucion" onclick="abrirDevolucion()">↩ Registrar devolución</button>
+            <button class="btn-confirmar" onclick="confirmarEntrega()">✓ Confirmar entrega</button>
+            <button class="btn-cancelar-modal" onclick="cerrarModalParada()">Cancelar</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: Cobro -->
+<div class="modal-overlay" id="modal-cobro" onclick="cerrarModalCobro(event)">
+    <div class="modal">
+        <div class="modal-handle"></div>
+        <div class="modal-titulo">💳 Registrar cobro</div>
+        <div class="modal-subtitulo" id="cobro-est-nombre"></div>
+
+        <div class="form-group">
+            <label>Tipo de pago</label>
+            <div class="tipo-pago-selector">
+                <button class="tipo-pago-btn active" id="btn-efectivo" onclick="seleccionarPago('TP001', this)">
+                    💵 Efectivo
+                </button>
+                <button class="tipo-pago-btn" id="btn-tarjeta" onclick="seleccionarPago('TP002', this)">
+                    💳 Tarjeta
+                </button>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Monto a cobrar</label>
+            <input type="number" id="cobro-monto" placeholder="0.00" step="0.01">
+        </div>
+
+        <div class="modal-acciones">
+            <button class="btn-cobro" onclick="guardarCobro()">✓ Guardar cobro</button>
+            <button class="btn-cancelar-modal" onclick="cerrarModalCobro()">Cancelar</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: Devolución -->
+<div class="modal-overlay" id="modal-devolucion" onclick="cerrarModalDevolucion(event)">
+    <div class="modal">
+        <div class="modal-handle"></div>
+        <div class="modal-titulo">↩ Registrar devolución</div>
+        <div class="modal-subtitulo" id="dev-est-nombre"></div>
+
+        <div class="form-group">
+            <label>Tipo de devolución</label>
+            <select id="dev-tipo">
+                <option value="Producto dañado con sustitución">Producto dañado con sustitución</option>
+                <option value="Devolución completa sin reemplazo">Devolución completa sin reemplazo</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Cantidad</label>
+            <input type="number" id="dev-cantidad" placeholder="0" min="1">
+        </div>
+
+        <div class="form-group">
+            <label>Motivo</label>
+            <textarea id="dev-motivo" placeholder="Describe el motivo de la devolución..."></textarea>
+        </div>
+
+        <div class="modal-acciones">
+            <button class="btn-devolucion" style="background:#fff3e0;" onclick="guardarDevolucion()">✓ Registrar devolución</button>
+            <button class="btn-cancelar-modal" onclick="cerrarModalDevolucion()">Cancelar</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'entregas/js/ruta_entrega.js' %}"></script>
+{% endblock %}

@@ -1,4 +1,4 @@
--- Active: 1785279407257@@127.0.0.1@3306
+-- Active: 1772565691688@@127.0.0.1@3306@inpredis_db
 CREATE DATABASE inpredis_db;
 
 USE inpredis_db;
@@ -406,3 +406,10 @@ CREATE TABLE ruta_visita_orden (
     FOREIGN KEY (establecimiento) REFERENCES establecimiento(numero)
 );
 
+SELECT re.numero, re.nombre, er.nombre AS estado, re.empleado,
+       CONCAT(em.empNombre, ' ', em.empApellPat) AS repartidor
+FROM ruta_entrega re
+INNER JOIN edo_ruta_entrega er ON er.codigo = re.edo_ruta_entrega
+INNER JOIN empleado em ON em.num = re.empleado
+WHERE er.nombre NOT IN ('Entregada')
+ORDER BY re.numero;

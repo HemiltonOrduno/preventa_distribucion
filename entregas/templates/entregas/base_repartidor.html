@@ -1,0 +1,44 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{% static 'rutas/css/leaflet.css' %}">
+    <link rel="stylesheet" href="{% static 'entregas/css/repartidor.css' %}">
+    <title>{% block title %}Repartidor{% endblock %} - INPREDISROUTE</title>
+</head>
+<body>
+
+<nav class="top-nav">
+    <div class="top-nav__brand">
+        <span class="brand-icon">🚚</span> INPREDISROUTE
+    </div>
+    <div class="top-nav__links">
+        <a href="/api/entregas/ruta-entrega/" class="top-nav__link {% block nav_ruta %}{% endblock %}">
+            🗺️ Ruta del día
+        </a>
+        <a href="/api/entregas/pedidos/" class="top-nav__link {% block nav_pedidos %}{% endblock %}">
+            📦 Pedidos
+        </a>
+    </div>
+    <div class="top-nav__avatar">👤</div>
+</nav>
+
+<div class="page {% block page_class %}{% endblock %}">
+    {% block content %}{% endblock %}
+</div>
+
+<nav class="bottom-nav">
+    <a href="/api/entregas/ruta-entrega/" class="bottom-nav__item {% block nav_ruta_m %}{% endblock %}">
+        🗺️ <span>Ruta</span>
+    </a>
+    <a href="/api/entregas/pedidos/" class="bottom-nav__item {% block nav_pedidos_m %}{% endblock %}">
+        📦 <span>Pedidos</span>
+    </a>
+</nav>
+
+<script src="{% static 'rutas/js/leaflet.js' %}"></script>
+{% block extra_scripts %}{% endblock %}
+</body>
+</html>
