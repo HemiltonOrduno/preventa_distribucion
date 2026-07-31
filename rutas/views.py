@@ -4,6 +4,7 @@ from django.shortcuts import render
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.db import connection
+from usuarios.permissions import rol_requerido
 
 # Coordenadas del almacén (Pepsico El Florido, Tijuana)
 ALMACEN = {
@@ -14,7 +15,7 @@ ALMACEN = {
 
 OSRM_URL = "http://127.0.0.1:5000"
 
-
+@rol_requerido('Coordinador', 'Administrador')
 def coordinador(request):
     return render(request, "rutas/coordinador.html")
 
