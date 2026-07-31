@@ -54,7 +54,14 @@ class LoginView(APIView):
         if usuario.edo_usuario.nombre != 'Activo':
             return Response({'detail': 'Usuario inactivo'}, status=status.HTTP_403_FORBIDDEN)
 
-        if not check_password(contrasena_input, usuario.contrasena):
+        try:
+            contrasena_valida = check_password(contrasena_input, usuario.contrasena)
+        except ValueError:
+            # Pasa cuando el hash guardado en la BD no tiene un formato reconocido
+            # (por ejemplo, si la base de datos no está actualizada con el fix de contraseñas)
+            return Response({'detail': 'Usuario o contraseña incorrectos'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        if not contrasena_valida:
             return Response({'detail': 'Usuario o contraseña incorrectos'}, status=status.HTTP_401_UNAUTHORIZED)
 
         request.session['usuario_num'] = usuario.num

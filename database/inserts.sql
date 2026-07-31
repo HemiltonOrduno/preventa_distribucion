@@ -1462,3 +1462,4 @@ UPDATE usuario SET contraseña = 'pbkdf2_sha256$600000$4hjwVtBXL4jc$wbrUkajyHkWd
 UPDATE usuario SET contraseña = 'pbkdf2_sha256$600000$hLj4mfww1jqr$B4T2e99hXnQuFxQpNO09t8ts12cm8k1oF+5e//p1j+8=' WHERE num = 61;
 UPDATE usuario SET contraseña = 'pbkdf2_sha256$600000$QgZ7VF4vT4Uu$fAhCp/RbmzDeD2paxJMg1JvhYrikszO6A69X785G0Nw=' WHERE num = 62;
 UPDATE usuario SET contraseña = 'pbkdf2_sha256$600000$B3d4kIWwd1mq$Hme68BTxynHqEsxLcLkMKpGQe6AOeMUsv1GFt6aNHYs=' WHERE num = 63;
+
