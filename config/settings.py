@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from decouple import config
 
@@ -84,8 +85,11 @@ TIME_ZONE = 'America/Tijuana'
 USE_I18N = True
 USE_TZ = True
 
-STATIC_URL = 'static/'
-STATICFILES_DIRS = [BASE_DIR / 'static']
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static'),
+]
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
@@ -110,3 +114,4 @@ BaseDatabaseWrapper.check_database_version_supported = lambda self: None
 
 # Desactiva la sintaxis RETURNING para MariaDB 10.4
 DatabaseFeatures.can_return_columns_from_insert = False
+

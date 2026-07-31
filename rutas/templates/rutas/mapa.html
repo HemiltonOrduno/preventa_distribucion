@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mapa de Rutas - Sabritas Tijuana</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'rutas/css/leaflet.css' %}">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: sans-serif; display: flex; height: 100vh; }
@@ -177,7 +178,7 @@
 
 <div id="map"></div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="{% static 'rutas/js/leaflet.js' %}"></script>
 <script>
     const tijuanaBounds = L.latLngBounds(
         [32.38, -117.15],

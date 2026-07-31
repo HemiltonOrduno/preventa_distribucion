@@ -2,212 +2,39 @@
 
 {% block title %}Gestionar Zonas{% endblock %}
 {% block nav_zonas %}active{% endblock %}
-{% block page_icon %}📍{% endblock %}
-{% block page_title %}Gestionar Zonas{% endblock %}
 
-{% block extra_styles %}
-#layout {
-    display: flex;
-    gap: 16px;
-    height: calc(100vh - 60px);
-    overflow: hidden;
-}
 
-#panel-zonas {
-    width: 280px;
-    overflow-y: auto;
-    flex-shrink: 0;
-}
-
-#mapa-zonas {
-    flex: 1;
-    border-radius: 8px;
-    overflow: hidden;
-    border: 1px solid #dee2e6;
-    min-width: 0;
-}
-
-#panel-establecimientos {
-    width: 260px;
-    background: white;
-    border-radius: 8px;
-    border: 1px solid #dee2e6;
-    display: none;
-    flex-direction: column;
-    overflow: hidden;
-    flex-shrink: 0;
-}
-
-#panel-est-header {
-    background: #1a237e;
-    color: white;
-    padding: 12px 15px;
-    font-size: 13px;
-    font-weight: bold;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-#panel-est-header button {
-    background: none;
-    border: none;
-    color: white;
-    font-size: 18px;
-    cursor: pointer;
-    line-height: 1;
-}
-
-#panel-est-body {
-    flex: 1;
-    overflow-y: auto;
-    padding: 10px;
-}
-
-.est-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 10px;
-    background: #f8f9fa;
-    border-radius: 6px;
-    margin-bottom: 6px;
-    border: 1px solid #dee2e6;
-    cursor: pointer;
-    transition: all 0.2s;
-    font-size: 12px;
-}
-
-.est-item:hover { border-color: #1a237e; background: #f0f4ff; }
-.est-icono { font-size: 16px; flex-shrink: 0; }
-.est-nombre { font-weight: bold; color: #333; }
-.est-colonia { font-size: 11px; color: #888; margin-top: 1px; }
-
-.zona-card {
-    background: white;
-    border-radius: 8px;
-    padding: 12px;
-    margin-bottom: 10px;
-    border: 2px solid #dee2e6;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.zona-card:hover { border-color: #1a237e; }
-.zona-card.activa { border-color: #1a237e; background: #f0f4ff; }
-
-.zona-nombre {
-    font-weight: bold;
-    font-size: 13px;
-    color: #1a237e;
-    margin-bottom: 4px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.zona-color {
-    width: 12px;
-    height: 12px;
-    border-radius: 3px;
-    flex-shrink: 0;
-}
-
-.zona-info { font-size: 11px; color: #888; margin-bottom: 8px; }
-
-.zona-coords {
-    font-size: 11px;
-    color: #555;
-    background: #f8f9fa;
-    border-radius: 4px;
-    padding: 6px 8px;
-    margin-bottom: 8px;
-    display: none;
-}
-
-.zona-card.activa .zona-coords { display: block; }
-
-.coord-row { display: flex; gap: 6px; margin-bottom: 4px; }
-
-.coord-input { flex: 1; display: flex; flex-direction: column; gap: 2px; }
-.coord-input label { font-size: 10px; color: #888; }
-.coord-input input {
-    padding: 4px 6px;
-    border: 1px solid #dee2e6;
-    border-radius: 4px;
-    font-size: 11px;
-    width: 100%;
-}
-
-.zona-botones {
-    display: flex;
-    gap: 6px;
-    margin-top: 6px;
-}
-
-.btn-guardar-zona {
-    flex: 1;
-    padding: 7px;
-    background: #1a237e;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    font-size: 11px;
-    cursor: pointer;
-}
-
-.btn-guardar-zona:hover { background: #283593; }
-
-.btn-ver-est {
-    flex: 1;
-    padding: 7px;
-    background: #e3f2fd;
-    color: #1565c0;
-    border: 1px solid #1565c0;
-    border-radius: 6px;
-    font-size: 11px;
-    cursor: pointer;
-    font-weight: bold;
-}
-
-.btn-ver-est:hover { background: #1565c0; color: white; }
-
-.toast {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    background: #2e7d32;
-    color: white;
-    padding: 12px 20px;
-    border-radius: 8px;
-    font-size: 13px;
-    display: none;
-    z-index: 3000;
-}
-{% endblock %}
-
-{% block content %}
-<div id="layout">
-    <div id="panel-zonas">
-        <p style="font-size:12px;color:#888;margin-bottom:12px;">
-            Selecciona una zona para ver sus límites y establecimientos.
-        </p>
-        <div id="lista-zonas">Cargando zonas...</div>
+{% block main_content %}
+<div id="contenido">
+    <div id="page-header">
+        📍 Gestionar Zonas
     </div>
+    <div id="page-body">
+        <div id="layout">
+            <div id="panel-zonas">
+                <p style="font-size:12px;color:#888;margin-bottom:12px;">
+                    Selecciona una zona para ver sus límites y establecimientos.
+                </p>
+                <div id="lista-zonas">Cargando zonas...</div>
+            </div>
 
-    <div id="mapa-zonas"></div>
+            <div id="mapa-zonas"></div>
 
-    <div id="panel-establecimientos">
-        <div id="panel-est-header">
-            <span id="panel-est-titulo">Establecimientos</span>
-            <button onclick="cerrarPanelEst()">×</button>
+            <div id="panel-establecimientos">
+                <div id="panel-est-header">
+                    <span id="panel-est-titulo">Establecimientos</span>
+                    <button onclick="cerrarPanelEst()">×</button>
+                </div>
+                <div id="panel-est-body"></div>
+            </div>
         </div>
-        <div id="panel-est-body"></div>
+
+        <div class="toast" id="toast"></div>
     </div>
 </div>
-
-<div class="toast" id="toast"></div>
 {% endblock %}
+{% load static %}
+<script src="{% static 'rutas/js/leaflet.js' %}"></script>
 
 {% block extra_scripts %}
 <script>

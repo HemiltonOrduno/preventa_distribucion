@@ -2,409 +2,101 @@
 
 {% block title %}Gestionar Rutas de Visita{% endblock %}
 {% block nav_rutas_visita %}active{% endblock %}
-{% block page_icon %}🗓️{% endblock %}
-{% block page_title %}Gestionar Rutas de Visita{% endblock %}
 
-{% block extra_styles %}
-#layout {
-    display: flex;
-    gap: 16px;
-    height: calc(100vh - 60px);
-    overflow: hidden;
-}
-
-#panel-rutas {
-    width: 300px;
-    display: flex;
-    flex-direction: column;
-    flex-shrink: 0;
-    overflow: hidden;
-}
-
-#panel-rutas-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 12px;
-}
-
-.btn-nueva-ruta {
-    padding: 7px 14px;
-    background: #1a237e;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    font-size: 12px;
-    cursor: pointer;
-}
-
-.btn-nueva-ruta:hover { background: #283593; }
-
-.filtro-dia {
-    display: flex;
-    gap: 4px;
-    margin-bottom: 10px;
-    flex-wrap: wrap;
-}
-
-.filtro-dia button {
-    padding: 4px 10px;
-    border: 1px solid #dee2e6;
-    border-radius: 14px;
-    background: white;
-    font-size: 11px;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.filtro-dia button.active {
-    background: #1a237e;
-    color: white;
-    border-color: #1a237e;
-}
-
-#lista-rutas { flex: 1; overflow-y: auto; }
-
-.ruta-card {
-    background: white;
-    border-radius: 8px;
-    padding: 12px;
-    margin-bottom: 8px;
-    border: 2px solid #dee2e6;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.ruta-card:hover { border-color: #1a237e; }
-.ruta-card.activa { border-color: #c62828; background: #fff5f5; }
-
-.ruta-nombre {
-    font-weight: bold;
-    font-size: 13px;
-    color: #333;
-    margin-bottom: 4px;
-}
-
-.ruta-info {
-    font-size: 11px;
-    color: #888;
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin-bottom: 6px;
-}
-
-.badge {
-    display: inline-block;
-    padding: 2px 7px;
-    border-radius: 10px;
-    font-size: 10px;
-    font-weight: bold;
-}
-
-.badge-activa { background: #e8f5e9; color: #2e7d32; }
-.badge-completada { background: #e3f2fd; color: #1565c0; }
-.badge-pausada { background: #fff3e0; color: #e65100; }
-
-.progress-bar {
-    height: 4px;
-    background: #dee2e6;
-    border-radius: 2px;
-    overflow: hidden;
-}
-
-.progress-bar .fill {
-    height: 100%;
-    background: #c62828;
-    border-radius: 2px;
-}
-
-.asignar-row {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    margin-top: 8px;
-}
-
-.asignar-row select {
-    flex: 1;
-    padding: 5px 8px;
-    border: 1px solid #dee2e6;
-    border-radius: 5px;
-    font-size: 11px;
-}
-
-.btn-asignar {
-    padding: 5px 10px;
-    background: #1a237e;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    font-size: 11px;
-    cursor: pointer;
-}
-
-#mapa-rutas {
-    flex: 1;
-    border-radius: 8px;
-    overflow: hidden;
-    border: 1px solid #dee2e6;
-}
-
-/* MODAL CREAR RUTA */
-#modal-overlay {
-    display: none;
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    background: rgba(0,0,0,0.6);
-    z-index: 2000;
-    align-items: center;
-    justify-content: center;
-}
-
-#modal-overlay.visible { display: flex; }
-
-#modal {
-    background: white;
-    border-radius: 12px;
-    width: 90vw;
-    height: 85vh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-}
-
-#modal-header {
-    background: #1a237e;
-    color: white;
-    padding: 12px 20px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-shrink: 0;
-}
-
-#modal-header h3 { font-size: 14px; }
-#modal-header button { background: none; border: none; color: white; font-size: 20px; cursor: pointer; }
-
-#modal-body {
-    flex: 1;
-    display: flex;
-    overflow: hidden;
-}
-
-#modal-form {
-    width: 280px;
-    padding: 16px;
-    border-right: 1px solid #dee2e6;
-    overflow-y: auto;
-    flex-shrink: 0;
-}
-
-.form-group { margin-bottom: 12px; }
-.form-group label { display: block; font-size: 12px; color: #888; margin-bottom: 4px; }
-.form-group input, .form-group select, .form-group textarea {
-    width: 100%;
-    padding: 8px 10px;
-    border: 1px solid #dee2e6;
-    border-radius: 6px;
-    font-size: 13px;
-}
-
-.form-group textarea { resize: none; height: 60px; }
-
-#modal-mapa { flex: 1; }
-
-#modal-paradas {
-    width: 220px;
-    border-left: 1px solid #dee2e6;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    flex-shrink: 0;
-}
-
-#modal-paradas-header {
-    padding: 10px 12px;
-    font-size: 12px;
-    font-weight: bold;
-    background: #f8f9fa;
-    border-bottom: 1px solid #dee2e6;
-    color: #333;
-}
-
-#modal-paradas-header span {
-    font-size: 11px;
-    color: #888;
-    font-weight: normal;
-    display: block;
-    margin-top: 2px;
-}
-
-#lista-paradas-modal {
-    flex: 1;
-    overflow-y: auto;
-    padding: 8px;
-}
-
-.parada-modal-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 7px 8px;
-    background: white;
-    border: 1px solid #dee2e6;
-    border-radius: 6px;
-    margin-bottom: 5px;
-    font-size: 12px;
-}
-
-.parada-num-modal {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    background: #c62828;
-    color: white;
-    font-size: 11px;
-    font-weight: bold;
-    flex-shrink: 0;
-}
-
-.parada-nombre-modal {
-    flex: 1;
-    color: #333;
-    font-size: 11px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.btn-quitar {
-    background: none;
-    border: none;
-    color: #c62828;
-    cursor: pointer;
-    font-size: 14px;
-    flex-shrink: 0;
-    padding: 0;
-}
-
-#modal-footer {
-    padding: 12px 20px;
-    border-top: 1px solid #dee2e6;
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    flex-shrink: 0;
-}
-
-.btn-cancelar { padding: 8px 16px; background: #f0f2f5; color: #555; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; }
-.btn-crear { padding: 8px 20px; background: #1a237e; color: white; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; font-weight: bold; }
-
-.toast {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    background: #2e7d32;
-    color: white;
-    padding: 12px 20px;
-    border-radius: 8px;
-    font-size: 13px;
-    display: none;
-    z-index: 3000;
-}
-{% endblock %}
-
-{% block content %}
-<div id="layout">
-    <div id="panel-rutas">
-        <div id="panel-rutas-header">
-            <div style="font-size:13px;font-weight:bold;color:#333;">Rutas de visita</div>
-            <button class="btn-nueva-ruta" onclick="abrirCrearRuta()">+ Nueva ruta</button>
-        </div>
-
-        <div class="filtro-dia" id="filtro-dia">
-            <button class="active" onclick="filtrarDia('hoy', this)">Hoy</button>
-            <button onclick="filtrarDia('Lunes', this)">Lun</button>
-            <button onclick="filtrarDia('Martes', this)">Mar</button>
-            <button onclick="filtrarDia('Miércoles', this)">Mié</button>
-            <button onclick="filtrarDia('Jueves', this)">Jue</button>
-            <button onclick="filtrarDia('Viernes', this)">Vie</button>
-            <button onclick="filtrarDia('Sábado', this)">Sáb</button>
-        </div>
-
-        <div id="lista-rutas">Cargando...</div>
+{% block main_content %}
+<div id="contenido">
+    <div id="page-header">
+        🗓️ Gestionar Rutas de Visita
     </div>
+    <div id="page-body">
+        <div id="layout">
+            <div id="panel-rutas">
+                <div id="panel-rutas-header">
+                    <div style="font-size:13px;font-weight:bold;color:#333;">Rutas de visita</div>
+                    <button class="btn-nueva-ruta" onclick="abrirCrearRuta()">+ Nueva ruta</button>
+                </div>
 
-    <div id="mapa-rutas"></div>
-</div>
+                <div class="filtro-dia" id="filtro-dia">
+                    <button class="active" onclick="filtrarDia('hoy', this)">Hoy</button>
+                    <button onclick="filtrarDia('Lunes', this)">Lun</button>
+                    <button onclick="filtrarDia('Martes', this)">Mar</button>
+                    <button onclick="filtrarDia('Miércoles', this)">Mié</button>
+                    <button onclick="filtrarDia('Jueves', this)">Jue</button>
+                    <button onclick="filtrarDia('Viernes', this)">Vie</button>
+                    <button onclick="filtrarDia('Sábado', this)">Sáb</button>
+                </div>
 
-<!-- MODAL CREAR RUTA -->
-<div id="modal-overlay" onclick="cerrarModalClick(event)">
-    <div id="modal">
-        <div id="modal-header">
-            <h3>Nueva ruta de visita</h3>
-            <button onclick="cerrarModal()">×</button>
-        </div>
-        <div id="modal-body">
-            <div id="modal-form">
-                <div class="form-group">
-                    <label>Nombre de la ruta *</label>
-                    <input type="text" id="ruta-nombre" placeholder="Ej: Ruta Playas Lunes">
-                </div>
-                <div class="form-group">
-                    <label>Día *</label>
-                    <select id="ruta-dia">
-                        <option value="Lunes">Lunes</option>
-                        <option value="Martes">Martes</option>
-                        <option value="Miércoles">Miércoles</option>
-                        <option value="Jueves">Jueves</option>
-                        <option value="Viernes">Viernes</option>
-                        <option value="Sábado">Sábado</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Zona *</label>
-                    <select id="ruta-zona" onchange="cargarEstablecimientosZona()">
-                        <option value="">Selecciona una zona...</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Descripción (opcional)</label>
-                    <textarea id="ruta-descripcion" placeholder="Descripción de la ruta..."></textarea>
-                </div>
-                <p style="font-size:11px;color:#888;margin-top:8px;">
-                    Selecciona una zona y luego haz clic en los establecimientos del mapa en el orden que deseas visitarlos.
-                </p>
+                <div id="lista-rutas">Cargando...</div>
             </div>
 
-            <div id="modal-mapa"></div>
+            <div id="mapa-rutas"></div>
+        </div>
 
-            <div id="modal-paradas">
-                <div id="modal-paradas-header">
-                    Paradas seleccionadas
-                    <span id="contador-paradas">0 establecimientos</span>
+        <!-- MODAL CREAR RUTA -->
+        <div id="modal-overlay" onclick="cerrarModalClick(event)">
+            <div id="modal">
+                <div id="modal-header">
+                    <h3>Nueva ruta de visita</h3>
+                    <button onclick="cerrarModal()">×</button>
                 </div>
-                <div id="lista-paradas-modal"></div>
+                <div id="modal-body">
+                    <div id="modal-form">
+                        <div class="form-group">
+                            <label>Nombre de la ruta *</label>
+                            <input type="text" id="ruta-nombre" placeholder="Ej: Ruta Playas Lunes">
+                        </div>
+                        <div class="form-group">
+                            <label>Día *</label>
+                            <select id="ruta-dia">
+                                <option value="Lunes">Lunes</option>
+                                <option value="Martes">Martes</option>
+                                <option value="Miércoles">Miércoles</option>
+                                <option value="Jueves">Jueves</option>
+                                <option value="Viernes">Viernes</option>
+                                <option value="Sábado">Sábado</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Zona *</label>
+                            <select id="ruta-zona" onchange="cargarEstablecimientosZona()">
+                                <option value="">Selecciona una zona...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Descripción (opcional)</label>
+                            <textarea id="ruta-descripcion" placeholder="Descripción de la ruta..."></textarea>
+                        </div>
+                        <p style="font-size:11px;color:#888;margin-top:8px;">
+                            Selecciona una zona y luego haz clic en los establecimientos del mapa en el orden que deseas visitarlos.
+                        </p>
+                    </div>
+
+                    <div id="modal-mapa"></div>
+
+                    <div id="modal-paradas">
+                        <div id="modal-paradas-header">
+                            Paradas seleccionadas
+                            <span id="contador-paradas">0 establecimientos</span>
+                        </div>s
+                        <div id="lista-paradas-modal"></div>
+                    </div>
+                </div>
+                <div id="modal-footer">
+                    <button class="btn-cancelar" onclick="cerrarModal()">Cancelar</button>
+                    <button class="btn-crear" onclick="crearRuta()">✓ Crear ruta</button>
+                </div>
             </div>
         </div>
-        <div id="modal-footer">
-            <button class="btn-cancelar" onclick="cerrarModal()">Cancelar</button>
-            <button class="btn-crear" onclick="crearRuta()">✓ Crear ruta</button>
-        </div>
+
+        <div class="toast" id="toast"></div>
     </div>
 </div>
-
-<div class="toast" id="toast"></div>
 {% endblock %}
 
 {% block extra_scripts %}
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+{% load static %}
+<script src="{% static 'rutas/js/leaflet.js' %}"></script>
+<script src="{% static 'rutas/js/sortable.min.js' %}"></script>
 <script>
 let todasLasRutas = [];
 let vendedoresDisponibles = [];
