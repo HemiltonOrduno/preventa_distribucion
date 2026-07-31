@@ -70,7 +70,7 @@ class Licencia(models.Model):
 
 
 class Empleado(models.Model):
-    num = models.IntegerField(primary_key=True)  # PK real, sin auto-incremento en el .sql
+    num = models.IntegerField(primary_key=True)  
     nombre_de_pila = models.CharField(max_length=25, db_column='empNombre')
     apellido_paterno = models.CharField(max_length=25, db_column='empApellPat')
     apellido_materno = models.CharField(max_length=25, db_column='empApellMa', blank=True, null=True)

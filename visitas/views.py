@@ -3,20 +3,25 @@ from django.shortcuts import render
 from django.http import JsonResponse
 from django.db import connection, transaction
 from django.views.decorators.csrf import csrf_exempt
+from usuarios.permissions import rol_requerido
 
 
+@rol_requerido('Vendedor', 'Administrador')
 def ruta_del_dia_view(request):
     return render(request, 'visitas/ruta_del_dia.html')
 
 
+@rol_requerido('Vendedor', 'Administrador')
 def visita_view(request):
     return render(request, 'visitas/visita.html')
 
 
+@rol_requerido('Vendedor', 'Administrador')
 def levantar_pedido_view(request):
     return render(request, 'visitas/levantar_pedido.html')
 
 
+@rol_requerido('Vendedor', 'Administrador')
 def visita_sin_pedido_view(request):
     return render(request, 'visitas/visita_sin_pedido.html')
 
@@ -202,10 +207,6 @@ def levantar_pedido(request, visita_id):
                 precio = row[0]
                 importe = cantidad * precio
 
-                # RF05: se registra el pedido sin verificar existencias;
-                # el trigger tg_campos_calculados_pedido recalcula el
-                # total/subtotal/iva del pedido automáticamente al
-                # insertar cada línea.
                 cursor.execute("""
                     INSERT INTO detalle_pedido (num_pedido, cod_producto, cantidad, precioUnitario, importe)
                     VALUES (%s, %s, %s, %s, %s)

@@ -1,10 +1,21 @@
 from django.shortcuts import render
+from django.http import HttpResponse
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.permissions import AllowAny
 from django.contrib.auth.hashers import check_password
 from .models import Usuario
 from .serializers import LoginSerializer, UsuarioDataSerializer
+
+
+ROL_REDIRECT = {
+    'Vendedor': '/api/visitas/ruta-del-dia/',
+    'Coordinador': '/api/rutas/coordinador/',
+    'Almacenista': '/api/inventario/almacenista/movimientos/',
+    'Administrador': '/api/usuarios/panel-admin/',
+    'Repartidor': '/api/usuarios/panel-repartidor/',
+}
 
 
 def login_view(request):
@@ -15,7 +26,17 @@ def acceso_denegado_view(request):
     return render(request, 'usuarios/acceso_denegado.html', status=403)
 
 
+def panel_placeholder(request, nombre_rol):
+    return HttpResponse(f"<h1>Panel de {nombre_rol}</h1><p>Módulo en construcción.</p>")
+
+
 class LoginView(APIView):
+    # El proyecto tiene IsAuthenticated como permiso global (config/settings.py),
+    # pero el login es el único endpoint al que se debe poder entrar SIN estar
+    # logueado todavía, por eso se sobreescribe aquí, no en settings.py.
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -41,6 +62,7 @@ class LoginView(APIView):
         request.session['rol'] = usuario.empleado.rol.nombre
 
         data = UsuarioDataSerializer(usuario).data
+        data['redirect_url'] = ROL_REDIRECT.get(usuario.empleado.rol.nombre, '/')
         return Response(data, status=status.HTTP_200_OK)
 
 
