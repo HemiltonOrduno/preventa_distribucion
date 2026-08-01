@@ -413,3 +413,15 @@ INNER JOIN edo_ruta_entrega er ON er.codigo = re.edo_ruta_entrega
 INNER JOIN empleado em ON em.num = re.empleado
 WHERE er.nombre NOT IN ('Entregada')
 ORDER BY re.numero;
+
+CREATE TABLE producto_cancelado_pedido (
+    num_pedido INT NOT NULL,
+    cod_producto VARCHAR(10) NOT NULL,
+    cantidad_solicitada INT NOT NULL,
+    fecha_cancelacion DATETIME NOT NULL,
+    fecha_disponible_estimada DATE,
+    motivo VARCHAR(200),
+    PRIMARY KEY (num_pedido, cod_producto, fecha_cancelacion),
+    FOREIGN KEY (num_pedido) REFERENCES pedido(num),
+    FOREIGN KEY (cod_producto) REFERENCES producto(codigo)
+);

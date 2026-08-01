@@ -1,3 +1,4 @@
+-- Active: 1785279407257@@127.0.0.1@3306@inpredis_db
 -- =============================================================
 -- SCRIPT DE INSERCIÓN DE DATOS DE SIMULACIÓN
 -- Fecha de generación: 2026-07-22
