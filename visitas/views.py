@@ -250,7 +250,7 @@ def visita_sin_pedido(request, visita_id):
     return JsonResponse({"mensaje": "Visita completada sin pedido", "visita_id": visita_id},
                          json_dumps_params={'ensure_ascii': False})
 
-
+@rol_requerido('Almacenista', 'Administrador')
 def pedidos_pendientes(request):
     """
     RF16: Lista los pedidos pendientes de validación por el almacenista.
@@ -286,7 +286,7 @@ def pedidos_pendientes(request):
 
     return JsonResponse({"pedidos": pedidos}, json_dumps_params={'ensure_ascii': False})
 
-
+@rol_requerido('Almacenista', 'Administrador')
 def pedido_detalle(request, pedido_id):
     """
     RF17: Detalle de un pedido, incluyendo productos y cantidades.
@@ -334,7 +334,7 @@ def pedido_detalle(request, pedido_id):
     pedido['detalle'] = detalle
     return JsonResponse(pedido, json_dumps_params={'ensure_ascii': False})
 
-
+@rol_requerido('Almacenista', 'Administrador')
 @csrf_exempt
 def ajustar_cantidad_pedido(request, pedido_id, cod_producto):
     """
@@ -381,31 +381,53 @@ def ajustar_cantidad_pedido(request, pedido_id, cod_producto):
         "nueva_cantidad": nueva_cantidad
     }, json_dumps_params={'ensure_ascii': False})
 
-
+@rol_requerido('Almacenista', 'Administrador')
 @csrf_exempt
 def cancelar_producto_pedido(request, pedido_id, cod_producto):
     """
-    RF20: cancelar un producto específico del pedido cuando no hay
-    stock disponible en absoluto (se elimina la línea de detalle_pedido).
+    RF20 + RF21: cancela un producto del pedido por falta de stock,
+    y antes de borrar la línea, guarda un registro histórico con la
+    fecha estimada de disponibilidad (si el almacenista la proporciona).
     """
     if request.method != 'DELETE':
         return JsonResponse({"error": "Método no permitido"}, status=405)
 
+    try:
+        body = json.loads(request.body) if request.body else {}
+    except Exception:
+        body = {}
+
+    fecha_disponible = body.get("fecha_disponible_estimada")
+    motivo = body.get("motivo", "Sin stock disponible")
+
     with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT cantidad FROM detalle_pedido
+            WHERE num_pedido = %s AND cod_producto = %s
+        """, [pedido_id, cod_producto])
+        row = cursor.fetchone()
+        if not row:
+            return JsonResponse({"error": "Línea de pedido no encontrada"}, status=404)
+        cantidad_solicitada = row[0]
+
+        cursor.execute("""
+            INSERT INTO producto_cancelado_pedido
+                (num_pedido, cod_producto, cantidad_solicitada, fecha_cancelacion, fecha_disponible_estimada, motivo)
+            VALUES (%s, %s, %s, NOW(), %s, %s)
+        """, [pedido_id, cod_producto, cantidad_solicitada, fecha_disponible, motivo])
+
         cursor.execute("""
             DELETE FROM detalle_pedido
             WHERE num_pedido = %s AND cod_producto = %s
         """, [pedido_id, cod_producto])
 
-        if cursor.rowcount == 0:
-            return JsonResponse({"error": "Línea de pedido no encontrada"}, status=404)
-
     return JsonResponse({
         "mensaje": "Producto cancelado del pedido",
         "pedido_id": pedido_id,
-        "cod_producto": cod_producto
+        "cod_producto": cod_producto,
+        "fecha_disponible_estimada": fecha_disponible
     }, json_dumps_params={'ensure_ascii': False})
 
-
+@rol_requerido('Almacenista', 'Administrador')
 def almacenista_pedidos_view(request):
     return render(request, 'visitas/pedidos_pendientes.html')

@@ -1,0 +1,87 @@
+{% extends "almacenista/base_almacenista.html" %}
+
+{% block title %}Nuevo Producto{% endblock %}
+{% block nav_productos %}active{% endblock %}
+{% block page_icon %}🏷️{% endblock %}
+{% block page_title %}Registrar Nuevo Producto{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width:500px;">
+    <label style="font-size:13px; font-weight:600;">Nombre del producto</label>
+    <input type="text" id="nombre" placeholder="Ej. Cheetos Torciditos 62g" style="width:100%; padding:8px; margin:6px 0 14px; border-radius:6px; border:1px solid #ccc;">
+
+    <label style="font-size:13px; font-weight:600;">Descripción</label>
+    <input type="text" id="descripcion" placeholder="Ej. Botana de maíz sabor queso" style="width:100%; padding:8px; margin:6px 0 14px; border-radius:6px; border:1px solid #ccc;">
+
+    <label style="font-size:13px; font-weight:600;">Precio</label>
+    <input type="number" id="precio" step="0.01" placeholder="Ej. 16.50" style="width:100%; padding:8px; margin:6px 0 14px; border-radius:6px; border:1px solid #ccc;">
+
+    <label style="font-size:13px; font-weight:600;">Fecha de caducidad</label>
+    <input type="date" id="fecha_caducidad" style="width:100%; padding:8px; margin:6px 0 14px; border-radius:6px; border:1px solid #ccc;">
+
+    <label style="font-size:13px; font-weight:600;">Stock inicial</label>
+    <input type="number" id="stock" placeholder="Ej. 800" style="width:100%; padding:8px; margin:6px 0 14px; border-radius:6px; border:1px solid #ccc;">
+
+    <label style="font-size:13px; font-weight:600;">Peso (gramos)</label>
+    <input type="number" id="peso" placeholder="Ej. 62" style="width:100%; padding:8px; margin:6px 0 14px; border-radius:6px; border:1px solid #ccc;">
+
+    <label style="font-size:13px; font-weight:600;">Imagen del producto</label>
+    <input type="file" id="imagen" accept="image/*" style="width:100%; padding:8px; margin:6px 0 14px;">
+    <img id="preview" style="display:none; max-width:150px; border-radius:8px; margin-bottom:14px;">
+
+    <div style="text-align:right;">
+        <button class="btn btn-primary" onclick="registrarProducto()">Registrar producto</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    document.getElementById('imagen').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        const preview = document.getElementById('preview');
+        if (file) {
+            preview.src = URL.createObjectURL(file);
+            preview.style.display = 'block';
+        }
+    });
+
+    async function registrarProducto() {
+        const nombre = document.getElementById('nombre').value;
+        const descripcion = document.getElementById('descripcion').value;
+        const precio = document.getElementById('precio').value;
+        const fecha_caducidad = document.getElementById('fecha_caducidad').value;
+        const stock = document.getElementById('stock').value;
+        const peso = document.getElementById('peso').value;
+        const imagen = document.getElementById('imagen').files[0];
+
+        if (!nombre || !precio || !fecha_caducidad || !peso) {
+            mostrarToast('Faltan campos obligatorios', 'error');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('nombre', nombre);
+        formData.append('descripcion', descripcion);
+        formData.append('precio', precio);
+        formData.append('fecha_caducidad', fecha_caducidad);
+        formData.append('stock', stock || 0);
+        formData.append('peso', peso);
+        if (imagen) formData.append('imagen', imagen);
+
+        const res = await fetch('/api/productos/productos/', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+            mostrarToast(`Producto ${data.codigo} registrado correctamente`, 'success');
+            document.querySelectorAll('.card input').forEach(i => i.value = '');
+            document.getElementById('preview').style.display = 'none';
+        } else {
+            mostrarToast(data.error, 'error');
+        }
+    }
+</script>
+{% endblock %}

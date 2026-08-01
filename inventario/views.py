@@ -3,10 +3,11 @@ from django.views.decorators.csrf import csrf_exempt
 from django.db import connection, transaction
 import json
 from django.shortcuts import render  # agrégalo al import existente
+from usuarios.permissions import rol_requerido
 
 TIPOS_SALIDA = ('TM002', 'TM003')  # Salida por pedido, Salida por merma
 
-
+@rol_requerido('Almacenista', 'Administrador')
 @csrf_exempt
 def registrar_movimiento(request):
     """
@@ -73,7 +74,7 @@ def registrar_movimiento(request):
         "productos_afectados": len(detalle)
     }, status=201, json_dumps_params={'ensure_ascii': False})
 
-
+@rol_requerido('Almacenista', 'Administrador')
 def consultar_stock(request, cod_producto):
     """
     RF18: consulta el stock disponible de un producto específico.
@@ -88,5 +89,6 @@ def consultar_stock(request, cod_producto):
         "producto": row[0], "nombre": row[1], "stock": row[2]
     }, json_dumps_params={'ensure_ascii': False})
 
+@rol_requerido('Almacenista', 'Administrador')
 def almacenista_movimientos_view(request):
     return render(request, 'inventario/movimientos.html')
