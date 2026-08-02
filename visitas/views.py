@@ -4,6 +4,7 @@ from django.http import JsonResponse
 from django.db import connection, transaction
 from django.views.decorators.csrf import csrf_exempt
 from usuarios.permissions import rol_requerido
+from datetime import date
 
 
 @rol_requerido('Vendedor', 'Administrador')
@@ -51,6 +52,8 @@ def _empleado_de_sesion(request):
     return request.session.get('empleado_num')
 
 
+from datetime import date
+
 def ruta_del_dia_api(request):
     """
     RF07: siguiente destino de la ruta de visita asignada al vendedor,
@@ -60,19 +63,23 @@ def ruta_del_dia_api(request):
     if not empleado_num:
         return JsonResponse({"error": "Sesión no válida, inicia sesión de nuevo"}, status=401)
 
+    dias = {0: 'Lunes', 1: 'Martes', 2: 'Miércoles', 3: 'Jueves', 4: 'Viernes', 5: 'Sábado', 6: 'Domingo'}
+    dia_hoy = dias[date.today().weekday()]
+
     with connection.cursor() as cursor:
         cursor.execute("""
-            SELECT rv.numero
+            SELECT rv.numero, rv.edo_ruta_visita
             FROM ruta_visita rv
             WHERE rv.empleado = %s
-              AND rv.edo_ruta_visita IN ('ERV001', 'ERV003')
+              AND rv.dia = %s
+              AND rv.edo_ruta_visita IN ('ERV006', 'ERV003')
             ORDER BY rv.numero DESC
             LIMIT 1
-        """, [empleado_num])
+        """, [empleado_num, dia_hoy])
         ruta_row = cursor.fetchone()
         if not ruta_row:
             return JsonResponse({"error": "No tienes una ruta de visita asignada"}, status=404)
-        ruta_visita_id = ruta_row[0]
+        ruta_visita_id, edo_ruta_visita = ruta_row
 
         cursor.execute("""
             SELECT
@@ -101,6 +108,7 @@ def ruta_del_dia_api(request):
         destino['latitud'] = float(destino['latitud'])
         destino['longitud'] = float(destino['longitud'])
         destino['ruta_visita_id'] = ruta_visita_id
+        destino['ruta_iniciada'] = (edo_ruta_visita == 'ERV003')
 
     return JsonResponse(destino, json_dumps_params={'ensure_ascii': False})
 
@@ -109,7 +117,8 @@ def ruta_del_dia_api(request):
 def iniciar_visita(request):
     """
     RF08: crea la visita con estado "En camino" cuando el vendedor
-    empieza a trasladarse hacia el establecimiento.
+    empieza a trasladarse hacia el establecimiento. Si es la primera
+    visita de la ruta, la pasa de Asignada a Iniciada.
     """
     if request.method != 'POST':
         return JsonResponse({"error": "Método no permitido"}, status=405)
@@ -130,6 +139,21 @@ def iniciar_visita(request):
 
     with transaction.atomic():
         with connection.cursor() as cursor:
+            # Verifica que la ruta sea del vendedor logueado
+            cursor.execute("""
+                SELECT edo_ruta_visita FROM ruta_visita
+                WHERE numero = %s AND empleado = %s
+            """, [ruta_visita_id, empleado_num])
+            ruta_row = cursor.fetchone()
+            if not ruta_row:
+                return JsonResponse({"error": "Esta ruta no te pertenece"}, status=403)
+
+            # Si es la primera visita de la ruta (estaba Asignada), pásala a Iniciada
+            if ruta_row[0] == 'ERV006':
+                cursor.execute("""
+                    UPDATE ruta_visita SET edo_ruta_visita = 'ERV003' WHERE numero = %s
+                """, [ruta_visita_id])
+
             cursor.execute("SELECT COALESCE(MAX(numero), 0) + 1 FROM visita")
             nueva_visita = cursor.fetchone()[0]
 
@@ -431,3 +455,90 @@ def cancelar_producto_pedido(request, pedido_id, cod_producto):
 @rol_requerido('Almacenista', 'Administrador')
 def almacenista_pedidos_view(request):
     return render(request, 'visitas/pedidos_pendientes.html')
+
+def mapa_ruta_del_dia_api(request):
+    """
+    Regresa todas las paradas de la ruta activa del vendedor (Asignada/
+    Iniciada) del día de hoy, marcando cuál ya fue visitada, cuál es la
+    actual (siguiente pendiente) y cuáles faltan. Para pintar el mapa.
+    """
+    empleado_num = _empleado_de_sesion(request)
+    if not empleado_num:
+        return JsonResponse({"error": "Sesión no válida, inicia sesión de nuevo"}, status=401)
+
+    dias = {0: 'Lunes', 1: 'Martes', 2: 'Miércoles', 3: 'Jueves', 4: 'Viernes', 5: 'Sábado', 6: 'Domingo'}
+    dia_hoy = dias[date.today().weekday()]
+
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT rv.numero
+            FROM ruta_visita rv
+            WHERE rv.empleado = %s
+              AND rv.dia = %s
+              AND rv.edo_ruta_visita IN ('ERV006', 'ERV003')
+            ORDER BY rv.numero DESC
+            LIMIT 1
+        """, [empleado_num, dia_hoy])
+        ruta_row = cursor.fetchone()
+        if not ruta_row:
+            return JsonResponse({"error": "No tienes una ruta de visita asignada"}, status=404)
+        ruta_visita_id = ruta_row[0]
+
+        cursor.execute("""
+            SELECT
+                e.numero, e.nombre, e.latitud, e.longitud, e.estColonia AS colonia,
+                rvo.orden,
+                CASE WHEN EXISTS (
+                    SELECT 1 FROM visita v
+                    WHERE v.ruta_visita = rvo.ruta_visita
+                      AND v.establecimiento = rvo.establecimiento
+                      AND v.edo_visita IN ('EVI004', 'EVI005')
+                ) THEN 1 ELSE 0 END AS visitado
+            FROM ruta_visita_orden rvo
+            INNER JOIN establecimiento e ON e.numero = rvo.establecimiento
+            WHERE rvo.ruta_visita = %s
+            ORDER BY rvo.orden ASC
+        """, [ruta_visita_id])
+        columns = [col[0] for col in cursor.description]
+        paradas = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+    ya_encontro_actual = False
+    for p in paradas:
+        p['latitud'] = float(p['latitud'])
+        p['longitud'] = float(p['longitud'])
+        if p['visitado']:
+            p['estado'] = 'completada'
+        elif not ya_encontro_actual:
+            p['estado'] = 'actual'
+            ya_encontro_actual = True
+        else:
+            p['estado'] = 'pendiente'
+        del p['visitado']
+
+    return JsonResponse({
+        "ruta_visita_id": ruta_visita_id,
+        "almacen": {"lat": 32.4700, "lon": -116.9400, "nombre": "Almacén Sabritas - El Florido"},
+        "paradas": paradas
+    }, json_dumps_params={'ensure_ascii': False})
+    
+@rol_requerido('Almacenista', 'Administrador')
+@csrf_exempt
+def validar_pedido(request, pedido_id):
+    """
+    RF18: el almacenista valida el pedido (después de ajustar/cancelar
+    productos si hacía falta) y lo deja listo para agruparse en una
+    entrega. Pasa de EPD001 (Pendiente) a EPD003 (Registrado).
+    """
+    if request.method != 'POST':
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            UPDATE pedido SET edo_pedido = 'EPD003'
+            WHERE num = %s AND edo_pedido = 'EPD001'
+        """, [pedido_id])
+        if cursor.rowcount == 0:
+            return JsonResponse({"error": "El pedido no existe o ya fue validado"}, status=400)
+
+    return JsonResponse({"mensaje": "Pedido validado correctamente", "pedido_id": pedido_id},
+                         json_dumps_params={'ensure_ascii': False})

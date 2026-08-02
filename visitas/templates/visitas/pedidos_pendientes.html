@@ -80,6 +80,8 @@
                 `).join('')}
             </table>
             <p style="margin-top:12px; font-weight:bold;">Total: $${p.total.toFixed(2)}</p>
+            <button class="btn btn-primary" style="width:100%; margin-top:10px;"
+                onclick="validarPedido(${p.pedido_id})">✔ Validar pedido</button>
         `;
     }
 
@@ -101,24 +103,40 @@
     }
 
     async function cancelarProducto(pedidoId, codProducto) {
-    if (!confirm('¿Cancelar este producto del pedido?')) return;
+        if (!confirm('¿Cancelar este producto del pedido?')) return;
 
-    const fechaDisponible = prompt('¿Fecha estimada de disponibilidad? (opcional, formato AAAA-MM-DD, o deja vacío)');
+        const fechaDisponible = prompt('¿Fecha estimada de disponibilidad? (opcional, formato AAAA-MM-DD, o deja vacío)');
 
-    const res = await fetch(`/api/visitas/pedidos/${pedidoId}/detalle/${codProducto}/cancelar/`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fecha_disponible_estimada: fechaDisponible || null })
-    });
-    const data = await res.json();
+        const res = await fetch(`/api/visitas/pedidos/${pedidoId}/detalle/${codProducto}/cancelar/`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fecha_disponible_estimada: fechaDisponible || null })
+        });
+        const data = await res.json();
 
-    if (res.ok) {
-        mostrarToast(data.mensaje, 'success');
-        verDetalle(pedidoId);
-    } else {
-        mostrarToast(data.error, 'error');
+        if (res.ok) {
+            mostrarToast(data.mensaje, 'success');
+            verDetalle(pedidoId);
+        } else {
+            mostrarToast(data.error, 'error');
+        }
     }
-}
+
+    async function validarPedido(pedidoId) {
+        if (!confirm('¿Validar este pedido? Ya no podrás ajustar ni cancelar productos después.')) return;
+
+        const res = await fetch(`/api/visitas/pedidos/${pedidoId}/validar/`, {
+            method: 'POST'
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+            mostrarToast(data.mensaje, 'success');
+            cerrarModal();
+        } else {
+            mostrarToast(data.error, 'error');
+        }
+    }
 
     function cerrarModal() {
         document.getElementById('modal-detalle').style.display = 'none';

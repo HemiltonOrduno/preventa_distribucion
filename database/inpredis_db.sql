@@ -425,3 +425,12 @@ CREATE TABLE producto_cancelado_pedido (
     FOREIGN KEY (num_pedido) REFERENCES pedido(num),
     FOREIGN KEY (cod_producto) REFERENCES producto(codigo)
 );
+
+DELETE FROM ruta_visita_orden WHERE ruta_visita IN (12,13,14);
+DELETE FROM ruta_visita WHERE numero IN (12,13,14);
+
+UPDATE ruta_visita
+SET edo_ruta_visita = 'ERV002'
+WHERE numero IN (1,2,3,4,5,6,7,8,9,10,11);
+
+ALTER TABLE ruta_visita MODIFY empleado INT(11) NULL;

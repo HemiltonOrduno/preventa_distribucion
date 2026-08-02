@@ -62,7 +62,7 @@ def registrar_producto(request):
         "imagen": ruta_imagen
     }, status=201, json_dumps_params={'ensure_ascii': False})
 
-@rol_requerido('Almacenista', 'Administrador')
+@rol_requerido('Vendedor', 'Almacenista', 'Administrador')
 def listar_productos(request):
     with connection.cursor() as cursor:
         cursor.execute("""

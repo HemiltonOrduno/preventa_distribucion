@@ -390,7 +390,7 @@ def rutas_visita_hoy(request):
             INNER JOIN edo_ruta_visita erv ON erv.codigo = rv.edo_ruta_visita
             INNER JOIN zona z ON z.num = rv.zona
             INNER JOIN empleado em ON em.num = rv.empleado
-            WHERE rv.dia = %s
+            WHERE rv.dia = %s AND erv.nombre = 'Activa'
         """, [dia_hoy])
         columns = [col[0] for col in cursor.description]
         rutas_hoy = [dict(zip(columns, row)) for row in cursor.fetchall()]
@@ -419,7 +419,8 @@ def rutas_visita_hoy(request):
 @csrf_exempt
 def asignar_vendedor_ruta(request, ruta_id):
     """
-    Asigna o reasigna un vendedor a una ruta de visita.
+    Asigna un vendedor a una ruta de visita y la marca como Asignada.
+    Solo se puede asignar si la ruta está Activa (no si ya fue asignada).
     """
     if request.method != 'POST':
         return JsonResponse({"error": "Método no permitido"}, status=405)
@@ -435,8 +436,13 @@ def asignar_vendedor_ruta(request, ruta_id):
 
     with connection.cursor() as cursor:
         cursor.execute("""
-            UPDATE ruta_visita SET empleado = %s WHERE numero = %s
+            UPDATE ruta_visita
+            SET empleado = %s, edo_ruta_visita = 'ERV006'
+            WHERE numero = %s AND edo_ruta_visita = 'ERV001'
         """, [vendedor_id, ruta_id])
+
+        if cursor.rowcount == 0:
+            return JsonResponse({"error": "La ruta ya fue asignada o no está activa"}, status=409)
 
     return JsonResponse({
         "mensaje": "Vendedor asignado correctamente",
@@ -560,6 +566,7 @@ def rutas_visita_todas(request):
             INNER JOIN empleado em ON em.num = rv.empleado
             LEFT JOIN visita v ON v.ruta_visita = rv.numero
             LEFT JOIN edo_visita ev ON ev.codigo = v.edo_visita
+            WHERE erv.nombre != 'Inactiva'
             GROUP BY rv.numero, rv.nombre, rv.dia, erv.nombre, z.nombre, em.empNombre, em.empApellPat, em.num
             ORDER BY rv.dia, rv.numero
         """)

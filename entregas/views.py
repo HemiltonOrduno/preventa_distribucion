@@ -10,7 +10,10 @@ import json
 def vehiculos_disponibles(request):
     """
     RF22: consulta los vehículos disponibles y su capacidad de carga
-    (obtenida a través de VEHICULO -> MODELO -> capacidad).
+    (obtenida a través de VEHICULO -> MODELO -> capacidad). Excluye
+    vehículos que ya tienen una entrega activa asignada, aunque su
+    estado siga marcado como 'Disponible' (el estado solo cambia a
+    'En ruta' hasta que el repartidor da clic en Iniciar ruta).
     """
     with connection.cursor() as cursor:
         cursor.execute("""
@@ -23,7 +26,9 @@ def vehiculos_disponibles(request):
             FROM vehiculo v
             INNER JOIN modelo m ON m.numero = v.modelo
             INNER JOIN edo_vehiculo ev ON ev.codigo = v.edo_vehiculo
-            WHERE v.edo_vehiculo = 'EV001' AND m.capacidad > 0
+            WHERE v.edo_vehiculo = 'EV001'
+              AND m.capacidad > 0
+              AND v.entrega IS NULL
         """)
         columns = [col[0] for col in cursor.description]
         vehiculos = [dict(zip(columns, row)) for row in cursor.fetchall()]
@@ -75,21 +80,31 @@ def pedidos_validados_por_zona(request):
 def crear_entrega(request):
     """
     RF24-26: agrupa pedidos validados de una misma zona, los asigna a un
-    vehículo y crea el registro de ENTREGA.
+    vehículo y crea el registro de ENTREGA. La zona la determina el
+    primer pedido que se logre insertar (el trigger tg_verificar_zona_capacidad
+    ya lo valida en BD); cualquier pedido de otra zona o que exceda la
+    capacidad del vehículo se EXCLUYE en vez de tumbar toda la entrega.
+    El empleado se toma de la sesión activa, no se manda desde el front.
     """
     if request.method != 'POST':
         return JsonResponse({"error": "Método no permitido"}, status=405)
 
+    empleado = request.session.get('empleado_num')
+    if not empleado:
+        return JsonResponse({"error": "Sesión no válida, inicia sesión de nuevo"}, status=401)
+
     try:
         body = json.loads(request.body)
         vehiculo_id = body.get("vehiculo")
-        empleado = body.get("empleado")
         pedidos_ids = body.get("pedidos", [])
     except Exception:
         return JsonResponse({"error": "JSON inválido"}, status=400)
 
-    if not vehiculo_id or not empleado or not pedidos_ids:
-        return JsonResponse({"error": "Se requiere vehiculo, empleado y pedidos"}, status=400)
+    if not vehiculo_id or not pedidos_ids:
+        return JsonResponse({"error": "Se requiere vehiculo y pedidos"}, status=400)
+
+    pedidos_incluidos = []
+    pedidos_rechazados = []
 
     try:
         with transaction.atomic():
@@ -108,29 +123,36 @@ def crear_entrega(request):
                 if cursor.rowcount == 0:
                     raise ValueError(f"Vehículo {vehiculo_id} no encontrado")
 
-                for pedido_id in pedidos_ids:
-                    cursor.execute("""
-                        UPDATE pedido
-                        SET entrega = %s, edo_pedido = 'EPD004'
-                        WHERE num = %s AND edo_pedido = 'EPD003'
-                    """, [nueva_entrega, pedido_id])
-                    if cursor.rowcount == 0:
-                        raise ValueError(
-                            f"Pedido {pedido_id} no encontrado o no está en estado 'Registrado'"
-                        )
+            for pedido_id in pedidos_ids:
+                try:
+                    with transaction.atomic():
+                        with connection.cursor() as cursor:
+                            cursor.execute("""
+                                UPDATE pedido
+                                SET entrega = %s, edo_pedido = 'EPD004'
+                                WHERE num = %s AND edo_pedido = 'EPD003'
+                            """, [nueva_entrega, pedido_id])
+                            if cursor.rowcount == 0:
+                                raise ValueError("no encontrado o no está 'Registrado'")
+                    pedidos_incluidos.append(pedido_id)
+                except Exception as e:
+                    pedidos_rechazados.append({"pedido_id": pedido_id, "motivo": str(e)})
 
     except ValueError as e:
         return JsonResponse({"error": str(e)}, status=400)
     except Exception as e:
         return JsonResponse({"error": f"No se pudo crear la entrega: {str(e)}"}, status=400)
 
+    status = 201 if pedidos_incluidos else 400
     return JsonResponse({
-        "mensaje": "Entrega creada correctamente",
+        "mensaje": "Entrega creada correctamente" if pedidos_incluidos else "Ningún pedido pudo agregarse",
         "entrega_id": nueva_entrega,
         "vehiculo": vehiculo_id,
-        "pedidos_incluidos": pedidos_ids
-    }, status=201, json_dumps_params={'ensure_ascii': False})
-
+        "pedidos_incluidos": pedidos_incluidos,
+        "pedidos_rechazados": pedidos_rechazados
+    }, status=status, json_dumps_params={'ensure_ascii': False})
+    
+    
 @rol_requerido('Almacenista', 'Administrador')
 def almacenista_cargar_camion_view(request):
     return render(request, 'entregas/cargar_camion.html')
@@ -223,8 +245,8 @@ def mi_ruta(request):
         "geometria": geometria,
         "paradas": paradas
     }, json_dumps_params={'ensure_ascii': False})
-
-
+    
+    
 def detalle_pedido(request, pedido_id):
     with connection.cursor() as cursor:
         cursor.execute("""
@@ -401,3 +423,16 @@ def ruta_entrega_view(request):
 def pedidos_view(request):
     from django.shortcuts import render
     return render(request, 'entregas/pedidos.html')
+
+@rol_requerido('Almacenista', 'Administrador')
+def proximo_numero_entrega(request):
+    """
+    Muestra el folio que le tocaría a la siguiente entrega, solo
+    informativo — el número real se confirma hasta crear_entrega
+    (si alguien más crea una entrega entre medio, este número corre).
+    """
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT COALESCE(MAX(numero), 0) + 1 FROM entrega")
+        siguiente = cursor.fetchone()[0]
+
+    return JsonResponse({"proximo_numero": siguiente})

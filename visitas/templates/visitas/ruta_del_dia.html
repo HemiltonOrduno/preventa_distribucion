@@ -18,12 +18,22 @@
     </div>
 </div>
 
-<div class="map-box">
-    <i class='bx bx-map-alt'></i>
+<div>
+    <div class="map-box">
+        <div id="mapaVendedor"></div>
+    </div>
+    <div class="mapa-leyenda">
+        <span><i class="dot dot-almacen"></i> Almacén</span>
+        <span><i class="dot dot-visitado"></i> Visitado</span>
+        <span><i class="dot dot-actual"></i> Actual</span>
+        <span><i class="dot dot-pendiente"></i> Pendiente</span>
+    </div>
 </div>
 
 {% endblock %}
 
 {% block extra_scripts %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="{% static 'visitas/js/ruta_del_dia.js' %}"></script>
 {% endblock %}

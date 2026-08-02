@@ -1,11 +1,12 @@
 from django.urls import path
 from . import views
-from .views import vehiculos_disponibles, pedidos_validados_por_zona, crear_entrega, almacenista_cargar_camion_view
+from .views import vehiculos_disponibles, pedidos_validados_por_zona, crear_entrega, almacenista_cargar_camion_view, proximo_numero_entrega
 
 urlpatterns = [
     path('vehiculos-disponibles/', vehiculos_disponibles, name='vehiculos_disponibles'),
     path('pedidos-validados/', pedidos_validados_por_zona, name='pedidos_validados_por_zona'),
     path('entregas/', crear_entrega, name='crear_entrega'),
+    path('proximo-numero-entrega/', proximo_numero_entrega, name='proximo_numero_entrega'),
         path('almacenista/cargar-camion/', almacenista_cargar_camion_view, name='almacenista_cargar_camion'),
     path('ruta-entrega/', views.ruta_entrega_view, name='ruta_entrega'),
     path('pedidos/', views.pedidos_view, name='pedidos_repartidor'),

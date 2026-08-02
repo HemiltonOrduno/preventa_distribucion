@@ -7,6 +7,7 @@ from rest_framework.permissions import AllowAny
 from django.contrib.auth.hashers import check_password
 from .models import Usuario
 from .serializers import LoginSerializer, UsuarioDataSerializer
+from django.shortcuts import redirect
 
 
 ROL_REDIRECT = {
@@ -71,6 +72,10 @@ class LoginView(APIView):
         data = UsuarioDataSerializer(usuario).data
         data['redirect_url'] = ROL_REDIRECT.get(usuario.empleado.rol.nombre, '/')
         return Response(data, status=status.HTTP_200_OK)
+
+def logout_view(request):
+    request.session.flush()
+    return redirect('login-page')
 
 
 class UsuarioListCreate:

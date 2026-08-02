@@ -7,13 +7,14 @@
 
 {% block content %}
 <div class="card" style="max-width:700px;">
+    <p style="font-size:13px; color:#666; margin-bottom:10px;">
+        Folio de la entrega: <strong id="folio-entrega">—</strong>
+    </p>
+
     <label style="font-size:13px; font-weight:600;">Vehículo</label>
     <select id="vehiculo" style="width:100%; padding:8px; margin:6px 0 14px; border-radius:6px; border:1px solid #ccc;">
         <option value="">Cargando vehículos...</option>
     </select>
-
-    <label style="font-size:13px; font-weight:600;">Número de empleado</label>
-    <input type="number" id="empleado" placeholder="Ej. 4" style="width:100%; padding:8px; margin:6px 0 14px; border-radius:6px; border:1px solid #ccc;">
 </div>
 
 <div class="card" style="max-width:700px;">
@@ -64,27 +65,40 @@
         `).join('');
     }
 
+    async function cargarFolio() {
+        const res = await fetch('/api/entregas/proximo-numero-entrega/');
+        const data = await res.json();
+        document.getElementById('folio-entrega').textContent = `#${data.proximo_numero}`;
+    }
+
     async function crearEntrega() {
         const vehiculo = document.getElementById('vehiculo').value;
-        const empleado = document.getElementById('empleado').value;
         const pedidos = Array.from(document.querySelectorAll('.pedido-check:checked')).map(c => parseInt(c.value));
 
-        if (!vehiculo || !empleado || pedidos.length === 0) {
-            mostrarToast('Selecciona vehículo, empleado y al menos un pedido', 'error');
+        if (!vehiculo || pedidos.length === 0) {
+            mostrarToast('Selecciona vehículo y al menos un pedido', 'error');
             return;
         }
 
         const res = await fetch('/api/entregas/entregas/', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ vehiculo: parseInt(vehiculo), empleado: parseInt(empleado), pedidos })
+            body: JSON.stringify({ vehiculo: parseInt(vehiculo), pedidos })
         });
         const data = await res.json();
 
-        if (res.ok) {
-            mostrarToast(`Entrega #${data.entrega_id} creada correctamente`, 'success');
+        if (data.pedidos_incluidos !== undefined) {
+            let msg = data.pedidos_incluidos.length > 0
+                ? `Entrega #${data.entrega_id} creada con ${data.pedidos_incluidos.length} pedido(s)`
+                : `No se pudo crear la entrega`;
+            if (data.pedidos_rechazados.length > 0) {
+                const detalles = data.pedidos_rechazados.map(r => `#${r.pedido_id}: ${r.motivo}`).join(' | ');
+                msg += `. Rechazados: ${detalles}`;
+            }
+            mostrarToast(msg, data.pedidos_incluidos.length > 0 ? 'success' : 'error');
             cargarPedidosValidados();
             cargarVehiculos();
+            cargarFolio();
         } else {
             mostrarToast(data.error, 'error');
         }
@@ -92,5 +106,6 @@
 
     cargarVehiculos();
     cargarPedidosValidados();
+    cargarFolio();
 </script>
 {% endblock %}

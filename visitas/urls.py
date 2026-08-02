@@ -8,8 +8,10 @@ from .views import (
     pedido_detalle,
     ajustar_cantidad_pedido,
     cancelar_producto_pedido,
+    validar_pedido,          # <-- nuevo
     almacenista_pedidos_view,
     ruta_del_dia_api,
+    mapa_ruta_del_dia_api,
     iniciar_visita,
     realizar_visita,
     levantar_pedido,
@@ -29,8 +31,10 @@ urlpatterns = [
 
     # --- API del vendedor (RF04-15) ---
     path('api/ruta-del-dia/', ruta_del_dia_api, name='ruta_del_dia_api'),
+    path('api/mapa-ruta-del-dia/', mapa_ruta_del_dia_api, name='mapa_ruta_del_dia_api'),
     path('api/visitas/', iniciar_visita, name='iniciar_visita'),
     path('api/visitas/<int:visita_id>/realizar/', realizar_visita, name='realizar_visita'),
     path('api/visitas/<int:visita_id>/pedido/', levantar_pedido, name='levantar_pedido_api'),
     path('api/visitas/<int:visita_id>/sin-pedido/', visita_sin_pedido, name='visita_sin_pedido_api'),
+    path('pedidos/<int:pedido_id>/validar/', validar_pedido, name='validar_pedido'),
 ]

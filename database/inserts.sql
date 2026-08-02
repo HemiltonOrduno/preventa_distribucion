@@ -1,4 +1,4 @@
--- Active: 1785279407257@@127.0.0.1@3306@inpredis_db
+-- Active: 1772565691688@@127.0.0.1@3306@inpredis_db
 -- =============================================================
 -- SCRIPT DE INSERCIÓN DE DATOS DE SIMULACIÓN
 -- Fecha de generación: 2026-07-22
@@ -1464,3 +1464,91 @@ UPDATE usuario SET contraseña = 'pbkdf2_sha256$600000$hLj4mfww1jqr$B4T2e99hXnQu
 UPDATE usuario SET contraseña = 'pbkdf2_sha256$600000$QgZ7VF4vT4Uu$fAhCp/RbmzDeD2paxJMg1JvhYrikszO6A69X785G0Nw=' WHERE num = 62;
 UPDATE usuario SET contraseña = 'pbkdf2_sha256$600000$B3d4kIWwd1mq$Hme68BTxynHqEsxLcLkMKpGQe6AOeMUsv1GFt6aNHYs=' WHERE num = 63;
 
+-- Script generado: alta de establecimientos nuevos para completar 10 por zona
+-- Revisar antes de correr en producción. numero inicia en 51 (siguiente al máximo actual = 50).
+
+INSERT INTO establecimiento (numero, nombre, estCalle, estNumero, estColonia, telefono, latitud, longitud, fecha_registro, zona, empleado, entrega, rep_establecimiento, edo_establecimiento) VALUES
+(51, 'Minisuper Cordero', 'Calle Quezada', '939', 'Playas de Tijuana', '6648196001', 32.532988, -117.114286, '2026-08-01', 1, 4, NULL, 1, 'EST001'),
+(52, 'Papelería Farías', 'Calle Beltrán', '4564', 'Playas de Tijuana', '6646379402', 32.525666, -117.126514, '2026-08-01', 1, 5, NULL, 2, 'EST001'),
+(53, 'Dulcería Uribe', 'Calle Uribe', '937', 'Playas de Tijuana', '6641615594', 32.518614, -117.115942, '2026-08-01', 1, 6, NULL, 3, 'EST001'),
+(54, 'Abarrotes Núñez', 'Calle Coronado', '745', 'Playas de Tijuana', '6648495931', 32.526623, -117.073506, '2026-08-01', 1, 7, NULL, 4, 'EST001'),
+(55, 'Abarrotes Farías', 'Calle Farías', '927', 'Playas de Tijuana', '6646475255', 32.533965, -117.072828, '2026-08-01', 1, 8, NULL, 5, 'EST001'),
+(56, 'Papelería León', 'Calle Herrera', '1501', 'Otay Poniente', '6648327648', 32.543687, -116.93605, '2026-08-01', 3, 9, NULL, 6, 'EST001'),
+(57, 'Papelería Sandoval', 'Calle Farías', '362', 'Otay Poniente', '6645641395', 32.550457, -116.929024, '2026-08-01', 3, 10, NULL, 7, 'EST001'),
+(58, 'Papelería Santoyo', 'Calle Núñez', '1270', 'Otay Poniente', '6644238849', 32.52899, -116.918494, '2026-08-01', 3, 11, NULL, 8, 'EST001'),
+(59, 'Dulcería Gallardo', 'Calle Quezada', '4274', 'Otay Poniente', '6647101226', 32.529171, -116.971332, '2026-08-01', 3, 12, NULL, 9, 'EST001'),
+(60, 'Tortillería Gaytán', 'Calle Ontiveros', '4434', 'Otay Poniente', '6644801845', 32.528469, -116.942712, '2026-08-01', 3, 13, NULL, 10, 'EST001'),
+(61, 'Minisuper Orozco', 'Calle Jiménez', '4200', 'Cacho', '6642814893', 32.486782, -117.098054, '2026-08-01', 4, 4, NULL, 11, 'EST001'),
+(62, 'Miscelánea Balderas', 'Calle Zaragoza', '104', 'Cacho', '6649570154', 32.497925, -117.092401, '2026-08-01', 4, 5, NULL, 12, 'EST001'),
+(63, 'Papelería Franco', 'Calle Ibáñez', '801', 'Cacho', '6647182278', 32.48019, -117.090554, '2026-08-01', 4, 6, NULL, 13, 'EST001'),
+(64, 'Miscelánea Jiménez', 'Calle Duran', '4517', 'Cacho', '6643465787', 32.489941, -117.087965, '2026-08-01', 4, 7, NULL, 14, 'EST001'),
+(65, 'Minisuper Huerta', 'Calle Higuera', '4637', 'Cacho', '6643930103', 32.47964, -117.105686, '2026-08-01', 4, 8, NULL, 15, 'EST001'),
+(66, 'Minisuper Chávez', 'Calle Guerra', '2381', 'Mesa de Otay', '6647382997', 32.501228, -117.053323, '2026-08-01', 5, 9, NULL, 16, 'EST001'),
+(67, 'Papelería Pantoja', 'Calle Lozano', '3631', 'Mesa de Otay', '6645667010', 32.499455, -117.045433, '2026-08-01', 5, 10, NULL, 17, 'EST001'),
+(68, 'Papelería Aranda', 'Calle Zamora', '2381', 'Mesa de Otay', '6647317810', 32.490234, -117.048748, '2026-08-01', 5, 11, NULL, 18, 'EST001'),
+(69, 'Ferretería Barrios', 'Calle Guerra', '1462', 'Mesa de Otay', '6646773602', 32.504946, -116.99686, '2026-08-01', 5, 12, NULL, 19, 'EST001'),
+(70, 'Dulcería Aguilar', 'Calle Núñez', '2436', 'El Florido', '6646872343', 32.505501, -116.967845, '2026-08-01', 6, 13, NULL, 20, 'EST001'),
+(71, 'Abarrotes Gallardo', 'Calle Robles', '568', 'El Florido', '6640978820', 32.497015, -116.983367, '2026-08-01', 6, 4, NULL, 21, 'EST001'),
+(72, 'Ferretería Ibáñez', 'Calle Gaytán', '2026', 'El Florido', '6646193990', 32.500946, -116.982792, '2026-08-01', 6, 5, NULL, 22, 'EST001'),
+(73, 'Tortillería Ibáñez', 'Calle Villegas', '2691', 'El Florido', '6644353462', 32.486254, -116.943641, '2026-08-01', 6, 6, NULL, 23, 'EST001'),
+(74, 'Tienda Núñez', 'Calle Herrera', '176', 'El Florido', '6647991183', 32.48275, -116.930858, '2026-08-01', 6, 7, NULL, 24, 'EST001'),
+(75, 'Ferretería Jiménez', 'Calle Gaytán', '2101', 'Cerro Colorado', '6645427849', 32.436768, -116.961475, '2026-08-01', 7, 8, NULL, 25, 'EST001'),
+(76, 'Ferretería Padilla', 'Calle Quezada', '2266', 'Cerro Colorado', '6641182449', 32.465543, -116.980127, '2026-08-01', 7, 9, NULL, 1, 'EST001'),
+(77, 'Papelería Uribe', 'Calle Jiménez', '4240', 'Cerro Colorado', '6647401640', 32.43933, -116.939798, '2026-08-01', 7, 10, NULL, 2, 'EST001'),
+(78, 'Abarrotes Torres', 'Calle Jiménez', '1423', 'Cerro Colorado', '6647868011', 32.45976, -116.939579, '2026-08-01', 7, 11, NULL, 3, 'EST001'),
+(79, 'Miscelánea Barajas', 'Calle Cazarez', '1313', 'Cerro Colorado', '6646204505', 32.433297, -116.95994, '2026-08-01', 7, 12, NULL, 4, 'EST001'),
+(80, 'Papelería Huerta', 'Calle Dávila', '3429', 'San Antonio de los Buenos', '6649232260', 32.45601, -117.104657, '2026-08-01', 8, 13, NULL, 5, 'EST001'),
+(81, 'Miscelánea Torres', 'Calle Huerta', '2285', 'San Antonio de los Buenos', '6642160733', 32.460166, -117.100827, '2026-08-01', 8, 4, NULL, 6, 'EST001'),
+(82, 'Farmacia Valles', 'Calle Farías', '1926', 'San Antonio de los Buenos', '6640365414', 32.442987, -117.075507, '2026-08-01', 8, 5, NULL, 7, 'EST001'),
+(83, 'Carnicería Urías', 'Calle Anaya', '2812', 'San Antonio de los Buenos', '6640142940', 32.446388, -117.063244, '2026-08-01', 8, 6, NULL, 8, 'EST001'),
+(84, 'Minisuper Iñiguez', 'Calle Robles', '3674', 'San Antonio de los Buenos', '6649816934', 32.447644, -117.079916, '2026-08-01', 8, 7, NULL, 9, 'EST001'),
+(85, 'Abarrotes Juárez', 'Calle Anaya', '1714', 'Camino Verde', '6645615951', 32.432061, -116.996912, '2026-08-01', 9, 8, NULL, 10, 'EST001'),
+(86, 'Tienda Trujillo', 'Calle Fonseca', '2522', 'Camino Verde', '6648236629', 32.443134, -117.031046, '2026-08-01', 9, 9, NULL, 11, 'EST001'),
+(87, 'Tortillería Padilla', 'Calle Padilla', '2450', 'Camino Verde', '6643699577', 32.446619, -117.002974, '2026-08-01', 9, 10, NULL, 12, 'EST001'),
+(88, 'Farmacia Duran', 'Calle Urbina', '794', 'Camino Verde', '6644895134', 32.450402, -117.005613, '2026-08-01', 9, 11, NULL, 13, 'EST001'),
+(89, 'Papelería Beltrán', 'Calle Pantoja', '696', 'Camino Verde', '6647693676', 32.437305, -117.05495, '2026-08-01', 9, 12, NULL, 14, 'EST001'),
+(90, 'Papelería Rangel', 'Calle Macías', '3582', 'Camino Verde', '6643287083', 32.455618, -117.057634, '2026-08-01', 9, 13, NULL, 15, 'EST001'),
+(91, 'Minisuper Núñez', 'Calle Zaragoza', '4678', 'Sureste 2', '6649579868', 32.441867, -116.801273, '2026-08-01', 10, 4, NULL, 16, 'EST001'),
+(92, 'Farmacia Trejo', 'Calle Jiménez', '2125', 'Sureste 2', '6644873471', 32.487031, -116.800912, '2026-08-01', 10, 5, NULL, 17, 'EST001'),
+(93, 'Tienda Guerra', 'Calle Barajas', '760', 'Sureste 2', '6642236231', 32.452107, -116.80649, '2026-08-01', 10, 6, NULL, 18, 'EST001'),
+(94, 'Dulcería Godínez', 'Calle Franco', '1794', 'Sureste 2', '6646690967', 32.456485, -116.801227, '2026-08-01', 10, 7, NULL, 19, 'EST001'),
+(95, 'Abarrotes Zúñiga', 'Calle Hurtado', '4509', 'Sureste 2', '6648937346', 32.454097, -116.80396, '2026-08-01', 10, 8, NULL, 20, 'EST001'),
+(96, 'Farmacia Cordero', 'Calle Fonseca', '1452', 'Sureste 2', '6647298069', 32.460775, -116.793921, '2026-08-01', 10, 9, NULL, 21, 'EST001'),
+(97, 'Tortillería Cordero', 'Calle Ontiveros', '1588', 'Sureste 2', '6640465375', 32.438212, -116.80257, '2026-08-01', 10, 10, NULL, 22, 'EST001'),
+(98, 'Carnicería Coronado', 'Calle Hurtado', '2166', 'Sureste 2', '6641708053', 32.452591, -116.783757, '2026-08-01', 10, 11, NULL, 23, 'EST001'),
+(99, 'Minisuper Duarte', 'Calle Beltrán', '266', 'Sureste 2', '6649232719', 32.487813, -116.783814, '2026-08-01', 10, 12, NULL, 24, 'EST001'),
+(100, 'Papelería Ontiveros', 'Calle Urbina', '1038', 'Sureste 2', '6642419049', 32.48376, -116.790392, '2026-08-01', 10, 13, NULL, 25, 'EST001'),
+(101, 'Dulcería Elizondo', 'Calle Higuera', '2089', 'Noreste', '6641491905', 32.555191, -116.890944, '2026-08-01', 11, 4, NULL, 1, 'EST001'),
+(102, 'Ferretería Ibarra', 'Calle Uribe', '203', 'Noreste', '6646716572', 32.541753, -116.90207, '2026-08-01', 11, 5, NULL, 2, 'EST001'),
+(103, 'Dulcería Vega', 'Calle León', '4508', 'Noreste', '6647769453', 32.545222, -116.824969, '2026-08-01', 11, 6, NULL, 3, 'EST001'),
+(104, 'Minisuper Marín', 'Calle Ontiveros', '4768', 'Noreste', '6649650752', 32.552318, -116.887028, '2026-08-01', 11, 7, NULL, 4, 'EST001'),
+(105, 'Carnicería Jiménez', 'Calle Marín', '4653', 'Noreste', '6640831367', 32.526336, -116.832292, '2026-08-01', 11, 8, NULL, 5, 'EST001'),
+(106, 'Ferretería Guerra', 'Calle Reséndiz', '3771', 'Noreste', '6640143634', 32.543149, -116.852452, '2026-08-01', 11, 9, NULL, 6, 'EST001'),
+(107, 'Tortillería Balderas', 'Calle Ibarra', '4608', 'Noreste', '6645574443', 32.532717, -116.862341, '2026-08-01', 11, 10, NULL, 7, 'EST001'),
+(108, 'Minisuper Aranda', 'Calle Zamora', '1669', 'Noreste', '6643749894', 32.525146, -116.844112, '2026-08-01', 11, 11, NULL, 8, 'EST001'),
+(109, 'Tienda Farías', 'Calle Anaya', '1136', 'Noreste', '6644008427', 32.527322, -116.882005, '2026-08-01', 11, 12, NULL, 9, 'EST001'),
+(110, 'Minisuper Barrios', 'Calle Landeros', '2891', 'Noreste', '6642047116', 32.537555, -116.867632, '2026-08-01', 11, 13, NULL, 10, 'EST001'),
+(111, 'Farmacia Herrera', 'Calle Salcedo', '1322', 'Este', '6649413186', 32.491619, -116.848965, '2026-08-01', 12, 4, NULL, 11, 'EST001'),
+(112, 'Tortillería Iñiguez', 'Calle Villegas', '3216', 'Este', '6647749649', 32.498885, -116.888591, '2026-08-01', 12, 5, NULL, 12, 'EST001'),
+(113, 'Tortillería Franco', 'Calle Cazares', '1828', 'Este', '6644123281', 32.492727, -116.844352, '2026-08-01', 12, 6, NULL, 13, 'EST001'),
+(114, 'Miscelánea Aguilar', 'Calle Pantoja', '2485', 'Este', '6640344713', 32.48589, -116.848714, '2026-08-01', 12, 7, NULL, 14, 'EST001'),
+(115, 'Tienda Higuera', 'Calle Ibarra', '1040', 'Este', '6648324210', 32.49448, -116.827705, '2026-08-01', 12, 8, NULL, 15, 'EST001'),
+(116, 'Miscelánea Quintero', 'Calle Nava', '3697', 'Este', '6641746488', 32.492231, -116.837115, '2026-08-01', 12, 9, NULL, 16, 'EST001'),
+(117, 'Farmacia Landeros', 'Calle Juárez', '2740', 'Este', '6649401399', 32.474735, -116.904572, '2026-08-01', 12, 10, NULL, 17, 'EST001'),
+(118, 'Abarrotes León', 'Calle Vega', '3954', 'Este', '6648742967', 32.491592, -116.842373, '2026-08-01', 12, 11, NULL, 18, 'EST001'),
+(119, 'Minisuper Pantoja', 'Calle Macías', '1417', 'Este', '6645674680', 32.483831, -116.879335, '2026-08-01', 12, 12, NULL, 19, 'EST001'),
+(120, 'Farmacia Jáuregui', 'Calle Fonseca', '4315', 'Este', '6640876038', 32.482694, -116.880198, '2026-08-01', 12, 13, NULL, 20, 'EST001'),
+(121, 'Carnicería Montiel', 'Calle Escobar', '1767', 'Sureste', '6644824771', 32.459232, -116.854215, '2026-08-01', 13, 4, NULL, 21, 'EST001'),
+(122, 'Abarrotes Jasso', 'Calle Quintero', '4612', 'Sureste', '6640861317', 32.460775, -116.846959, '2026-08-01', 13, 5, NULL, 22, 'EST001'),
+(123, 'Minisuper Salcedo', 'Calle Urías', '2339', 'Sureste', '6646773782', 32.449942, -116.846372, '2026-08-01', 13, 6, NULL, 23, 'EST001'),
+(124, 'Dulcería Aranda', 'Calle Quezada', '671', 'Sureste', '6644658404', 32.465187, -116.864291, '2026-08-01', 13, 7, NULL, 24, 'EST001'),
+(125, 'Tortillería Reséndiz', 'Calle Quiñones', '2927', 'Sureste', '6645886753', 32.463149, -116.869597, '2026-08-01', 13, 8, NULL, 25, 'EST001'),
+(126, 'Papelería Fregoso', 'Calle Godínez', '457', 'Sureste', '6645766270', 32.445787, -116.834383, '2026-08-01', 13, 9, NULL, 1, 'EST001'),
+(127, 'Miscelánea Trujillo', 'Calle Lozano', '3706', 'Sureste', '6641870262', 32.466753, -116.879448, '2026-08-01', 13, 10, NULL, 2, 'EST001'),
+(128, 'Tienda Uribe', 'Calle Ibáñez', '2791', 'Sureste', '6648657809', 32.454437, -116.873816, '2026-08-01', 13, 11, NULL, 3, 'EST001'),
+(129, 'Minisuper Guerra', 'Calle Farías', '840', 'Sureste', '6646117240', 32.454722, -116.8288, '2026-08-01', 13, 12, NULL, 4, 'EST001'),
+(130, 'Abarrotes Sandoval', 'Calle Balderas', '3628', 'Sureste', '6642386922', 32.460661, -116.88277, '2026-08-01', 13, 13, NULL, 5, 'EST001');
+
+
+INSERT INTO edo_ruta_visita (codigo, nombre, descripcion) VALUES
+('ERV006', 'Asignada', 'La ruta de visita ya fue asignada a un vendedor y está lista para iniciar');
