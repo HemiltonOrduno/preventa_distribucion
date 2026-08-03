@@ -434,3 +434,5 @@ SET edo_ruta_visita = 'ERV002'
 WHERE numero IN (1,2,3,4,5,6,7,8,9,10,11);
 
 ALTER TABLE ruta_visita MODIFY empleado INT(11) NULL;
+
+ALTER TABLE ruta_entrega MODIFY empleado INT(11) NULL;

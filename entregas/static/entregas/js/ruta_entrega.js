@@ -29,8 +29,12 @@ function cargarRuta() {
         .then(res => res.json())
         .then(data => {
             if (data.error) {
-                document.getElementById('lista-paradas').innerHTML =
-                    `<p style="text-align:center;color:#888;padding:20px;font-size:13px;">${data.error}</p>`;
+                if (data.error === 'No tienes una ruta asignada para hoy') {
+                    mostrarEntregasDisponibles();
+                } else {
+                    document.getElementById('lista-paradas').innerHTML =
+                        `<p style="text-align:center;color:#888;padding:20px;font-size:13px;">${data.error}</p>`;
+                }
                 return;
             }
 
@@ -43,6 +47,10 @@ function cargarRuta() {
                 rutaIniciada = true;
                 document.getElementById('btn-iniciar').style.display = 'none';
                 document.getElementById('btn-finalizar').style.display = 'block';
+            } else {
+                rutaIniciada = false;
+                document.getElementById('btn-iniciar').style.display = 'block';
+                document.getElementById('btn-finalizar').style.display = 'none';
             }
 
             renderizarParadas();
@@ -53,6 +61,67 @@ function cargarRuta() {
                 '<p style="text-align:center;color:#c62828;padding:20px;font-size:13px;">Error cargando la ruta</p>';
         });
 }
+
+// ===== ENTREGAS DISPONIBLES (sin repartidor asignado) =====
+function mostrarEntregasDisponibles() {
+    document.getElementById('btn-iniciar').style.display = 'none';
+    document.getElementById('btn-finalizar').style.display = 'none';
+    document.getElementById('info-bar').style.display = 'none';
+
+    const lista = document.getElementById('lista-paradas');
+    lista.innerHTML = '<p style="text-align:center;color:#888;padding:20px;font-size:13px;">Cargando entregas disponibles...</p>';
+
+    fetch('/api/entregas/entregas-disponibles/')
+        .then(res => res.json())
+        .then(data => {
+            const entregas = data.entregas || [];
+
+            if (entregas.length === 0) {
+                lista.innerHTML = '<p style="text-align:center;color:#888;padding:20px;font-size:13px;">No hay entregas disponibles por ahora</p>';
+                return;
+            }
+
+            lista.innerHTML = `<p style="padding:10px 15px 0;font-size:13px;color:#888;">Entregas disponibles</p>`;
+
+            entregas.forEach(e => {
+                const div = document.createElement('div');
+                div.className = 'parada-item';
+                div.style.cursor = 'pointer';
+                div.innerHTML = `
+                    <div class="parada-num almacen">📦</div>
+                    <div class="parada-info">
+                        <div class="parada-nombre">Entrega #${e.entrega_id}</div>
+                        <div class="parada-sub">${e.total_pedidos} pedidos · ${e.peso_total_kg.toFixed(1)} kg · ${e.placas || 'sin vehículo'}</div>
+                    </div>
+                `;
+                div.onclick = () => tomarEntrega(e.ruta_entrega_id);
+                lista.appendChild(div);
+            });
+        })
+        .catch(() => {
+            lista.innerHTML = '<p style="text-align:center;color:#c62828;padding:20px;font-size:13px;">No se pudieron cargar las entregas disponibles</p>';
+        });
+}
+
+function tomarEntrega(rutaEntregaId) {
+    fetch('/api/entregas/tomar-entrega/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ruta_entrega_id: rutaEntregaId })
+    })
+    .then(res => res.json().then(data => ({ ok: res.ok, data })))
+    .then(({ ok, data }) => {
+        if (!ok) {
+            alert(data.error || 'No se pudo tomar la entrega');
+            mostrarEntregasDisponibles(); // refresca, por si alguien más ya se la ganó
+            return;
+        }
+        mostrarToast('✓ Entrega tomada');
+        cargarRuta();
+    })
+    .catch(() => alert('Error de conexión'));
+}
+
 
 // ===== RENDERIZAR LISTA DE PARADAS =====
 function renderizarParadas() {

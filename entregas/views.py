@@ -77,6 +77,8 @@ def pedidos_validados_por_zona(request):
 
 @rol_requerido('Almacenista', 'Administrador')
 @csrf_exempt
+@rol_requerido('Almacenista', 'Administrador')
+@csrf_exempt
 def crear_entrega(request):
     """
     RF24-26: agrupa pedidos validados de una misma zona, los asigna a un
@@ -85,6 +87,10 @@ def crear_entrega(request):
     ya lo valida en BD); cualquier pedido de otra zona o que exceda la
     capacidad del vehículo se EXCLUYE en vez de tumbar toda la entrega.
     El empleado se toma de la sesión activa, no se manda desde el front.
+
+    También crea la RUTA_ENTREGA asociada, sin repartidor asignado
+    (empleado = NULL) para que quede disponible y cualquier repartidor
+    la pueda tomar desde su pantalla.
     """
     if request.method != 'POST':
         return JsonResponse({"error": "Método no permitido"}, status=405)
@@ -123,6 +129,14 @@ def crear_entrega(request):
                 if cursor.rowcount == 0:
                     raise ValueError(f"Vehículo {vehiculo_id} no encontrado")
 
+                cursor.execute("SELECT COALESCE(MAX(numero), 0) + 1 FROM ruta_entrega")
+                nueva_ruta_entrega = cursor.fetchone()[0]
+
+                cursor.execute("""
+                    INSERT INTO ruta_entrega (numero, nombre, descripcion, empleado, entrega, edo_ruta_entrega)
+                    VALUES (%s, %s, %s, NULL, %s, 'ERET001')
+                """, [nueva_ruta_entrega, f"Ruta de entrega #{nueva_entrega}", None, nueva_entrega])
+
             for pedido_id in pedidos_ids:
                 try:
                     with transaction.atomic():
@@ -159,11 +173,11 @@ def almacenista_cargar_camion_view(request):
 
 def mi_ruta(request):
     """
-    Regresa la ruta de entrega asignada al repartidor autenticado.
+    Regresa la ruta de entrega asignada (tomada) por el repartidor autenticado.
     """
-    # Por ahora usamos el empleado 44 como repartidor de prueba
-    # Después se conectará con el sistema de autenticación
-    empleado_id = 57
+    empleado_id = request.session.get('empleado_num')
+    if not empleado_id:
+        return JsonResponse({"error": "Sesión no válida, inicia sesión de nuevo"}, status=401)
 
     with connection.cursor() as cursor:
         cursor.execute("""
@@ -436,3 +450,75 @@ def proximo_numero_entrega(request):
         siguiente = cursor.fetchone()[0]
 
     return JsonResponse({"proximo_numero": siguiente})
+
+def entregas_disponibles(request):
+    """
+    Lista las entregas que ya arma el almacenista pero que todavía
+    ningún repartidor ha tomado (empleado IS NULL en ruta_entrega).
+    """
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT
+                re.numero AS ruta_entrega_id,
+                re.entrega AS entrega_id,
+                en.fecha_creacion,
+                COUNT(DISTINCT p.num) AS total_pedidos,
+                COALESCE(SUM(dp.cantidad * pr.peso) / 1000, 0) AS peso_total_kg,
+                veh.placas,
+                mdl.nombre AS modelo,
+                mdl.capacidad
+            FROM ruta_entrega re
+            INNER JOIN entrega en ON en.numero = re.entrega
+            LEFT JOIN pedido p ON p.entrega = en.numero
+            LEFT JOIN detalle_pedido dp ON dp.num_pedido = p.num
+            LEFT JOIN producto pr ON pr.codigo = dp.cod_producto
+            LEFT JOIN vehiculo veh ON veh.entrega = en.numero
+            LEFT JOIN modelo mdl ON mdl.numero = veh.modelo
+            WHERE re.empleado IS NULL AND re.edo_ruta_entrega = 'ERET001'
+            GROUP BY re.numero, re.entrega, en.fecha_creacion, veh.placas, mdl.nombre, mdl.capacidad
+            ORDER BY en.fecha_creacion ASC
+        """)
+        columns = [col[0] for col in cursor.description]
+        entregas = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+    for e in entregas:
+        e['peso_total_kg'] = float(e['peso_total_kg'])
+        e['capacidad'] = float(e['capacidad']) if e['capacidad'] else 0
+        e['fecha_creacion'] = e['fecha_creacion'].isoformat() if e['fecha_creacion'] else None
+
+    return JsonResponse({"entregas": entregas}, json_dumps_params={'ensure_ascii': False})
+
+@csrf_exempt
+def tomar_entrega(request):
+    """
+    El repartidor toma una entrega disponible. El UPDATE con
+    'AND empleado IS NULL' evita que dos repartidores se queden
+    con la misma entrega si le dan clic casi al mismo tiempo.
+    """
+    if request.method != 'POST':
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+
+    empleado_id = request.session.get('empleado_num')
+    if not empleado_id:
+        return JsonResponse({"error": "Sesión no válida, inicia sesión de nuevo"}, status=401)
+
+    try:
+        body = json.loads(request.body)
+        ruta_entrega_id = body.get('ruta_entrega_id')
+    except Exception:
+        return JsonResponse({"error": "JSON inválido"}, status=400)
+
+    if not ruta_entrega_id:
+        return JsonResponse({"error": "Se requiere ruta_entrega_id"}, status=400)
+
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            UPDATE ruta_entrega
+            SET empleado = %s
+            WHERE numero = %s AND empleado IS NULL
+        """, [empleado_id, ruta_entrega_id])
+
+        if cursor.rowcount == 0:
+            return JsonResponse({"error": "Esta entrega ya fue tomada por otro repartidor"}, status=409)
+
+    return JsonResponse({"mensaje": "Entrega tomada correctamente"})
