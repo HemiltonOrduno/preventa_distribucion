@@ -610,38 +610,64 @@ def mapa_ruta_del_dia_api(request):
 def confirmar_pedido(request, pedido_id):
     """
     Cierra el flujo de validación: revisa que TODAS las líneas del
-    pedido tengan stock suficiente antes de dejarlo pasar a Registrado.
-    Si alguna no tiene stock, rechaza y dice cuál ajustar/cancelar.
+    pedido tengan stock suficiente antes de dejarlo pasar a Registrado,
+    y genera el movimiento de salida por pedido (TM002). El descuento
+    de stock lo hace el trigger tg_actualizar_stock, no este código.
     """
     if request.method != 'POST':
         return JsonResponse({"error": "Método no permitido"}, status=405)
 
-    with connection.cursor() as cursor:
-        cursor.execute("""
-            SELECT dp.cod_producto, pr.nombre, dp.cantidad, pr.stock
-            FROM detalle_pedido dp
-            INNER JOIN producto pr ON pr.codigo = dp.cod_producto
-            WHERE dp.num_pedido = %s
-        """, [pedido_id])
-        lineas = cursor.fetchall()
+    empleado_num = request.session.get('empleado_num')
+    if not empleado_num:
+        return JsonResponse({"error": "Sesión no válida, inicia sesión de nuevo"}, status=401)
 
-        if not lineas:
-            return JsonResponse({"error": "El pedido no tiene productos"}, status=400)
+    with transaction.atomic():
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT dp.cod_producto, pr.nombre, dp.cantidad, pr.stock, dp.precioUnitario
+                FROM detalle_pedido dp
+                INNER JOIN producto pr ON pr.codigo = dp.cod_producto
+                WHERE dp.num_pedido = %s
+            """, [pedido_id])
+            lineas = cursor.fetchall()
 
-        insuficientes = [
-            {"producto": nombre, "solicitado": cantidad, "disponible": stock}
-            for cod, nombre, cantidad, stock in lineas if cantidad > stock
-        ]
-        if insuficientes:
-            return JsonResponse({
-                "error": "Hay productos sin stock suficiente. Ajusta o cancela antes de confirmar.",
-                "detalle": insuficientes
-            }, status=400)
+            if not lineas:
+                return JsonResponse({"error": "El pedido no tiene productos"}, status=400)
 
-        cursor.execute("""
-            UPDATE pedido SET edo_pedido = 'EPD003' WHERE num = %s AND edo_pedido = 'EPD001'
-        """, [pedido_id])
-        if cursor.rowcount == 0:
-            return JsonResponse({"error": "El pedido ya no está pendiente de validación"}, status=400)
+            insuficientes = [
+                {"producto": nombre, "solicitado": cantidad, "disponible": stock}
+                for cod, nombre, cantidad, stock, precio in lineas if cantidad > stock
+            ]
+            if insuficientes:
+                return JsonResponse({
+                    "error": "Hay productos sin stock suficiente. Ajusta o cancela antes de confirmar.",
+                    "detalle": insuficientes
+                }, status=400)
 
-    return JsonResponse({"mensaje": "Pedido confirmado y registrado", "pedido_id": pedido_id}, json_dumps_params={'ensure_ascii': False})
+            cursor.execute("""
+                UPDATE pedido SET edo_pedido = 'EPD003' WHERE num = %s AND edo_pedido = 'EPD001'
+            """, [pedido_id])
+            if cursor.rowcount == 0:
+                return JsonResponse({"error": "El pedido ya no está pendiente de validación"}, status=400)
+
+            # Salida por pedido: el INSERT en detalle_movimiento dispara el trigger
+            cursor.execute("SELECT COALESCE(MAX(codigo), 0) + 1 FROM movimientos")
+            nuevo_mov = cursor.fetchone()[0]
+
+            cursor.execute("""
+                INSERT INTO movimientos (codigo, observaciones, fecha, tipo_movimiento, empleado)
+                VALUES (%s, %s, NOW(), 'TM002', %s)
+            """, [nuevo_mov, f"Salida por validación del pedido #{pedido_id}", empleado_num])
+
+            for cod, _nombre, cantidad, _stock, precio in lineas:
+                cursor.execute("""
+                    INSERT INTO detalle_movimiento
+                        (cod_movimientos, cod_producto, cantidad, precioUnitario, subtotal)
+                    VALUES (%s, %s, %s, %s, %s)
+                """, [nuevo_mov, cod, cantidad, precio, cantidad * precio])
+
+    return JsonResponse({
+        "mensaje": "Pedido confirmado, registrado y stock descontado",
+        "pedido_id": pedido_id,
+        "movimiento_id": nuevo_mov
+    }, json_dumps_params={'ensure_ascii': False})

@@ -12,6 +12,18 @@
     <link rel="stylesheet" href="{% static 'establecimientos/css/vendedor.css' %}">
     {% block extra_styles %}{% endblock %}
 
+    <script>
+        /* Aplica el modo alto contraste ANTES de pintar la pagina, para que
+           no haya parpadeo si el usuario ya lo tenia activado (RFN-19) */
+        (function(){
+            try{
+                if (localStorage.getItem('altoContraste') === '1'){
+                    document.documentElement.classList.add('alto-contraste');
+                }
+            }catch(e){}
+        })();
+    </script>
+
     <title>{% block title %}Vendedor{% endblock %} - INPREDISROUTE</title>
 </head>
 <body>
@@ -32,6 +44,11 @@
             <i class='bx bx-store'></i> Clientes
         </a>
     </div>
+    <button class="btn-contraste" onclick="toggleAltoContraste()"
+            title="Modo alto contraste" aria-label="Activar modo de alto contraste"
+            aria-pressed="false">
+        <i class='bx bx-adjust'></i>
+    </button>
     <div class="top-nav__avatar" onclick="togglePerfil(event)"><i class='bx bx-user'></i></div>
 </nav>
 
@@ -66,6 +83,14 @@
         </div>
     </div>
 </div>
+
+<!-- BOTON FLOTANTE DE ALTO CONTRASTE: solo visible en movil (RFN-19).
+     En escritorio ya existe el boton equivalente dentro del top-nav. -->
+<button class="btn-contraste-fab" onclick="toggleAltoContraste()"
+        title="Modo alto contraste" aria-label="Activar modo de alto contraste"
+        aria-pressed="false">
+    <i class='bx bx-adjust'></i>
+</button>
 
 <div class="page {% block page_class %}{% endblock %}">
     {% block content %}{% endblock %}
@@ -180,6 +205,25 @@
     function cerrarPerfil(){
         menuPerfil.classList.remove("perfil--abierto");
     }
+
+    /*===== MODO ALTO CONTRASTE (RFN-19) =====*/
+    function toggleAltoContraste(){
+        var activo = document.documentElement.classList.toggle('alto-contraste');
+        try{ localStorage.setItem('altoContraste', activo ? '1' : '0'); }catch(e){}
+
+        document.querySelectorAll('.btn-contraste, .btn-contraste-fab').forEach(function(btn){
+            btn.setAttribute('aria-pressed', activo);
+        });
+    }
+
+    /* Sincroniza el estado visual del boton al cargar (por si el script del
+       <head> ya activo la clase antes de que existiera este boton) */
+    document.addEventListener('DOMContentLoaded', function(){
+        var activo = document.documentElement.classList.contains('alto-contraste');
+        document.querySelectorAll('.btn-contraste, .btn-contraste-fab').forEach(function(btn){
+            btn.setAttribute('aria-pressed', activo);
+        });
+    });
 </script>
 
 {% block extra_scripts %}{% endblock %}

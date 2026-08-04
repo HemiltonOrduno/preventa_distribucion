@@ -495,3 +495,81 @@ input.qty__value{
     }
     .map-box{ height: 340px; min-height: 340px; }
 }
+
+/*===== MODO ALTO CONTRASTE (RFN-19) =====*/
+html.alto-contraste{
+    --color-primary: #ffe600;
+    --color-primary-light: #000000;
+    --color-bg: #000000;
+    --color-card: #0a0a0a;
+    --color-border: #ffffff;
+    --color-text: #ffffff;
+    --color-text-muted: #f5f5f5;
+    --color-success-bg: #062b0a;
+    --color-success-text: #4dff4d;
+    --color-danger-bg: #2b0606;
+    --color-danger-text: #ff5c5c;
+    --color-info-bg: #05202b;
+    --color-info-text: #4ddbff;
+}
+
+/* Elementos con colores fijos (no variables) que hay que ajustar aparte */
+html.alto-contraste .btn--primary{ color:#000; font-weight:700; }
+html.alto-contraste .modal__btn--confirmar{ color:#000; }
+html.alto-contraste .card,
+html.alto-contraste .form__div,
+html.alto-contraste .modal__caja,
+html.alto-contraste .top-nav,
+html.alto-contraste .bottom-nav,
+html.alto-contraste .perfil{
+    border: 2px solid var(--color-border);
+}
+html.alto-contraste .badge{ border: 1px solid currentColor; }
+html.alto-contraste .dot{ border: 1px solid #fff; }
+html.alto-contraste .btn{ font-weight: 700; letter-spacing: .01em; }
+html.alto-contraste .form__label,
+html.alto-contraste .card__sub,
+html.alto-contraste .perfil__rol{ color: #ffffff; }
+
+/*===== BOTON DE ALTO CONTRASTE =====*/
+.btn-contraste,
+.btn-contraste-fab{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg);
+    color: var(--color-primary);
+    cursor: pointer;
+    transition: transform .2s, background .2s, color .2s;
+}
+.btn-contraste{
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    font-size: 17px;
+}
+.btn-contraste-fab{
+    position: fixed;
+    right: 16px;
+    bottom: 96px;      /* justo arriba del bottom-nav */
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    font-size: 20px;
+    box-shadow: 0 8px 20px rgba(0,0,0,.25);
+    z-index: 150;
+}
+.btn-contraste:hover,
+.btn-contraste-fab:hover{ transform: scale(1.08); }
+.btn-contraste[aria-pressed="true"],
+.btn-contraste-fab[aria-pressed="true"]{
+    background: var(--color-primary, #ffe600);
+    color: #000;
+    border-color: #000;
+}
+
+/* En escritorio el boton flotante ya no hace falta, esta el del top-nav */
+@media screen and (min-width: 768px){
+    .btn-contraste-fab{ display: none; }
+}

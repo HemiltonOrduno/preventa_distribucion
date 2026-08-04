@@ -291,7 +291,7 @@ def rutas_activas(request):
                 re.numero AS id,
                 re.nombre,
                 er.nombre AS estado,
-                CONCAT(em.empNombre, ' ', em.empApellPat) AS repartidor,
+                COALESCE(CONCAT(em.empNombre, ' ', em.empApellPat), 'Sin asignar') AS repartidor,
                 ve.placas AS vehiculo,
                 COUNT(p.num) AS total_pedidos,
                 SUM(CASE WHEN ep.nombre = 'Entregado' THEN 1 ELSE 0 END) AS entregados,
@@ -300,7 +300,7 @@ def rutas_activas(request):
                 re.entrega AS entrega_id
             FROM ruta_entrega re
             INNER JOIN edo_ruta_entrega er ON er.codigo = re.edo_ruta_entrega
-            INNER JOIN empleado em ON em.num = re.empleado
+            LEFT JOIN empleado em ON em.num = re.empleado
             INNER JOIN entrega en2 ON en2.numero = re.entrega
             LEFT JOIN vehiculo ve ON ve.entrega = en2.numero
             LEFT JOIN pedido p ON p.entrega = en2.numero
@@ -313,7 +313,6 @@ def rutas_activas(request):
         """)
         columns = [col[0] for col in cursor.description]
         rutas_entrega = [dict(zip(columns, row)) for row in cursor.fetchall()]
-
     # Convertir Decimal a float para JSON
     for r in rutas_entrega:
         if r.get('total'):
