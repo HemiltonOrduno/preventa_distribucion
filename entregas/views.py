@@ -413,18 +413,30 @@ def confirmar_entrega_establecimiento(request):
     establecimiento_id = body.get('establecimiento_id')
     entrega_id = body.get('entrega_id')
 
-    with connection.cursor() as cursor:
-        cursor.execute("""
-            UPDATE pedido SET edo_pedido = 'EPD005' WHERE num = %s
-        """, [pedido_id])
+    with transaction.atomic():
+        with connection.cursor() as cursor:
+            # RF36: no se puede confirmar la entrega sin pago registrado
+            cursor.execute("SELECT COALESCE(SUM(monto), 0) FROM pago WHERE pedido = %s",
+                           [pedido_id])
+            cobrado = cursor.fetchone()[0]
 
-        cursor.execute("SELECT COALESCE(MAX(entrega), 0) FROM entrega_estable WHERE entrega = %s", [entrega_id])
+            if cobrado <= 0:
+                return JsonResponse({
+                    "error": "Debes registrar el cobro antes de confirmar la entrega"
+                }, status=400)
 
-        cursor.execute("""
-            INSERT INTO entrega_estable (entrega, establecimiento, fecha_entrega, hora_entrega)
-            VALUES (%s, %s, CURDATE(), TIME(NOW()))
-            ON DUPLICATE KEY UPDATE fecha_entrega = CURDATE(), hora_entrega = TIME(NOW())
-        """, [entrega_id, establecimiento_id])
+            cursor.execute("""
+                UPDATE pedido SET edo_pedido = 'EPD005'
+                WHERE num = %s AND edo_pedido <> 'EPD005'
+            """, [pedido_id])
+            if cursor.rowcount == 0:
+                return JsonResponse({"error": "El pedido no existe o ya fue entregado"}, status=400)
+
+            cursor.execute("""
+                INSERT INTO entrega_estable (entrega, establecimiento, fecha_entrega, hora_entrega)
+                VALUES (%s, %s, CURDATE(), TIME(NOW()))
+                ON DUPLICATE KEY UPDATE fecha_entrega = CURDATE(), hora_entrega = TIME(NOW())
+            """, [entrega_id, establecimiento_id])
 
     return JsonResponse({"mensaje": "Entrega confirmada correctamente"})
 

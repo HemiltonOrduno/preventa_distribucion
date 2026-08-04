@@ -321,6 +321,9 @@ function abrirModalParada(parada) {
 
     paradaActual = parada;
 
+    habilitarConfirmacion(false);
+    document.getElementById('cobro-monto').value = parseFloat(parada.subtotal || 0).toFixed(2);
+
     document.getElementById('modal-est-nombre').innerText = parada.nombre;
     document.getElementById('modal-est-direccion').innerText = parada.colonia;
     document.getElementById('cobro-est-nombre').innerText = parada.nombre;
@@ -347,6 +350,7 @@ function abrirModalParada(parada) {
     `;
 
     // Cargar detalle del pedido
+    document.getElementById('modal-productos').innerHTML = '';
     fetch(`/api/entregas/pedido/${parada.pedido_id}/detalle/`)
         .then(res => res.json())
         .then(data => {
@@ -424,9 +428,19 @@ function guardarCobro() {
         if (data.error) { alert('Error: ' + data.error); return; }
         document.getElementById('modal-cobro').classList.remove('visible');
         mostrarToast('✓ Cobro registrado');
-        // El cobro ya implica que la entrega se completó, se confirma automáticamente
-        confirmarEntrega();
+        // Regresa al detalle de la parada y desbloquea la confirmación
+        document.getElementById('modal-parada').classList.add('visible');
+        habilitarConfirmacion(true);
     });
+}
+
+
+function habilitarConfirmacion(habilitado) {
+    const btn = document.getElementById('btn-confirmar-entrega');
+    const aviso = document.getElementById('aviso-cobro');
+    if (!btn) return;
+    btn.disabled = !habilitado;
+    if (aviso) aviso.style.display = habilitado ? 'none' : 'block';
 }
 
 // ===== MODAL DEVOLUCION =====

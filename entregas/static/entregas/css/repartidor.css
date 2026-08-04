@@ -400,6 +400,16 @@ a { text-decoration: none; color: inherit; }
     border-color: var(--color-danger-text);
 }
 
+/*===== RNF-20: TAMAÑO MÍNIMO DE ELEMENTOS INTERACTIVOS =====*/
+.btn-cobro, .btn-devolucion, .btn-cancelar-modal,
+.btn-confirmar-dev, .tipo-pago-btn, .tipo-dev-btn,
+.btn-iniciar-ruta, .btn-finalizar-ruta,
+.form-group input, .form-group select {
+    min-height: 48px;
+}
+.bottom-nav__item { min-height: 48px; justify-content: center; }
+.parada-item { min-height: 56px; }
+
 
 /*===== MEDIA QUERIES: ESCRITORIO =====*/
 @media screen and (min-width: 768px) {
@@ -443,4 +453,15 @@ a { text-decoration: none; color: inherit; }
 
 
 
+}
+
+.btn-confirmar-entrega {
+    padding: 14px; background: var(--color-success-text); color: white; border: none;
+    border-radius: .8rem; font-family: var(--font-display); font-size: 14px; font-weight: 700;
+    cursor: pointer; width: 100%; min-height: 48px;
+    box-shadow: var(--shadow-soft); transition: opacity .2s;
+}
+.btn-confirmar-entrega:disabled {
+    background: var(--color-border); color: var(--color-text-muted);
+    cursor: not-allowed; box-shadow: none;
 }
