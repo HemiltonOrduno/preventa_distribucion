@@ -106,6 +106,63 @@
         .toast.success { background: #2e7d32; }
         .toast.error { background: #c62828; }
 
+        /* ===== WIDGET DE PERFIL ===== */
+        #perfil-widget {
+            border-top: 1px solid rgba(255,255,255,0.15);
+            padding: 14px 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        #perfil-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: #a5d6a7;
+            color: #1b5e20;
+            font-weight: 700;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        #perfil-info { flex: 1; min-width: 0; }
+        #perfil-nombre {
+            color: white;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        #perfil-rol {
+            color: #a5d6a7;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        #perfil-email {
+            color: rgba(255,255,255,0.6);
+            font-size: 10px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        #btn-logout {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: white;
+            font-size: 15px;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: background 0.2s;
+        }
+        #btn-logout:hover { background: #c62828; }
+
         {% block extra_styles %}{% endblock %}
     </style>
 </head>
@@ -130,6 +187,16 @@
             <span class="icon">🏷️</span> Nuevo producto
         </a>
     </nav>
+
+    <div id="perfil-widget">
+        <div id="perfil-avatar">--</div>
+        <div id="perfil-info">
+            <div id="perfil-nombre">Cargando...</div>
+            <div id="perfil-rol"></div>
+            <div id="perfil-email"></div>
+        </div>
+        <button id="btn-logout" title="Cerrar sesión" onclick="cerrarSesion()">⏻</button>
+    </div>
 </div>
 
 <div id="contenido">
@@ -152,6 +219,31 @@
         toast.style.display = 'block';
         setTimeout(() => { toast.style.display = 'none'; }, 3500);
     }
+
+    function cerrarSesion() {
+        if (confirm('¿Cerrar sesión?')) {
+            window.location.href = '/api/usuarios/logout/';
+        }
+    }
+
+    async function cargarPerfil() {
+        try {
+            const res = await fetch('/api/inventario/perfil-actual/');
+            const data = await res.json();
+            if (!res.ok) return;
+
+            document.getElementById('perfil-nombre').textContent = data.nombre;
+            document.getElementById('perfil-rol').textContent = data.rol;
+            document.getElementById('perfil-email').textContent = data.email;
+
+            const iniciales = data.nombre.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
+            document.getElementById('perfil-avatar').textContent = iniciales;
+        } catch (e) {
+            document.getElementById('perfil-nombre').textContent = 'Sesión activa';
+        }
+    }
+
+    cargarPerfil();
 </script>
 {% block extra_scripts %}{% endblock %}
 </body>

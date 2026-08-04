@@ -1,0 +1,9 @@
+{
+  "nombre": "Cheetos Torciditos 62g",
+  "descripcion": "Botana de maíz sabor queso",
+  "imagen": "/img/cheetos_torciditos.jpg",
+  "precio": 16.50,
+  "fecha_caducidad": "2027-01-15",
+  "stock": 800,
+  "peso": 62
+}

@@ -5,6 +5,75 @@
 {% block page_icon %}📦{% endblock %}
 {% block page_title %}Registrar Movimiento de Inventario{% endblock %}
 
+{% block extra_styles %}
+    .grid-catalogo {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        gap: 14px;
+    }
+    .tarjeta-producto {
+        border: 1px solid #eee;
+        border-radius: 10px;
+        overflow: hidden;
+        background: white;
+        transition: box-shadow 0.2s, transform 0.15s;
+        cursor: pointer;
+        position: relative;
+    }
+    .tarjeta-producto:hover {
+        box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+        transform: translateY(-2px);
+    }
+    .tarjeta-producto img {
+        width: 100%;
+        height: 140px;
+        object-fit: cover;
+        display: block;
+        background: #f5f5f5;
+    }
+    .tarjeta-info {
+        padding: 10px;
+    }
+    .tarjeta-nombre {
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 4px;
+        line-height: 1.3;
+    }
+    .tarjeta-precio {
+        font-size: 13px;
+        color: #555;
+        margin-bottom: 8px;
+    }
+    .tarjeta-stock {
+        font-size: 11px;
+        font-weight: 600;
+        padding: 4px 8px;
+        border-radius: 20px;
+        display: inline-block;
+    }
+    .tarjeta-add-hint {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        background: #1b5e20;
+        color: white;
+        font-size: 11px;
+        font-weight: 700;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transition: opacity 0.15s;
+    }
+    .tarjeta-producto:hover .tarjeta-add-hint {
+        opacity: 1;
+    }
+{% endblock %}
+
 {% block content %}
 <div class="card" style="max-width:600px;">
     <label style="font-size:13px; font-weight:600;">Tipo de movimiento</label>
@@ -27,24 +96,59 @@
         <button class="btn btn-primary" onclick="registrarMovimiento()">Registrar movimiento</button>
     </div>
 </div>
+
+<div class="card" style="max-width:900px; margin-top:20px;">
+    <strong>Catálogo — Stock actual</strong>
+    <span id="cache-indicator" style="font-size:11px; color:#888; margin-left:8px;"></span>
+    <p style="font-size:11px; color:#888; margin:4px 0 0;">Clic en un producto para agregarlo directo al movimiento de arriba.</p>
+    <div id="tabla-stock" style="margin-top:10px;">Cargando...</div>
+</div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
     let contadorLineas = 0;
+    let catalogoProductos = [];
 
-    function agregarLinea() {
+    function agregarLinea(codigoPreseleccionado = null) {
         contadorLineas++;
         const div = document.createElement('div');
         div.id = `linea-${contadorLineas}`;
         div.style = 'display:flex; gap:8px; margin-bottom:8px;';
+
+        const opciones = catalogoProductos.map(p =>
+            `<option value="${p.codigo}" ${p.codigo === codigoPreseleccionado ? 'selected' : ''}>${p.codigo} — ${p.nombre}</option>`
+        ).join('');
+
         div.innerHTML = `
-            <input type="text" placeholder="Código (ej. P007)" class="prod-codigo" style="flex:1; padding:6px; border-radius:6px; border:1px solid #ccc;">
+            <select class="prod-codigo" onchange="autocompletarPrecio(this)" style="flex:1; padding:6px; border-radius:6px; border:1px solid #ccc;">
+                <option value="">Selecciona un producto...</option>
+                ${opciones}
+            </select>
             <input type="number" placeholder="Cantidad" class="prod-cantidad" style="width:100px; padding:6px; border-radius:6px; border:1px solid #ccc;">
             <input type="number" placeholder="Precio unitario" class="prod-precio" step="0.01" style="width:130px; padding:6px; border-radius:6px; border:1px solid #ccc;">
             <button class="btn btn-danger" style="padding:6px 10px;" onclick="document.getElementById('linea-${contadorLineas}').remove()">✕</button>
         `;
         document.getElementById('lineas-detalle').appendChild(div);
+
+        if (codigoPreseleccionado) {
+            autocompletarPrecio(div.querySelector('.prod-codigo'));
+            div.querySelector('.prod-cantidad').focus();
+        }
+    }
+
+    function autocompletarPrecio(select) {
+        const producto = catalogoProductos.find(p => p.codigo === select.value);
+        const inputPrecio = select.parentElement.querySelector('.prod-precio');
+        if (producto) {
+            inputPrecio.value = producto.precio.toFixed(2);
+        }
+    }
+
+    function agregarDesdeCatalogo(codigo) {
+        agregarLinea(codigo);
+        document.querySelector('.card').scrollIntoView({ behavior: 'smooth' });
+        mostrarToast('Producto agregado al movimiento', 'success');
     }
 
     async function registrarMovimiento() {
@@ -78,11 +182,64 @@
             mostrarToast(`Movimiento #${data.movimiento_id} registrado correctamente`, 'success');
             document.getElementById('lineas-detalle').innerHTML = '';
             document.getElementById('observaciones').value = '';
+            agregarLinea();
+            cargarCatalogoStock();
         } else {
             mostrarToast(data.error, 'error');
         }
     }
 
-    agregarLinea(); // arranca con una línea vacía lista para llenar
+    function badgeStock(stock) {
+        if (stock < 50) return { texto: `${stock} — Crítico`, color: '#c62828', fondo: '#ffebee' };
+        if (stock < 200) return { texto: `${stock} — Bajo`, color: '#e65100', fondo: '#fff3e0' };
+        return { texto: `${stock} disponibles`, color: '#2e7d32', fondo: '#e8f5e9' };
+    }
+
+    async function cargarCatalogoStock() {
+        const cont = document.getElementById('tabla-stock');
+        const indicador = document.getElementById('cache-indicator');
+        const inicio = performance.now();
+
+        const res = await fetch('/api/inventario/catalogo-stock/');
+        const data = await res.json();
+        const tiempo = Math.round(performance.now() - inicio);
+
+        indicador.textContent = `(${tiempo} ms${data.cache ? ', desde caché' : ''})`;
+        catalogoProductos = data.productos;
+
+        cont.innerHTML = `
+            <div class="grid-catalogo">
+                ${data.productos.map(p => {
+                    const badge = badgeStock(p.stock);
+                    return `
+                        <div class="tarjeta-producto" onclick="agregarDesdeCatalogo('${p.codigo}')">
+                            <span class="tarjeta-add-hint">+</span>
+                            <img src="${p.imagen}" alt="${p.nombre}">
+                            <div class="tarjeta-info">
+                                <div class="tarjeta-nombre">${p.nombre}</div>
+                                <div class="tarjeta-precio">$${p.precio.toFixed(2)}</div>
+                                <div class="tarjeta-stock" style="color:${badge.color}; background:${badge.fondo};">
+                                    ${badge.texto}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+
+        // Si ya hay líneas de producto en el formulario esperando catálogo, las llenamos
+        document.querySelectorAll('.prod-codigo').forEach(select => {
+            if (select.options.length <= 1) {
+                const valorActual = select.value;
+                select.innerHTML = '<option value="">Selecciona un producto...</option>' +
+                    catalogoProductos.map(p => `<option value="${p.codigo}">${p.codigo} — ${p.nombre}</option>`).join('');
+                select.value = valorActual;
+            }
+        });
+    }
+
+    // Cargamos primero el catálogo, y hasta que esté listo agregamos la primera línea del formulario
+    cargarCatalogoStock().then(() => agregarLinea());
 </script>
 {% endblock %}
