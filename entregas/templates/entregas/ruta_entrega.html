@@ -94,7 +94,7 @@
     </div>
 </div>
 
-<!-- MODAL: Devolución -->
+<!-- MODAL: Devolución (RNF-27: codificación visual por color en acciones críticas) -->
 <div class="modal-overlay" id="modal-devolucion" onclick="cerrarModalDevolucion(event)">
     <div class="modal">
         <div class="modal-handle"></div>
@@ -103,10 +103,22 @@
 
         <div class="form-group">
             <label>Tipo de devolución</label>
-            <select id="dev-tipo">
-                <option value="Producto dañado con sustitución">Producto dañado con sustitución</option>
-                <option value="Devolución completa sin reemplazo">Devolución completa sin reemplazo</option>
-            </select>
+            <div class="tipo-dev-selector">
+                <button class="tipo-dev-btn tipo-dev-btn--sustitucion active"
+                        id="btn-dev-sustitucion"
+                        onclick="seleccionarTipoDevolucion('sustitucion', this)">
+                    <span class="tipo-dev-punto"></span>
+                    <span class="tipo-dev-texto">Con sustitución</span>
+                    <span class="tipo-dev-nota">Se reemplaza el producto</span>
+                </button>
+                <button class="tipo-dev-btn tipo-dev-btn--completa"
+                        id="btn-dev-completa"
+                        onclick="seleccionarTipoDevolucion('completa', this)">
+                    <span class="tipo-dev-punto"></span>
+                    <span class="tipo-dev-texto">Completa sin reemplazo</span>
+                    <span class="tipo-dev-nota">Se cancela de la venta</span>
+                </button>
+            </div>
         </div>
 
         <div class="form-group">
@@ -120,7 +132,10 @@
         </div>
 
         <div class="modal-acciones">
-            <button class="btn-devolucion" style="background:#fff3e0;" onclick="guardarDevolucion()">✓ Registrar devolución</button>
+            <button class="btn-confirmar-dev btn-confirmar-dev--sustitucion"
+                    id="btn-guardar-dev" onclick="guardarDevolucion()">
+                ✓ Registrar devolución con sustitución
+            </button>
             <button class="btn-cancelar-modal" onclick="cerrarModalDevolucion()">Cancelar</button>
         </div>
     </div>

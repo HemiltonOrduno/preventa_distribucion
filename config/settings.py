@@ -8,7 +8,8 @@ SECRET_KEY = config('SECRET_KEY')
 
 DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = []
+
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '192.168.1.13']  # la IP local de tu PC]
 
 # Aplicaciones instaladas
 INSTALLED_APPS = [

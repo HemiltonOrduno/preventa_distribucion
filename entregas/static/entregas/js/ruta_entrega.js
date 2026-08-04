@@ -18,9 +18,18 @@ function inicializarMapa() {
         center: [32.505, -117.010],
         zoom: 12
     });
+
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap contributors'
     }).addTo(mapa);
+
+    // Leaflet no detecta solo los cambios de tamaño del contenedor
+    window.addEventListener('resize', () => {
+        setTimeout(() => mapa.invalidateSize(), 200);
+    });
+    window.addEventListener('orientationchange', () => {
+        setTimeout(() => mapa.invalidateSize(), 300);
+    });
 }
 
 // ===== CARGAR RUTA =====
@@ -438,10 +447,15 @@ function cerrarModalDevolucion(e) {
 function guardarDevolucion() {
     const cantidad = parseInt(document.getElementById('dev-cantidad').value);
     const motivo = document.getElementById('dev-motivo').value.trim();
-    const tipo = document.getElementById('dev-tipo').value;
+    const tipo = TIPOS_DEVOLUCION[tipoDevolucionActual].valor;
 
     if (!cantidad || cantidad <= 0) { alert('Ingresa una cantidad válida'); return; }
     if (!motivo) { alert('Ingresa el motivo de la devolución'); return; }
+
+    // Doble confirmación para la acción irreversible
+    if (tipoDevolucionActual === 'completa') {
+        if (!confirm('Esta acción cancela definitivamente el producto de la venta. ¿Continuar?')) return;
+    }
 
     fetch('/api/entregas/registrar-devolucion/', {
         method: 'POST',
@@ -517,3 +531,43 @@ window.addEventListener('load', () => {
     inicializarMapa();
     cargarRuta();
 });
+
+// ===== MODAL DEVOLUCION =====
+const TIPOS_DEVOLUCION = {
+    sustitucion: {
+        valor: 'Producto dañado con sustitución',
+        etiqueta: '✓ Registrar devolución con sustitución',
+        clase: 'btn-confirmar-dev--sustitucion'
+    },
+    completa: {
+        valor: 'Devolución completa sin reemplazo',
+        etiqueta: '⚠ Confirmar devolución completa sin reemplazo',
+        clase: 'btn-confirmar-dev--completa'
+    }
+};
+
+let tipoDevolucionActual = 'sustitucion';
+
+function seleccionarTipoDevolucion(tipo, btn) {
+    tipoDevolucionActual = tipo;
+
+    document.querySelectorAll('.tipo-dev-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    // El botón de confirmar hereda el color del tipo seleccionado
+    const confirmar = document.getElementById('btn-guardar-dev');
+    confirmar.classList.remove('btn-confirmar-dev--sustitucion', 'btn-confirmar-dev--completa');
+    confirmar.classList.add(TIPOS_DEVOLUCION[tipo].clase);
+    confirmar.innerText = TIPOS_DEVOLUCION[tipo].etiqueta;
+}
+
+function abrirDevolucion() {
+    document.getElementById('modal-parada').classList.remove('visible');
+    document.getElementById('dev-cantidad').value = '';
+    document.getElementById('dev-motivo').value = '';
+
+    // Siempre arranca en la opción de menor impacto
+    seleccionarTipoDevolucion('sustitucion', document.getElementById('btn-dev-sustitucion'));
+
+    document.getElementById('modal-devolucion').classList.add('visible');
+}

@@ -18,9 +18,18 @@ function inicializarMapa() {
         center: [32.505, -117.010],
         zoom: 12
     });
+
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap contributors'
     }).addTo(mapa);
+
+    // Leaflet no detecta solo los cambios de tamaño del contenedor
+    window.addEventListener('resize', () => {
+        setTimeout(() => mapa.invalidateSize(), 200);
+    });
+    window.addEventListener('orientationchange', () => {
+        setTimeout(() => mapa.invalidateSize(), 300);
+    });
 }
 
 // ===== CARGAR RUTA =====
@@ -29,8 +38,12 @@ function cargarRuta() {
         .then(res => res.json())
         .then(data => {
             if (data.error) {
-                document.getElementById('lista-paradas').innerHTML =
-                    `<p style="text-align:center;color:#888;padding:20px;font-size:13px;">${data.error}</p>`;
+                if (data.error === 'No tienes una ruta asignada para hoy') {
+                    mostrarEntregasDisponibles();
+                } else {
+                    document.getElementById('lista-paradas').innerHTML =
+                        `<p style="text-align:center;color:#888;padding:20px;font-size:13px;">${data.error}</p>`;
+                }
                 return;
             }
 
@@ -39,10 +52,17 @@ function cargarRuta() {
             paradas = data.paradas;
 
             // Verificar si la ruta ya está iniciada
+            // Verificar si la ruta ya está iniciada
             if (data.estado === 'En camino') {
                 rutaIniciada = true;
                 document.getElementById('btn-iniciar').style.display = 'none';
                 document.getElementById('btn-finalizar').style.display = 'block';
+                document.getElementById('btn-regresar').style.display = 'none';
+            } else {
+                rutaIniciada = false;
+                document.getElementById('btn-iniciar').style.display = 'block';
+                document.getElementById('btn-finalizar').style.display = 'none';
+                document.getElementById('btn-regresar').style.display = 'block';
             }
 
             renderizarParadas();
@@ -53,6 +73,123 @@ function cargarRuta() {
                 '<p style="text-align:center;color:#c62828;padding:20px;font-size:13px;">Error cargando la ruta</p>';
         });
 }
+
+// ===== REGRESAR RUTA (soltar antes de iniciarla) =====
+function regresarRuta() {
+    if (!confirm('¿Seguro que no quieres realizar esta ruta? Quedará disponible para otro repartidor.')) return;
+    if (!rutaId) return;
+
+    fetch('/api/entregas/soltar-entrega/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ruta_entrega_id: rutaId })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.error) { alert('Error: ' + data.error); return; }
+        mostrarToast('✓ Ruta liberada');
+        entregaId = null;
+        rutaId = null;
+        cargarRuta();
+    })
+    .catch(() => alert('Error de conexión'));
+}
+
+
+// ===== ENTREGAS DISPONIBLES (sin repartidor asignado) =====
+function mostrarEntregasDisponibles() {
+    document.getElementById('btn-iniciar').style.display = 'none';
+    document.getElementById('btn-finalizar').style.display = 'none';
+    document.getElementById('info-bar').style.display = 'none';
+
+    const lista = document.getElementById('lista-paradas');
+    lista.innerHTML = '<p style="text-align:center;color:#888;padding:20px;font-size:13px;">Cargando entregas disponibles...</p>';
+
+    fetch('/api/entregas/entregas-disponibles/')
+        .then(res => res.json())
+        .then(data => {
+            const entregas = data.entregas || [];
+
+            if (entregas.length === 0) {
+                lista.innerHTML = '<p style="text-align:center;color:#888;padding:20px;font-size:13px;">No hay entregas disponibles por ahora</p>';
+                return;
+            }
+
+            lista.innerHTML = `<p style="padding:10px 15px 0;font-size:13px;color:#888;">Entregas disponibles</p>`;
+
+            entregas.forEach(e => {
+                const div = document.createElement('div');
+                div.className = 'parada-item';
+                div.style.cursor = 'pointer';
+                div.innerHTML = `
+                    <div class="parada-num almacen">📦</div>
+                    <div class="parada-info">
+                        <div class="parada-nombre">Entrega #${e.entrega_id}</div>
+                        <div class="parada-sub">${e.total_pedidos} pedidos · ${e.peso_total_kg.toFixed(1)} kg · ${e.placas || 'sin vehículo'}</div>
+                    </div>
+                    <button class="btn-iniciar-ruta" style="padding:6px 14px;font-size:12px;white-space:nowrap;"
+                        onclick="event.stopPropagation(); tomarYIniciarEntrega(${e.ruta_entrega_id}, ${e.entrega_id})">
+                        ▶ Iniciar
+                    </button>
+                `;
+                // Clic en la fila = solo tomarla y ver el detalle (con botón Iniciar arriba)
+                div.onclick = () => tomarEntrega(e.ruta_entrega_id);
+                lista.appendChild(div);
+            });
+        })
+        .catch(() => {
+            lista.innerHTML = '<p style="text-align:center;color:#c62828;padding:20px;font-size:13px;">No se pudieron cargar las entregas disponibles</p>';
+        });
+}
+
+// Toma la entrega y arranca la ruta de una sola vez (botón "▶ Iniciar" de la lista)
+function tomarYIniciarEntrega(rutaEntregaId, entregaIdParam) {
+    fetch('/api/entregas/tomar-entrega/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ruta_entrega_id: rutaEntregaId })
+    })
+    .then(res => res.json().then(data => ({ ok: res.ok, data })))
+    .then(({ ok, data }) => {
+        if (!ok) {
+            alert(data.error || 'No se pudo tomar la entrega');
+            mostrarEntregasDisponibles();
+            return Promise.reject('ya-tomada');
+        }
+        return fetch('/api/entregas/iniciar-ruta/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ entrega_id: entregaIdParam })
+        }).then(res => res.json());
+    })
+    .then(data => {
+        if (!data) return;
+        if (data.error) { alert('Error: ' + data.error); return; }
+        mostrarToast('✓ Ruta tomada e iniciada');
+        cargarRuta();
+    })
+    .catch(err => { if (err !== 'ya-tomada') console.error(err); });
+}
+
+function tomarEntrega(rutaEntregaId) {
+    fetch('/api/entregas/tomar-entrega/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ruta_entrega_id: rutaEntregaId })
+    })
+    .then(res => res.json().then(data => ({ ok: res.ok, data })))
+    .then(({ ok, data }) => {
+        if (!ok) {
+            alert(data.error || 'No se pudo tomar la entrega');
+            mostrarEntregasDisponibles(); // refresca, por si alguien más ya se la ganó
+            return;
+        }
+        mostrarToast('✓ Entrega tomada');
+        cargarRuta();
+    })
+    .catch(() => alert('Error de conexión'));
+}
+
 
 // ===== RENDERIZAR LISTA DE PARADAS =====
 function renderizarParadas() {
@@ -287,6 +424,8 @@ function guardarCobro() {
         if (data.error) { alert('Error: ' + data.error); return; }
         document.getElementById('modal-cobro').classList.remove('visible');
         mostrarToast('✓ Cobro registrado');
+        // El cobro ya implica que la entrega se completó, se confirma automáticamente
+        confirmarEntrega();
     });
 }
 
@@ -308,10 +447,15 @@ function cerrarModalDevolucion(e) {
 function guardarDevolucion() {
     const cantidad = parseInt(document.getElementById('dev-cantidad').value);
     const motivo = document.getElementById('dev-motivo').value.trim();
-    const tipo = document.getElementById('dev-tipo').value;
+    const tipo = TIPOS_DEVOLUCION[tipoDevolucionActual].valor;
 
     if (!cantidad || cantidad <= 0) { alert('Ingresa una cantidad válida'); return; }
     if (!motivo) { alert('Ingresa el motivo de la devolución'); return; }
+
+    // Doble confirmación para la acción irreversible
+    if (tipoDevolucionActual === 'completa') {
+        if (!confirm('Esta acción cancela definitivamente el producto de la venta. ¿Continuar?')) return;
+    }
 
     fetch('/api/entregas/registrar-devolucion/', {
         method: 'POST',
@@ -387,3 +531,43 @@ window.addEventListener('load', () => {
     inicializarMapa();
     cargarRuta();
 });
+
+// ===== MODAL DEVOLUCION =====
+const TIPOS_DEVOLUCION = {
+    sustitucion: {
+        valor: 'Producto dañado con sustitución',
+        etiqueta: '✓ Registrar devolución con sustitución',
+        clase: 'btn-confirmar-dev--sustitucion'
+    },
+    completa: {
+        valor: 'Devolución completa sin reemplazo',
+        etiqueta: '⚠ Confirmar devolución completa sin reemplazo',
+        clase: 'btn-confirmar-dev--completa'
+    }
+};
+
+let tipoDevolucionActual = 'sustitucion';
+
+function seleccionarTipoDevolucion(tipo, btn) {
+    tipoDevolucionActual = tipo;
+
+    document.querySelectorAll('.tipo-dev-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    // El botón de confirmar hereda el color del tipo seleccionado
+    const confirmar = document.getElementById('btn-guardar-dev');
+    confirmar.classList.remove('btn-confirmar-dev--sustitucion', 'btn-confirmar-dev--completa');
+    confirmar.classList.add(TIPOS_DEVOLUCION[tipo].clase);
+    confirmar.innerText = TIPOS_DEVOLUCION[tipo].etiqueta;
+}
+
+function abrirDevolucion() {
+    document.getElementById('modal-parada').classList.remove('visible');
+    document.getElementById('dev-cantidad').value = '';
+    document.getElementById('dev-motivo').value = '';
+
+    // Siempre arranca en la opción de menor impacto
+    seleccionarTipoDevolucion('sustitucion', document.getElementById('btn-dev-sustitucion'));
+
+    document.getElementById('modal-devolucion').classList.add('visible');
+}

@@ -124,8 +124,10 @@ body {
 }
 
 .badge-activa { background: var(--color-success-bg); color: var(--color-success); }
+.badge-asignada { background: var(--color-info-bg); color: var(--color-secondary); }
 .badge-completada { background: var(--color-info-bg); color: var(--color-secondary); }
 .badge-pausada { background: var(--color-warning-bg); color: var(--color-warning); }
+.badge-iniciada { background: #fff3e0; color: #e65100; }
 .badge-creada { background: var(--color-purple-bg); color: var(--color-purple); }
 .badge-inactivo { background: var(--color-danger-bg); color: var(--color-danger); }
 .badge-zona {
@@ -501,6 +503,32 @@ body {
 #panel-rutas { width: 300px; display: flex; flex-direction: column; overflow: hidden; }
 #panel-rutas-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 #lista-rutas { flex: 1; overflow-y: auto; }
+
+/* ===== PANEL EDICION (reemplaza al modal de crear/editar ruta) ===== */
+#panel-edicion {
+    width: 300px;
+    background: var(--color-card);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--color-border);
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+#panel-edicion-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 15px;
+    background: var(--color-primary-light);
+    border-bottom: 1px solid var(--color-border);
+    flex-shrink: 0;
+}
+
+#panel-edicion-form {
+    padding: 14px 12px 4px;
+    overflow-y: auto;
+    flex-shrink: 0;
+}
 #panel-zonas { width: 280px; }
 #panel-lista { width: 320px; display: flex; flex-direction: column; }
 #lista-establecimientos { flex: 1; overflow-y: auto; }
@@ -587,6 +615,32 @@ body {
     background: rgba(255,255,255,0.1);
     color: white;
     border-left-color: #90caf9;
+}
+
+#sidebar-logout {
+    padding: 12px 0;
+    border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+#sidebar-logout a {
+    display: block;
+    width: 100%;
+    padding: 12px 20px;
+    background: none;
+    border: none;
+    color: rgba(255,255,255,0.8);
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-left: 3px solid transparent;
+    text-decoration: none;
+}
+
+#sidebar-logout a:hover {
+    background: rgba(198,40,40,0.2);
+    color: white;
+    border-left-color: var(--color-danger);
 }
 
 .icon { margin-right: 10px; font-size: 15px; }

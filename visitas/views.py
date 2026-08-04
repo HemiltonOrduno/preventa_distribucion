@@ -52,6 +52,40 @@ def _empleado_de_sesion(request):
     return request.session.get('empleado_num')
 
 
+def _cerrar_ruta_si_completa(cursor, visita_id):
+    """
+    RF13: cuando ya no quedan visitas pendientes en la ruta,
+    la pasa de Iniciada (ERV003) a Completada (ERV004).
+    """
+    cursor.execute("SELECT ruta_visita FROM visita WHERE numero = %s", [visita_id])
+    row = cursor.fetchone()
+    if not row:
+        return False
+    ruta_id = row[0]
+
+    # ¿Quedan establecimientos de la ruta sin visitar?
+    cursor.execute("""
+        SELECT COUNT(*)
+        FROM ruta_visita_orden rvo
+        WHERE rvo.ruta_visita = %s
+          AND NOT EXISTS (
+              SELECT 1 FROM visita v
+              WHERE v.ruta_visita = rvo.ruta_visita
+                AND v.establecimiento = rvo.establecimiento
+                AND v.edo_visita IN ('EVI004', 'EVI005')
+          )
+    """, [ruta_id])
+
+    if cursor.fetchone()[0] > 0:
+        return False
+
+    cursor.execute("""
+        UPDATE ruta_visita SET edo_ruta_visita = 'ERV004'
+        WHERE numero = %s AND edo_ruta_visita = 'ERV003'
+    """, [ruta_id])
+    return cursor.rowcount > 0
+
+
 from datetime import date
 
 def ruta_del_dia_api(request):
@@ -112,7 +146,6 @@ def ruta_del_dia_api(request):
 
     return JsonResponse(destino, json_dumps_params={'ensure_ascii': False})
 
-
 @csrf_exempt
 def iniciar_visita(request):
     """
@@ -153,6 +186,21 @@ def iniciar_visita(request):
                 cursor.execute("""
                     UPDATE ruta_visita SET edo_ruta_visita = 'ERV003' WHERE numero = %s
                 """, [ruta_visita_id])
+
+            # Reutiliza la visita si ya hay una abierta para este establecimiento,
+            # así un doble clic en "Iniciar visita" no genera registros duplicados
+            cursor.execute("""
+                SELECT numero FROM visita
+                WHERE ruta_visita = %s AND establecimiento = %s
+                  AND edo_visita IN ('EVI002', 'EVI003')
+                ORDER BY numero DESC LIMIT 1
+            """, [ruta_visita_id, establecimiento_id])
+            existente = cursor.fetchone()
+            if existente:
+                return JsonResponse({
+                    "mensaje": "Visita ya iniciada, continuando",
+                    "visita_id": existente[0]
+                }, json_dumps_params={'ensure_ascii': False})
 
             cursor.execute("SELECT COALESCE(MAX(numero), 0) + 1 FROM visita")
             nueva_visita = cursor.fetchone()[0]
@@ -240,9 +288,12 @@ def levantar_pedido(request, visita_id):
                 UPDATE visita SET edo_visita = 'EVI004' WHERE numero = %s
             """, [visita_id])
 
+            ruta_cerrada = _cerrar_ruta_si_completa(cursor, visita_id)
+
     return JsonResponse({
         "mensaje": "Pedido registrado correctamente",
-        "pedido_id": nuevo_pedido
+        "pedido_id": nuevo_pedido,
+        "ruta_completada": ruta_cerrada
     }, json_dumps_params={'ensure_ascii': False})
 
 
@@ -264,15 +315,21 @@ def visita_sin_pedido(request, visita_id):
     if not motivo:
         return JsonResponse({"error": "El motivo es obligatorio"}, status=400)
 
-    with connection.cursor() as cursor:
-        cursor.execute("""
-            UPDATE visita SET edo_visita = 'EVI005', observaciones = %s WHERE numero = %s
-        """, [motivo, visita_id])
-        if cursor.rowcount == 0:
-            return JsonResponse({"error": "Visita no encontrada"}, status=404)
+    with transaction.atomic():
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                UPDATE visita SET edo_visita = 'EVI005', observaciones = %s WHERE numero = %s
+            """, [motivo, visita_id])
+            if cursor.rowcount == 0:
+                return JsonResponse({"error": "Visita no encontrada"}, status=404)
 
-    return JsonResponse({"mensaje": "Visita completada sin pedido", "visita_id": visita_id},
-                         json_dumps_params={'ensure_ascii': False})
+            ruta_cerrada = _cerrar_ruta_si_completa(cursor, visita_id)
+
+    return JsonResponse({
+        "mensaje": "Visita completada sin pedido",
+        "visita_id": visita_id,
+        "ruta_completada": ruta_cerrada
+    }, json_dumps_params={'ensure_ascii': False})
 
 @rol_requerido('Almacenista', 'Administrador')
 def pedidos_pendientes(request):
