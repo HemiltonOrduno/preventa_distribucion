@@ -67,6 +67,8 @@ def registrar_movimiento(request):
                     VALUES (%s, %s, %s, %s, %s)
                 """, [nuevo_codigo, linea["producto"], linea["cantidad"], linea["precio_unitario"], subtotal])
                 # ↑ Este INSERT es el que dispara tg_actualizar_stock.
+    
+    cache.delete('catalogo_stock')  # <-- NUEVA: borra el caché para que el stock se vea actualizado de inmediato
 
     return JsonResponse({
         "mensaje": "Movimiento registrado correctamente",

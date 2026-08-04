@@ -81,7 +81,7 @@
             </table>
             <p style="margin-top:12px; font-weight:bold;">Total: $${p.total.toFixed(2)}</p>
             <button class="btn btn-primary" style="width:100%; margin-top:10px;"
-                onclick="validarPedido(${p.pedido_id})">✔ Validar pedido</button>
+                onclick="confirmarPedido(${p.pedido_id})">✔ Confirmar pedido</button>
         `;
     }
 
@@ -122,19 +122,21 @@
         }
     }
 
-    async function validarPedido(pedidoId) {
-        if (!confirm('¿Validar este pedido? Ya no podrás ajustar ni cancelar productos después.')) return;
+    async function confirmarPedido(pedidoId) {
+        if (!confirm('¿Confirmar este pedido? Se revisará el stock de todos los productos antes de aprobarlo.')) return;
 
-        const res = await fetch(`/api/visitas/pedidos/${pedidoId}/validar/`, {
-            method: 'POST'
-        });
+        const res = await fetch(`/api/visitas/pedidos/${pedidoId}/confirmar/`, { method: 'POST' });
         const data = await res.json();
 
         if (res.ok) {
             mostrarToast(data.mensaje, 'success');
             cerrarModal();
         } else {
-            mostrarToast(data.error, 'error');
+            let mensaje = data.error;
+            if (data.detalle) {
+                mensaje += ': ' + data.detalle.map(d => `${d.producto} (pide ${d.solicitado}, hay ${d.disponible})`).join(', ');
+            }
+            mostrarToast(mensaje, 'error');
         }
     }
 

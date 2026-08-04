@@ -8,7 +8,7 @@ from .views import (
     pedido_detalle,
     ajustar_cantidad_pedido,
     cancelar_producto_pedido,
-    validar_pedido,          # <-- nuevo
+    confirmar_pedido,           # <-- nuevo
     almacenista_pedidos_view,
     ruta_del_dia_api,
     mapa_ruta_del_dia_api,
@@ -27,6 +27,8 @@ urlpatterns = [
     path('pedidos/<int:pedido_id>/detalle/', pedido_detalle, name='pedido_detalle'),
     path('pedidos/<int:pedido_id>/detalle/<str:cod_producto>/ajustar/', ajustar_cantidad_pedido, name='ajustar_cantidad_pedido'),
     path('pedidos/<int:pedido_id>/detalle/<str:cod_producto>/cancelar/', cancelar_producto_pedido, name='cancelar_producto_pedido'),
+    path('pedidos/<int:pedido_id>/confirmar/', confirmar_pedido, name='confirmar_pedido'),   # <-- NUEVA
+
     path('almacenista/pedidos/', almacenista_pedidos_view, name='almacenista_pedidos'),
 
     # --- API del vendedor (RF04-15) ---
@@ -36,5 +38,4 @@ urlpatterns = [
     path('api/visitas/<int:visita_id>/realizar/', realizar_visita, name='realizar_visita'),
     path('api/visitas/<int:visita_id>/pedido/', levantar_pedido, name='levantar_pedido_api'),
     path('api/visitas/<int:visita_id>/sin-pedido/', visita_sin_pedido, name='visita_sin_pedido_api'),
-    path('pedidos/<int:pedido_id>/validar/', validar_pedido, name='validar_pedido'),
 ]
