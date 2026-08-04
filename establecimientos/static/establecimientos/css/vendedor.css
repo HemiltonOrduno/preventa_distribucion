@@ -297,7 +297,7 @@ input.qty__value{
     border-radius: var(--radius-card);
     box-shadow: 0 12px 28px rgba(26,35,126,0.18);
     padding: 12px;
-    z-index: 200;
+    z-index: 1100;   /* por encima de los controles de Leaflet (1000) */
 }
 .perfil--abierto{ display: flex; }
 
@@ -356,7 +356,7 @@ input.qty__value{
     align-items: center;
     justify-content: center;
     padding: 1.25rem;
-    z-index: 300;
+    z-index: 1200;   /* siempre por encima del panel de perfil */
 }
 .modal--abierto{ display: flex; animation: modalFondo .18s ease-out; }
 
