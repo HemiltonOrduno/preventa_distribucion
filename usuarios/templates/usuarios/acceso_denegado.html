@@ -1,9 +1,64 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="es">
-<head><meta charset="UTF-8"><title>Acceso denegado</title></head>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/boxicons@2.0.5/css/boxicons.min.css" rel="stylesheet">
+
+    <link rel="stylesheet" href="{% static 'usuarios/css/acceso_denegado.css' %}">
+
+    <title>Acceso denegado - INPREDISROUTE</title>
+</head>
 <body>
-    <h1>Acceso denegado</h1>
-    <p>No cuentas con los permisos necesarios para realizar esta acción.</p>
-    <a href="{% url 'login-page' %}">Volver al login</a>
+
+<div class="fondo"></div>
+
+<main class="denegado">
+
+    <div class="denegado__marca">
+        <i class='bx bx-package'></i> INPREDISROUTE
+    </div>
+
+    <div class="denegado__escudo">
+        <i class='bx bx-lock-alt'></i>
+    </div>
+
+    <span class="denegado__codigo">Error 403</span>
+    <h1 class="denegado__titulo">Acceso denegado</h1>
+
+    <p class="denegado__texto">
+        {{ mensaje|default:"Tu rol no cuenta con los permisos necesarios para acceder a esta sección." }}
+    </p>
+
+    {% if request.session.rol %}
+    <div class="denegado__sesion">
+        <i class='bx bx-user'></i>
+        <span>
+            Sesión activa como
+            <strong>{{ request.session.nombre_usuario|default:"Usuario" }}</strong>
+            &middot; {{ request.session.rol }}
+        </span>
+    </div>
+    {% endif %}
+
+    <div class="denegado__acciones">
+        <a href="javascript:history.back()" class="denegado__btn denegado__btn--secundario">
+            <i class='bx bx-arrow-back'></i> Regresar
+        </a>
+        <a href="{% url 'logout' %}" class="denegado__btn denegado__btn--principal">
+            <i class='bx bx-log-out'></i> Cerrar sesión
+        </a>
+    </div>
+
+    <p class="denegado__pie">
+        Si crees que esto es un error, contacta al administrador del sistema.
+    </p>
+
+</main>
+
 </body>
 </html>

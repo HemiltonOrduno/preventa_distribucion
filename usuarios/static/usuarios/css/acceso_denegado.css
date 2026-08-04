@@ -1,0 +1,216 @@
+/*===== VARIABLES CSS =====*/
+/* Se reusa la paleta del login para que las dos pantallas publicas
+   del sistema (login y acceso denegado) se vean como una sola pieza. */
+:root{
+    --color-bg-deep: #080C18;
+    --color-bg: #10182C;
+    --color-bg-soft: #161F3B;
+    --text-color: #8590AD;
+    --text-color-light: #E7EBFA;
+    --accent: #E63950;
+    --accent-soft: rgba(230, 57, 80, 0.35);
+    --panel-bg: rgba(255, 255, 255, 0.055);
+    --panel-border: rgba(255, 255, 255, 0.1);
+
+    --font-display: 'Sora', sans-serif;
+    --font-body: 'Roboto', sans-serif;
+}
+
+/*===== BASE =====*/
+*,::before,::after{ box-sizing: border-box; }
+body{
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    font-family: var(--font-body);
+    color: var(--text-color);
+    background: linear-gradient(160deg,
+                var(--color-bg-deep) 0%,
+                var(--color-bg) 55%,
+                var(--color-bg-soft) 100%);
+}
+h1{ margin: 0; font-family: var(--font-display); }
+a{ text-decoration: none; color: inherit; }
+
+/* Retícula de fondo, igual que en el login */
+.fondo{
+    position: fixed;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(133,144,173,0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(133,144,173,0.08) 1px, transparent 1px);
+    background-size: 42px 42px;
+    pointer-events: none;
+}
+
+/*===== TARJETA =====*/
+.denegado{
+    position: relative;
+    width: 100%;
+    max-width: 430px;
+    padding: 2.5rem 2rem 2rem;
+    text-align: center;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 1.25rem;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 24px 60px rgba(0,0,0,0.45);
+    animation: entrada .35s ease-out;
+}
+
+.denegado__marca{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    font-family: var(--font-display);
+    font-size: .68rem;
+    font-weight: 600;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--text-color);
+    margin-bottom: 1.75rem;
+}
+.denegado__marca i{ font-size: 1rem; color: var(--accent); }
+
+/*===== ESCUDO =====*/
+.denegado__escudo{
+    position: relative;
+    width: 84px;
+    height: 84px;
+    margin: 0 auto 1.5rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 38px;
+    color: var(--accent);
+    background: rgba(230, 57, 80, 0.12);
+    border: 1px solid var(--accent-soft);
+}
+/* Halo que late suavemente alrededor del candado */
+.denegado__escudo::after{
+    content: "";
+    position: absolute;
+    inset: -10px;
+    border-radius: 50%;
+    border: 1px solid var(--accent-soft);
+    animation: halo 2.4s ease-out infinite;
+}
+
+/*===== TEXTOS =====*/
+.denegado__codigo{
+    display: inline-block;
+    padding: 4px 12px;
+    margin-bottom: .85rem;
+    border-radius: 1rem;
+    background: rgba(230, 57, 80, 0.14);
+    border: 1px solid var(--accent-soft);
+    color: var(--accent);
+    font-family: var(--font-display);
+    font-size: .65rem;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+}
+.denegado__titulo{
+    font-size: 1.65rem;
+    font-weight: 700;
+    color: var(--text-color-light);
+    margin-bottom: .7rem;
+}
+.denegado__texto{
+    font-size: .92rem;
+    line-height: 1.55;
+    color: var(--text-color);
+    margin: 0 0 1.5rem;
+}
+
+/*===== SESION ACTIVA =====*/
+.denegado__sesion{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: .7rem .9rem;
+    margin-bottom: 1.5rem;
+    border-radius: .8rem;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--panel-border);
+    font-size: .78rem;
+    color: var(--text-color);
+}
+.denegado__sesion i{ font-size: 1rem; flex-shrink: 0; }
+.denegado__sesion strong{ color: var(--text-color-light); font-weight: 500; }
+
+/*===== BOTONES =====*/
+.denegado__acciones{
+    display: flex;
+    gap: 10px;
+    margin-bottom: 1.5rem;
+}
+.denegado__btn{
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: .8rem .9rem;
+    border-radius: .75rem;
+    font-family: var(--font-display);
+    font-size: .78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform .2s, filter .2s;
+}
+.denegado__btn i{ font-size: 1.05rem; }
+.denegado__btn:hover{ transform: translateY(-2px); }
+
+.denegado__btn--secundario{
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--panel-border);
+    color: var(--text-color-light);
+}
+.denegado__btn--principal{
+    background: linear-gradient(140deg, var(--accent), #e67965);
+    border: none;
+    color: #fff;
+    box-shadow: 0 10px 26px var(--accent-soft);
+}
+.denegado__btn--principal:hover{ filter: brightness(1.08); }
+
+/*===== PIE =====*/
+.denegado__pie{
+    font-size: .72rem;
+    color: rgba(133,144,173,0.7);
+    margin: 0;
+    line-height: 1.5;
+}
+
+/*===== ANIMACIONES =====*/
+@keyframes entrada{
+    from{ opacity: 0; transform: translateY(16px) scale(.97); }
+    to{ opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes halo{
+    0%{ opacity: .7; transform: scale(1); }
+    70%{ opacity: 0; transform: scale(1.25); }
+    100%{ opacity: 0; transform: scale(1.25); }
+}
+
+/* Respeta la preferencia del sistema de reducir animaciones */
+@media (prefers-reduced-motion: reduce){
+    .denegado, .denegado__escudo::after{ animation: none; }
+    .denegado__btn:hover{ transform: none; }
+}
+
+/*===== MOVIL =====*/
+@media screen and (max-width: 420px){
+    .denegado{ padding: 2rem 1.4rem 1.6rem; }
+    .denegado__titulo{ font-size: 1.4rem; }
+    .denegado__acciones{ flex-direction: column; }
+}

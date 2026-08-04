@@ -604,24 +604,44 @@ def mapa_ruta_del_dia_api(request):
         "duracion_total_min": duracion
     }, json_dumps_params={'ensure_ascii': False})
     
+
 @rol_requerido('Almacenista', 'Administrador')
 @csrf_exempt
-def validar_pedido(request, pedido_id):
+def confirmar_pedido(request, pedido_id):
     """
-    RF18: el almacenista valida el pedido (después de ajustar/cancelar
-    productos si hacía falta) y lo deja listo para agruparse en una
-    entrega. Pasa de EPD001 (Pendiente) a EPD003 (Registrado).
+    Cierra el flujo de validación: revisa que TODAS las líneas del
+    pedido tengan stock suficiente antes de dejarlo pasar a Registrado.
+    Si alguna no tiene stock, rechaza y dice cuál ajustar/cancelar.
     """
     if request.method != 'POST':
         return JsonResponse({"error": "Método no permitido"}, status=405)
 
     with connection.cursor() as cursor:
         cursor.execute("""
-            UPDATE pedido SET edo_pedido = 'EPD003'
-            WHERE num = %s AND edo_pedido = 'EPD001'
+            SELECT dp.cod_producto, pr.nombre, dp.cantidad, pr.stock
+            FROM detalle_pedido dp
+            INNER JOIN producto pr ON pr.codigo = dp.cod_producto
+            WHERE dp.num_pedido = %s
+        """, [pedido_id])
+        lineas = cursor.fetchall()
+
+        if not lineas:
+            return JsonResponse({"error": "El pedido no tiene productos"}, status=400)
+
+        insuficientes = [
+            {"producto": nombre, "solicitado": cantidad, "disponible": stock}
+            for cod, nombre, cantidad, stock in lineas if cantidad > stock
+        ]
+        if insuficientes:
+            return JsonResponse({
+                "error": "Hay productos sin stock suficiente. Ajusta o cancela antes de confirmar.",
+                "detalle": insuficientes
+            }, status=400)
+
+        cursor.execute("""
+            UPDATE pedido SET edo_pedido = 'EPD003' WHERE num = %s AND edo_pedido = 'EPD001'
         """, [pedido_id])
         if cursor.rowcount == 0:
-            return JsonResponse({"error": "El pedido no existe o ya fue validado"}, status=400)
+            return JsonResponse({"error": "El pedido ya no está pendiente de validación"}, status=400)
 
-    return JsonResponse({"mensaje": "Pedido validado correctamente", "pedido_id": pedido_id},
-                         json_dumps_params={'ensure_ascii': False})
+    return JsonResponse({"mensaje": "Pedido confirmado y registrado", "pedido_id": pedido_id}, json_dumps_params={'ensure_ascii': False})
