@@ -5,6 +5,7 @@ from django.db import connection, transaction
 from django.views.decorators.csrf import csrf_exempt
 from usuarios.permissions import rol_requerido
 from datetime import date
+import requests as req
 
 
 @rol_requerido('Vendedor', 'Administrador')
@@ -572,10 +573,35 @@ def mapa_ruta_del_dia_api(request):
             p['estado'] = 'pendiente'
         del p['visitado']
 
+    # Traza la ruta real por calles con OSRM: almacén -> paradas en orden
+    almacen = {"lat": 32.4700, "lon": -116.9400, "nombre": "Almacén Sabritas - El Florido"}
+    coords = [(almacen['lon'], almacen['lat'])]
+    coords += [(p['longitud'], p['latitud']) for p in paradas if p['latitud'] and p['longitud']]
+
+    geometria = None
+    distancia = 0
+    duracion = 0
+
+    if len(coords) >= 2:
+        coords_str = ";".join(f"{lon},{lat}" for lon, lat in coords)
+        try:
+            r = req.get(f"http://127.0.0.1:5000/route/v1/driving/{coords_str}",
+                        params={"geometries": "geojson", "overview": "full"}, timeout=15)
+            osrm = r.json()
+            if osrm.get("code") == "Ok":
+                geometria = osrm["routes"][0]["geometry"]
+                distancia = round(osrm["routes"][0]["distance"] / 1000, 2)
+                duracion = round(osrm["routes"][0]["duration"] / 60, 2)
+        except Exception:
+            pass
+
     return JsonResponse({
         "ruta_visita_id": ruta_visita_id,
-        "almacen": {"lat": 32.4700, "lon": -116.9400, "nombre": "Almacén Sabritas - El Florido"},
-        "paradas": paradas
+        "almacen": almacen,
+        "paradas": paradas,
+        "geometria": geometria,
+        "distancia_total_km": distancia,
+        "duracion_total_min": duracion
     }, json_dumps_params={'ensure_ascii': False})
     
 @rol_requerido('Almacenista', 'Administrador')

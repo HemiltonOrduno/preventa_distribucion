@@ -10,6 +10,7 @@ let destinoActual = null;
 let visitaEnProcesoId = null;
 let mapaVendedor = null;
 let marcadoresMapa = [];
+let rutaLayerVendedor = null;
 
 const ALMACEN_ICONO = () => L.divIcon({
     className: '',
@@ -68,6 +69,24 @@ async function cargarMapaRuta() {
             marcadoresMapa.push(m);
             puntos.push([p.latitud, p.longitud]);
         });
+
+        // Traza la ruta por calles (OSRM); si no hay geometría,
+        // une los puntos con una línea recta punteada como respaldo
+        if (rutaLayerVendedor) {
+            mapaVendedor.removeLayer(rutaLayerVendedor);
+            rutaLayerVendedor = null;
+        }
+
+        if (data.geometria && data.geometria.coordinates) {
+            const coords = data.geometria.coordinates.map(c => [c[1], c[0]]);
+            rutaLayerVendedor = L.polyline(coords, {
+                color: '#1a237e', weight: 4, opacity: 0.75
+            }).addTo(mapaVendedor);
+        } else if (puntos.length >= 2) {
+            rutaLayerVendedor = L.polyline(puntos, {
+                color: '#9e9e9e', weight: 3, opacity: 0.6, dashArray: '6,6'
+            }).addTo(mapaVendedor);
+        }
 
         setTimeout(() => {
             mapaVendedor.invalidateSize();
