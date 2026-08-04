@@ -410,6 +410,12 @@ a { text-decoration: none; color: inherit; }
 .bottom-nav__item { min-height: 48px; justify-content: center; }
 .parada-item { min-height: 56px; }
 
+/* El botón dentro de una tarjeta de entrega no debe ocupar todo el ancho */
+.parada-item .btn-iniciar-ruta {
+    width: auto;
+    flex-shrink: 0;
+}
+
 
 /*===== MEDIA QUERIES: ESCRITORIO =====*/
 @media screen and (min-width: 768px) {

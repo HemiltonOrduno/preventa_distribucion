@@ -38,7 +38,8 @@ function cargarRuta() {
         .then(res => res.json())
         .then(data => {
             if (data.error) {
-                if (data.error === 'No tienes una ruta asignada para hoy') {
+                // Si no trae ruta propia, se ofrecen las entregas disponibles
+                if (data.error.includes('ruta asignada')) {
                     mostrarEntregasDisponibles();
                 } else {
                     document.getElementById('lista-paradas').innerHTML =
@@ -51,8 +52,7 @@ function cargarRuta() {
             rutaId = data.ruta_id;
             paradas = data.paradas;
 
-            // Verificar si la ruta ya está iniciada
-            // Verificar si la ruta ya está iniciada
+            // Si ya está en camino solo se puede finalizar; si no, iniciar o regresar
             if (data.estado === 'En camino') {
                 rutaIniciada = true;
                 document.getElementById('btn-iniciar').style.display = 'none';
@@ -125,7 +125,8 @@ function mostrarEntregasDisponibles() {
                     <div class="parada-num almacen">📦</div>
                     <div class="parada-info">
                         <div class="parada-nombre">Entrega #${e.entrega_id}</div>
-                        <div class="parada-sub">${e.total_pedidos} pedidos · ${e.peso_total_kg.toFixed(1)} kg · ${e.placas || 'sin vehículo'}</div>
+                        <div class="parada-sub">Ruta #${e.ruta_entrega_id} · ${e.total_pedidos} pedidos · ${e.peso_total_kg.toFixed(1)} kg</div>
+                        <div class="parada-sub">🚚 ${e.placas || 'sin vehículo'} · ${e.modelo || ''}</div>
                     </div>
                     <button class="btn-iniciar-ruta" style="padding:6px 14px;font-size:12px;white-space:nowrap;"
                         onclick="event.stopPropagation(); tomarYIniciarEntrega(${e.ruta_entrega_id}, ${e.entrega_id})">
