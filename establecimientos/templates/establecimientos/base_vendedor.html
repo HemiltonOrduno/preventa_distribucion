@@ -32,8 +32,40 @@
             <i class='bx bx-store'></i> Clientes
         </a>
     </div>
-    <div class="top-nav__avatar"><i class='bx bx-user'></i></div>
+    <div class="top-nav__avatar" onclick="togglePerfil(event)"><i class='bx bx-user'></i></div>
 </nav>
+
+<!-- PANEL DE PERFIL: va FUERA de los dos <nav> porque en movil el menu
+     superior esta en display:none y arrastraria el panel con el.
+     Su posicion la calcula posicionarPerfil() segun el icono que se clickeo. -->
+<div class="perfil" id="menuPerfil">
+    <div class="perfil__avatar"><i class='bx bx-user'></i></div>
+    <div class="perfil__datos">
+        <div class="perfil__nombre">{{ request.session.nombre_usuario|default:"Usuario" }}</div>
+        <div class="perfil__rol">{{ request.session.rol }}</div>
+    </div>
+    <a href="{% url 'logout' %}" class="perfil__logout"
+       title="Cerrar sesión" aria-label="Cerrar sesión"
+       onclick="return abrirModalLogout(event);">
+        <i class='bx bx-log-out'></i>
+    </a>
+</div>
+
+<!-- MODAL DE CONFIRMACION DE CIERRE DE SESION -->
+<div class="modal" id="modalLogout">
+    <div class="modal__caja">
+        <div class="modal__icono"><i class='bx bx-log-out'></i></div>
+        <h3 class="modal__titulo">Cerrar sesión</h3>
+        <p class="modal__texto">¿Seguro que quieres salir del sistema?</p>
+        <div class="modal__acciones">
+            <button type="button" class="modal__btn modal__btn--cancelar"
+                    onclick="cerrarModalLogout()">Cancelar</button>
+            <a href="{% url 'logout' %}" class="modal__btn modal__btn--confirmar">
+                Sí, salir
+            </a>
+        </div>
+    </div>
+</div>
 
 <div class="page {% block page_class %}{% endblock %}">
     {% block content %}{% endblock %}
@@ -53,7 +85,7 @@
         <i class='bx bx-store'></i>
         <span>Clientes</span>
     </a>
-    <a href="#" class="bottom-nav__item">
+    <a href="#" class="bottom-nav__item" onclick="togglePerfil(event)">
         <i class='bx bx-user-circle'></i>
         <span>Perfil</span>
     </a>
@@ -75,6 +107,79 @@
             input.closest(".form__div").classList.add("focus");
         }
     });
+
+    /*===== PANEL DE PERFIL =====*/
+    var menuPerfil = document.getElementById("menuPerfil");
+
+    /* Abre o cierra el panel y lo ancla al icono que se acaba de clickear.
+       Se calcula con JS para que sirva igual en el avatar de escritorio
+       y en el boton "Perfil" del menu inferior de movil. */
+    function togglePerfil(e){
+        e.preventDefault();
+        e.stopPropagation();
+        var abierto = menuPerfil.classList.toggle("perfil--abierto");
+        if (abierto){
+            posicionarPerfil(e.currentTarget);
+        }
+    }
+
+    function posicionarPerfil(icono){
+        var r = icono.getBoundingClientRect();
+        var ancho = menuPerfil.offsetWidth;
+        var margen = 12;
+
+        /* Alineado por su borde derecho con el del icono, sin salirse */
+        var izq = r.right - ancho;
+        if (izq < margen){ izq = margen; }
+        if (izq + ancho > window.innerWidth - margen){
+            izq = window.innerWidth - ancho - margen;
+        }
+        menuPerfil.style.left = izq + "px";
+
+        /* Si el icono esta en la mitad de abajo (menu movil) el panel sube;
+           si esta arriba (avatar de escritorio) el panel baja. */
+        if (r.top > window.innerHeight / 2){
+            menuPerfil.style.top = "auto";
+            menuPerfil.style.bottom = (window.innerHeight - r.top + 10) + "px";
+        } else {
+            menuPerfil.style.top = (r.bottom + 10) + "px";
+            menuPerfil.style.bottom = "auto";
+        }
+    }
+
+    /*===== MODAL DE CIERRE DE SESION =====*/
+    var modalLogout = document.getElementById("modalLogout");
+
+    /* Devuelve false para que el enlace no navegue: primero se confirma */
+    function abrirModalLogout(e){
+        e.preventDefault();
+        e.stopPropagation();
+        cerrarPerfil();
+        modalLogout.classList.add("modal--abierto");
+        return false;
+    }
+
+    function cerrarModalLogout(){
+        modalLogout.classList.remove("modal--abierto");
+    }
+
+    /* Se cierra al hacer clic en el fondo oscuro o con la tecla Escape */
+    modalLogout.addEventListener("click", function(e){
+        if (e.target === modalLogout){ cerrarModalLogout(); }
+    });
+    document.addEventListener("keydown", function(e){
+        if (e.key === "Escape"){ cerrarModalLogout(); }
+    });
+
+    /* Se cierra al hacer clic fuera, al hacer scroll o al girar la pantalla */
+    document.addEventListener("click", cerrarPerfil);
+    window.addEventListener("scroll", cerrarPerfil, true);
+    window.addEventListener("resize", cerrarPerfil);
+    menuPerfil.addEventListener("click", function(e){ e.stopPropagation(); });
+
+    function cerrarPerfil(){
+        menuPerfil.classList.remove("perfil--abierto");
+    }
 </script>
 
 {% block extra_scripts %}{% endblock %}
