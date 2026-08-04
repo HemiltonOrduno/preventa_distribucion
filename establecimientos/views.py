@@ -3,12 +3,16 @@ from django.shortcuts import render
 from django.http import JsonResponse
 from django.db import connection, transaction
 from django.views.decorators.csrf import csrf_exempt
+from usuarios.permissions import rol_requerido, rol_requerido
 
-
+@csrf_exempt
+@rol_requerido('Vendedor', 'Administrador')
 def registro_cliente_view(request):
     return render(request, 'establecimientos/registro_cliente.html')
 
 
+@csrf_exempt
+@rol_requerido('Vendedor', 'Administrador')
 def registro_establecimiento_view(request):
     return render(request, 'establecimientos/registro_establecimiento.html')
 
