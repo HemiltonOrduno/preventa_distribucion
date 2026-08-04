@@ -1,0 +1,377 @@
+{% extends "reportes/base_panel.html" %}
+
+{% block titulo %}Reporte de cobranza{% endblock %}
+{% block encabezado %}Reporte de cobranza{% endblock %}
+{% block subtitulo %}Recuperación diferenciada por forma de pago — RF55{% endblock %}
+
+{% block estilos %}
+.grafica{padding:20px 22px 14px;margin-bottom:20px}
+.grafica-titulo{display:flex;justify-content:space-between;align-items:baseline;
+  gap:14px;flex-wrap:wrap;margin-bottom:16px}
+.grafica-titulo h2{font-size:15px;font-weight:650;text-transform:uppercase;
+  letter-spacing:.6px;color:var(--texto-tenue)}
+.leyenda{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;
+  color:var(--texto-tenue)}
+.leyenda span{display:flex;align-items:center;gap:6px}
+.leyenda i{width:11px;height:11px;border-radius:3px;display:inline-block}
+.lienzo-grafica{width:100%;overflow-x:auto}
+.lienzo-grafica svg{display:block;min-width:520px;width:100%;height:auto}
+.barra-serie{transition:opacity .12s}
+.barra-serie:hover{opacity:.78}
+.eje{font-size:11px;fill:var(--texto-tenue)}
+.valor-barra{font-size:11px;font-weight:650;fill:var(--texto)}
+.malla{stroke:var(--borde);stroke-width:1}
+
+.desglose{display:grid;gap:12px;margin-bottom:20px;
+  grid-template-columns:repeat(auto-fit,minmax(238px,1fr))}
+.forma{padding:14px 16px;background:var(--superficie);border:1px solid var(--borde);
+  border-radius:var(--radio);box-shadow:var(--sombra)}
+.forma-encabezado{display:flex;justify-content:space-between;
+  align-items:center;gap:10px;margin-bottom:9px}
+.forma-encabezado strong{font-size:19px;font-variant-numeric:tabular-nums}
+.barra{height:7px;border-radius:99px;background:#EEF0F4;overflow:hidden}
+.barra i{display:block;height:100%;border-radius:99px}
+.barra i.verde{background:var(--exito)}
+.barra i.gris{background:#414A5E}
+.barra i.ambar{background:var(--alerta)}
+.barra i.rojo{background:var(--peligro)}
+.forma small{display:block;margin-top:7px;font-size:12.5px;color:var(--texto-tenue)}
+
+.conciliacion{padding:20px 22px;margin-bottom:20px}
+.conciliacion h2{font-size:15px;font-weight:650;text-transform:uppercase;
+  letter-spacing:.6px;color:var(--texto-tenue);margin-bottom:6px}
+.conciliacion p.pie{font-size:12.5px;color:var(--texto-tenue);margin-bottom:16px}
+.avance{height:26px;border-radius:8px;background:#EEF0F4;overflow:hidden;
+  display:flex;margin-bottom:12px}
+.avance i{display:block;height:100%;background:var(--exito)}
+.cifras{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+.cifras div span{display:block;font-size:11.5px;font-weight:650;
+  text-transform:uppercase;letter-spacing:.6px;color:var(--texto-tenue)}
+.cifras div strong{display:block;margin-top:3px;font-size:19px;
+  font-variant-numeric:tabular-nums}
+.cifras div strong.falta{color:var(--peligro)}
+{% endblock %}
+
+{% block contenido %}
+<section class="panel filtros" aria-labelledby="tituloFiltros">
+  <p class="filtros-titulo" id="tituloFiltros">Parámetros del reporte</p>
+  <div class="rejilla">
+    <div class="campo">
+      <label for="agrupacion">Agrupar por</label>
+      <select id="agrupacion">
+        <option value="dia">Día</option>
+        <option value="semana">Semana</option>
+        <option value="mes">Mes</option>
+      </select>
+    </div>
+    <div class="campo">
+      <label for="fechaInicio">Desde</label>
+      <input type="date" id="fechaInicio">
+    </div>
+    <div class="campo">
+      <label for="fechaFin">Hasta</label>
+      <input type="date" id="fechaFin">
+    </div>
+    <div class="campo">
+      <label for="cobrador">Cobrado por</label>
+      <select id="cobrador"><option value="">Todos</option></select>
+    </div>
+    <div class="campo">
+      <label for="zona">Zona</label>
+      <select id="zona"><option value="">Todas</option></select>
+    </div>
+  </div>
+  <div class="acciones">
+    <button class="boton boton-principal" id="btnAplicar">Generar reporte</button>
+    <button class="boton boton-neutro" id="btnLimpiar">Limpiar</button>
+  </div>
+</section>
+
+<section class="indicadores" aria-label="Resumen de cobranza">
+  <article class="indicador">
+    <span>Cobros registrados</span><strong id="kpiCobros">—</strong>
+  </article>
+  <article class="indicador verde">
+    <span>Efectivo</span><strong id="kpiEfectivo">—</strong>
+  </article>
+  <article class="indicador">
+    <span>Tarjeta</span><strong id="kpiTarjeta">—</strong>
+  </article>
+  <article class="indicador ambar">
+    <span>Total recuperado</span><strong id="kpiTotal">—</strong>
+  </article>
+</section>
+
+<section class="desglose" id="desglose" aria-label="Desglose por forma de pago"></section>
+
+<section class="panel conciliacion">
+  <h2>Avance de recuperación</h2>
+  <p class="pie">
+    Compara lo facturado en los pedidos <strong>entregados</strong> del periodo
+    contra los pagos ligados a esos mismos pedidos, sin importar la fecha del cobro.
+  </p>
+  <div class="avance"><i id="barraAvance" style="width:0%"></i></div>
+  <div class="cifras">
+    <div><span>Pedidos entregados</span><strong id="conPedidos">—</strong></div>
+    <div><span>Facturado</span><strong id="conFacturado">—</strong></div>
+    <div><span>Recuperado</span><strong id="conRecuperado">—</strong></div>
+    <div><span>Pendiente</span><strong class="falta" id="conPendiente">—</strong></div>
+  </div>
+</section>
+
+<section class="panel grafica">
+  <div class="grafica-titulo">
+    <h2>Cobranza por periodo</h2>
+    <div class="leyenda">
+      <span><i style="background:#10B981"></i> Efectivo</span>
+      <span><i style="background:#414A5E"></i> Tarjeta</span>
+    </div>
+  </div>
+  <div class="lienzo-grafica" id="lienzo">
+    <p class="aviso"><span class="girando"></span></p>
+  </div>
+</section>
+
+<section class="panel" style="margin-bottom:20px">
+  <div class="envoltura-tabla">
+    <table>
+      <caption>Desglose por periodo</caption>
+      <thead>
+        <tr>
+          <th scope="col">Periodo</th>
+          <th scope="col" class="num">Cobros</th>
+          <th scope="col" class="num">Efectivo</th>
+          <th scope="col" class="num">Tarjeta</th>
+          <th scope="col" class="num">% efectivo</th>
+          <th scope="col" class="num">Total</th>
+        </tr>
+      </thead>
+      <tbody id="cuerpoPeriodos">
+        <tr><td colspan="6" class="aviso"><span class="girando"></span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="envoltura-tabla">
+    <table>
+      <caption>Desglose por cobrador</caption>
+      <thead>
+        <tr>
+          <th scope="col">Cobrador</th>
+          <th scope="col" class="num">Cobros</th>
+          <th scope="col" class="num">Efectivo</th>
+          <th scope="col" class="num">Tarjeta</th>
+          <th scope="col" class="num">% efectivo</th>
+          <th scope="col" class="num">Total</th>
+        </tr>
+      </thead>
+      <tbody id="cuerpoCobradores">
+        <tr><td colspan="6" class="aviso"><span class="girando"></span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+
+{% block script %}
+<script>
+(function () {
+  "use strict";
+  var P = Panel, $ = P.$;
+
+  function filtros() {
+    return {
+      agrupacion: $("agrupacion").value,
+      fecha_inicio: $("fechaInicio").value,
+      fecha_fin: $("fechaFin").value,
+      cobrador: $("cobrador").value,
+      zona: $("zona").value
+    };
+  }
+
+  function porcentaje(parte, total) {
+    var a = Number(parte) || 0, b = Number(total) || 0;
+    return b ? Math.round((a / b) * 1000) / 10 : 0;
+  }
+
+  /* Barras apiladas en SVG puro: sin librerias externas, el sistema debe
+     operar sin conexion. */
+  function dibujar(periodos) {
+    if (!periodos.length) {
+      $("lienzo").innerHTML =
+        '<p class="aviso"><strong>Sin datos para graficar</strong>' +
+        "Ajusta el rango de fechas.</p>";
+      return;
+    }
+
+    var ancho = Math.max(560, periodos.length * 74);
+    var alto = 300;
+    var margen = { arriba: 26, derecha: 14, abajo: 46, izquierda: 74 };
+    var util = {
+      ancho: ancho - margen.izquierda - margen.derecha,
+      alto: alto - margen.arriba - margen.abajo
+    };
+
+    var tope = Math.max.apply(null, periodos.map(function (p) {
+      return Number(p.total) || 0;
+    })) || 1;
+    // Escala redondeada al millar superior para que el eje sea legible.
+    var unidad = Math.pow(10, Math.floor(Math.log10(tope / 4)));
+    var paso = Math.ceil((tope / 4) / unidad) * unidad;
+    var escalaTope = paso * 4;
+
+    var anchoRanura = util.ancho / periodos.length;
+    var anchoBarra = Math.min(38, anchoRanura * 0.56);
+    var piezas = [];
+
+    for (var i = 0; i <= 4; i++) {
+      var valor = paso * i;
+      var y = margen.arriba + util.alto - (valor / escalaTope) * util.alto;
+      piezas.push('<line class="malla" x1="' + margen.izquierda + '" y1="' + y +
+        '" x2="' + (margen.izquierda + util.ancho) + '" y2="' + y + '"/>');
+      piezas.push('<text class="eje" x="' + (margen.izquierda - 9) + '" y="' +
+        (y + 4) + '" text-anchor="end">$' +
+        new Intl.NumberFormat("es-MX", { notation: "compact" }).format(valor) +
+        "</text>");
+    }
+
+    periodos.forEach(function (p, indice) {
+      var centro = margen.izquierda + anchoRanura * (indice + 0.5);
+      var x = centro - anchoBarra / 2;
+      var base = margen.arriba + util.alto;
+      var acumulado = 0;
+
+      [
+        { monto: Number(p.efectivo) || 0, color: "#10B981", texto: "efectivo" },
+        { monto: Number(p.tarjeta) || 0, color: "#414A5E", texto: "tarjeta" }
+      ].forEach(function (serie) {
+        if (!serie.monto) { return; }
+        var altoSerie = (serie.monto / escalaTope) * util.alto;
+        var y = base - acumulado - altoSerie;
+        piezas.push('<rect class="barra-serie" x="' + x + '" y="' + y +
+          '" width="' + anchoBarra + '" height="' + Math.max(altoSerie, 1) +
+          '" fill="' + serie.color + '"><title>' + P.escapar(p.etiqueta) +
+          " · " + serie.texto + ": " + P.dinero.format(serie.monto) +
+          "</title></rect>");
+        acumulado += altoSerie;
+      });
+
+      var altoTotal = ((Number(p.total) || 0) / escalaTope) * util.alto;
+      piezas.push('<text class="valor-barra" x="' + centro + '" y="' +
+        (base - altoTotal - 7) + '" text-anchor="middle">' +
+        new Intl.NumberFormat("es-MX", { notation: "compact" })
+          .format(Number(p.total) || 0) + "</text>");
+
+      piezas.push('<text class="eje" x="' + centro + '" y="' + (base + 19) +
+        '" text-anchor="middle">' + P.escapar(p.etiqueta) + "</text>");
+    });
+
+    piezas.push('<line class="malla" x1="' + margen.izquierda + '" y1="' +
+      (margen.arriba + util.alto) + '" x2="' + (margen.izquierda + util.ancho) +
+      '" y2="' + (margen.arriba + util.alto) + '"/>');
+
+    $("lienzo").innerHTML =
+      '<svg viewBox="0 0 ' + ancho + " " + alto + '" role="img" ' +
+      'aria-label="Gráfica de cobranza por periodo">' + piezas.join("") + "</svg>";
+  }
+
+  function pintarFormas(lista) {
+    if (!lista || !lista.length) {
+      $("desglose").innerHTML = "";
+      return;
+    }
+    $("desglose").innerHTML = lista.map(function (f) {
+      return '<article class="forma">' +
+        '<div class="forma-encabezado">' +
+          P.etiqueta(f.forma_pago, f.tono) +
+          "<strong>" + P.dinero.format(f.monto || 0) + "</strong>" +
+        "</div>" +
+        '<div class="barra"><i class="' + (f.tono || "gris") +
+          '" style="width:' + (f.porcentaje || 0) + '%"></i></div>' +
+        "<small>" + f.cobros + (f.cobros === 1 ? " cobro" : " cobros") +
+        " · " + (f.porcentaje || 0) + "% del total</small>" +
+        "</article>";
+    }).join("");
+  }
+
+  function filaCorte(nombre, d) {
+    var pct = porcentaje(d.efectivo, d.total);
+    var clase = pct >= 60 ? "verde" : pct >= 30 ? "ambar" : "gris";
+    return "<tr><td><strong>" + P.escapar(nombre) + "</strong></td>" +
+      '<td class="num">' + d.cobros + "</td>" +
+      '<td class="num">' + P.dinero.format(d.efectivo || 0) + "</td>" +
+      '<td class="num">' + P.dinero.format(d.tarjeta || 0) + "</td>" +
+      '<td class="num">' + P.etiqueta(pct + "%", clase) + "</td>" +
+      '<td class="num"><strong>' + P.dinero.format(d.total || 0) +
+      "</strong></td></tr>";
+  }
+
+  function cargar() {
+    P.cargando("cuerpoPeriodos", 6);
+    P.cargando("cuerpoCobradores", 6);
+    $("lienzo").innerHTML = '<p class="aviso"><span class="girando"></span></p>';
+
+    P.pedir("/cobranza/?" + P.parametros(filtros(), 1)).then(function (d) {
+      var periodos = d.periodos || [];
+      var cobradores = d.cobradores || [];
+
+      dibujar(periodos);
+      pintarFormas(d.formas);
+
+      $("cuerpoPeriodos").innerHTML = periodos.length
+        ? periodos.map(function (p) { return filaCorte(p.etiqueta, p); }).join("")
+        : '<tr><td colspan="6" class="aviso"><strong>Sin resultados</strong>' +
+          "No hubo cobros en el periodo.</td></tr>";
+
+      $("cuerpoCobradores").innerHTML = cobradores.length
+        ? cobradores.map(function (c) { return filaCorte(c.nombre, c); }).join("")
+        : '<tr><td colspan="6" class="aviso"><strong>Sin resultados</strong>' +
+          "No hubo cobros en el periodo.</td></tr>";
+
+      var r = d.resumen || {};
+      $("kpiCobros").textContent = r.cobros || 0;
+      $("kpiEfectivo").textContent = P.dinero.format(r.efectivo || 0);
+      $("kpiTarjeta").textContent = P.dinero.format(r.tarjeta || 0);
+      $("kpiTotal").textContent = P.dinero.format(r.monto || 0);
+
+      var c = d.conciliacion || {};
+      $("conPedidos").textContent = c.pedidos_entregados || 0;
+      $("conFacturado").textContent = P.dinero.format(c.facturado || 0);
+      $("conRecuperado").textContent = P.dinero.format(c.recuperado || 0);
+      $("conPendiente").textContent = P.dinero.format(c.pendiente || 0);
+      $("barraAvance").style.width = Math.min(c.avance || 0, 100) + "%";
+    }).catch(function (e) {
+      P.mensaje("cuerpoPeriodos", 6, "No se pudo generar el reporte",
+        e.message, true);
+      P.mensaje("cuerpoCobradores", 6, "Sin datos", "", true);
+      $("lienzo").innerHTML =
+        '<p class="aviso error"><strong>Sin gráfica</strong>' +
+        P.escapar(e.message) + "</p>";
+      $("desglose").innerHTML = "";
+      ["kpiCobros", "kpiEfectivo", "kpiTarjeta", "kpiTotal",
+       "conPedidos", "conFacturado", "conRecuperado", "conPendiente"]
+        .forEach(function (id) { $(id).textContent = "—"; });
+      $("barraAvance").style.width = "0%";
+    });
+  }
+
+  $("btnAplicar").addEventListener("click", cargar);
+  $("agrupacion").addEventListener("change", cargar);
+  $("btnLimpiar").addEventListener("click", function () {
+    ["fechaInicio", "fechaFin", "cobrador", "zona"]
+      .forEach(function (id) { $(id).value = ""; });
+    $("agrupacion").value = "dia";
+    cargar();
+  });
+
+  P.pedir("/catalogos/").then(function (d) {
+    P.llenarSelect("cobrador", d.cobradores, "Todos");
+    P.llenarSelect("zona", d.zonas, "Todas");
+  }).catch(function () { /* los filtros quedan en "Todos" */ });
+
+  cargar();
+})();
+</script>
+{% endblock %}

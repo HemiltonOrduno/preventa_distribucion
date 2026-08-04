@@ -1,0 +1,234 @@
+{% extends "reportes/base_panel.html" %}
+
+{% block titulo %}Historial de entregas{% endblock %}
+{% block encabezado %}Historial de entregas{% endblock %}
+{% block subtitulo %}Seguimiento de entregas ejecutadas en ruta — RF45{% endblock %}
+{% block titulo_modal %}Detalle de la entrega{% endblock %}
+
+{% block contenido %}
+<section class="panel filtros" aria-labelledby="tituloFiltros">
+  <p class="filtros-titulo" id="tituloFiltros">Filtros de búsqueda</p>
+  <div class="rejilla">
+    <div class="campo">
+      <label for="campoFecha">Filtrar por</label>
+      <select id="campoFecha">
+        <option value="creacion">Fecha de creación</option>
+        <option value="entrega">Fecha de entrega</option>
+      </select>
+    </div>
+    <div class="campo">
+      <label for="fechaInicio">Desde</label>
+      <input type="date" id="fechaInicio">
+    </div>
+    <div class="campo">
+      <label for="fechaFin">Hasta</label>
+      <input type="date" id="fechaFin">
+    </div>
+    <div class="campo">
+      <label for="repartidor">Repartidor</label>
+      <select id="repartidor"><option value="">Todos</option></select>
+    </div>
+    <div class="campo">
+      <label for="estado">Estado</label>
+      <select id="estado"><option value="">Todos</option></select>
+    </div>
+  </div>
+  <div class="acciones">
+    <button class="boton boton-principal" id="btnAplicar">Aplicar filtros</button>
+    <button class="boton boton-neutro" id="btnLimpiar">Limpiar</button>
+  </div>
+</section>
+
+<section class="indicadores" aria-label="Resumen del periodo consultado">
+  <article class="indicador">
+    <span>Entregas encontradas</span><strong id="kpiEntregas">—</strong>
+  </article>
+  <article class="indicador verde">
+    <span>Completadas</span><strong id="kpiCompletadas">—</strong>
+  </article>
+  <article class="indicador ambar">
+    <span>Pedidos distribuidos</span><strong id="kpiPedidos">—</strong>
+  </article>
+  <article class="indicador">
+    <span>Monto distribuido</span><strong id="kpiMonto">—</strong>
+  </article>
+</section>
+
+<section class="panel">
+  <div class="envoltura-tabla">
+    <table>
+      <caption>Entregas registradas</caption>
+      <thead>
+        <tr>
+          <th scope="col">Folio</th>
+          <th scope="col">Creación</th>
+          <th scope="col">Entrega</th>
+          <th scope="col">Repartidor</th>
+          <th scope="col">Ruta</th>
+          <th scope="col" class="num">Pedidos</th>
+          <th scope="col" class="num">Paradas</th>
+          <th scope="col" class="num">Monto</th>
+          <th scope="col">Estado</th>
+        </tr>
+      </thead>
+      <tbody id="cuerpoTabla">
+        <tr><td colspan="9" class="aviso"><span class="girando"></span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="paginacion">
+    <p id="textoPagina">—</p>
+    <div class="acciones pegada">
+      <button class="boton boton-neutro" id="btnAnterior" disabled>Anterior</button>
+      <button class="boton boton-neutro" id="btnSiguiente" disabled>Siguiente</button>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block script %}
+<script>
+(function () {
+  "use strict";
+  var P = Panel, $ = P.$;
+  var COLS = 9;
+  var estado = { pagina: 1, siguiente: null };
+
+  function filtros() {
+    return {
+      campo_fecha: $("campoFecha").value,
+      fecha_inicio: $("fechaInicio").value,
+      fecha_fin: $("fechaFin").value,
+      repartidor: $("repartidor").value,
+      estado: $("estado").value
+    };
+  }
+
+  function pintar(lista) {
+    if (!lista.length) {
+      P.mensaje("cuerpoTabla", COLS, "Sin resultados",
+        "Ajusta los filtros para ampliar la búsqueda.");
+      return;
+    }
+    $("cuerpoTabla").innerHTML = lista.map(function (e) {
+      return '<tr tabindex="0" data-clave="' + e.numero + '">' +
+        '<td class="folio">#' + e.numero + "</td>" +
+        "<td>" + P.aFecha(e.fecha_creacion) + "</td>" +
+        "<td>" + P.aFechaHora(e.fecha_entrega) + "</td>" +
+        "<td>" + P.escapar(e.repartidor || "—") + "</td>" +
+        "<td>" + P.escapar(e.ruta || "Sin asignar") + "</td>" +
+        '<td class="num">' + (e.total_pedidos || 0) + "</td>" +
+        '<td class="num">' + (e.total_paradas || 0) + "</td>" +
+        '<td class="num"><strong>' + P.dinero.format(e.monto || 0) + "</strong></td>" +
+        "<td>" + P.etiqueta(e.estado, e.estado_tono) + "</td></tr>";
+    }).join("");
+  }
+
+  function cargar() {
+    P.cargando("cuerpoTabla", COLS);
+    P.pedir("/entregas/?" + P.parametros(filtros(), estado.pagina)).then(function (d) {
+      pintar(d.results || []);
+      var r = d.resumen || {};
+      $("kpiEntregas").textContent = r.entregas || 0;
+      $("kpiCompletadas").textContent = r.completadas || 0;
+      $("kpiPedidos").textContent = r.pedidos || 0;
+      $("kpiMonto").textContent = P.dinero.format(r.monto || 0);
+
+      estado.siguiente = d.next;
+      $("btnAnterior").disabled = !d.previous;
+      $("btnSiguiente").disabled = !d.next;
+      var n = (d.results || []).length;
+      $("textoPagina").textContent = n
+        ? "Mostrando " + n + " de " + (d.count || 0) + " entregas"
+        : "Sin entregas que coincidan";
+    }).catch(function (e) {
+      P.mensaje("cuerpoTabla", COLS, "No se pudo cargar el historial", e.message, true);
+      ["kpiEntregas", "kpiCompletadas", "kpiPedidos", "kpiMonto", "textoPagina"]
+        .forEach(function (id) { $(id).textContent = "—"; });
+    });
+  }
+
+  function detalle(numero) {
+    P.abrirModal("Folio #" + numero);
+    P.pedir("/entregas/" + numero + "/").then(function (e) {
+      var pedidos = (e.pedidos || []).map(function (p) {
+        return '<tr><td class="folio">#' + p.num + "</td>" +
+          "<td>" + P.escapar(p.establecimiento || "—") + "</td>" +
+          "<td>" + P.escapar(p.zona || "—") + "</td>" +
+          '<td class="num">' + P.dinero.format(p.total || 0) + "</td>" +
+          "<td>" + P.etiqueta(p.estado, p.estado_tono) + "</td></tr>";
+      }).join("");
+
+      var paradas = (e.paradas || []).map(function (p) {
+        return "<tr><td>" + P.escapar(p.establecimiento || "—") + "</td>" +
+          "<td>" + P.aFecha(p.fecha_entrega) + "</td>" +
+          "<td>" + P.escapar(p.hora_entrega || "—") + "</td></tr>";
+      }).join("");
+
+      $("cuerpoModal").innerHTML =
+        '<div class="ficha">' +
+          "<div><span>Creación</span><strong>" + P.aFecha(e.fecha_creacion) + "</strong></div>" +
+          "<div><span>Entrega</span><strong>" + P.aFechaHora(e.fecha_entrega) + "</strong></div>" +
+          "<div><span>Repartidor</span><strong>" + P.escapar(e.repartidor || "—") + "</strong></div>" +
+          "<div><span>Ruta</span><strong>" + P.escapar(e.ruta || "Sin asignar") + "</strong></div>" +
+          "<div><span>Estado</span><strong>" + P.etiqueta(e.estado, e.estado_tono) + "</strong></div>" +
+          "<div><span>Duración</span><strong>" +
+            (e.dias_en_ruta === null || e.dias_en_ruta === undefined
+              ? "En curso"
+              : e.dias_en_ruta + (e.dias_en_ruta === 1 ? " día" : " días")) +
+            "</strong></div>" +
+        "</div>" +
+        '<p class="subtitulo">Pedidos incluidos</p>' +
+        (pedidos
+          ? '<table><thead><tr><th>Folio</th><th>Establecimiento</th><th>Zona</th>' +
+            '<th class="num">Total</th><th>Estado</th></tr></thead><tbody>' +
+            pedidos + "</tbody></table>"
+          : '<p class="aviso">Esta entrega no tiene pedidos asignados.</p>') +
+        '<p class="subtitulo">Paradas confirmadas</p>' +
+        (paradas
+          ? "<table><thead><tr><th>Establecimiento</th><th>Fecha</th><th>Hora</th>" +
+            "</tr></thead><tbody>" + paradas + "</tbody></table>"
+          : '<p class="aviso">Aún no hay paradas confirmadas.</p>') +
+        '<div class="totales">' +
+          '<div class="final"><span>Monto distribuido</span><strong>' +
+            P.dinero.format(e.monto || 0) + "</strong></div>" +
+        "</div>";
+    }).catch(function (err) {
+      $("cuerpoModal").innerHTML =
+        '<p class="aviso error"><strong>No se pudo abrir la entrega</strong>' +
+        P.escapar(err.message) + "</p>";
+    });
+  }
+
+  $("btnAplicar").addEventListener("click", function () { estado.pagina = 1; cargar(); });
+  $("btnLimpiar").addEventListener("click", function () {
+    ["fechaInicio", "fechaFin", "repartidor", "estado"]
+      .forEach(function (id) { $(id).value = ""; });
+    $("campoFecha").value = "creacion";
+    estado.pagina = 1; cargar();
+  });
+  $("btnAnterior").addEventListener("click", function () {
+    if (estado.pagina > 1) { estado.pagina--; cargar(); }
+  });
+  $("btnSiguiente").addEventListener("click", function () {
+    if (estado.siguiente) { estado.pagina++; cargar(); }
+  });
+  $("cuerpoTabla").addEventListener("click", function (e) {
+    var f = e.target.closest("tr[data-clave]");
+    if (f) { detalle(f.dataset.clave); }
+  });
+  $("cuerpoTabla").addEventListener("keydown", function (e) {
+    if (e.key !== "Enter") { return; }
+    var f = e.target.closest("tr[data-clave]");
+    if (f) { detalle(f.dataset.clave); }
+  });
+
+  P.pedir("/catalogos/").then(function (d) {
+    P.llenarSelect("repartidor", d.repartidores, "Todos");
+    P.llenarSelect("estado", d.estados_entrega, "Todos");
+  }).catch(function () { /* los filtros quedan en "Todos" */ });
+
+  cargar();
+})();
+</script>
+{% endblock %}

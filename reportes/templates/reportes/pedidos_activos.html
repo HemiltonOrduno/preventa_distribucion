@@ -1,149 +1,313 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pedidos Activos - Administrador</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: Arial, Helvetica, sans-serif; background: #f0f2f5; padding: 24px; }
-        h1 { color: #1a237e; font-size: 20px; margin-bottom: 4px; }
-        .subtitulo { color: #666; font-size: 13px; margin-bottom: 20px; }
-        .resumen {
-            display: flex; gap: 16px; margin-bottom: 20px;
-        }
-        .tarjeta-resumen {
-            background: white; border-radius: 8px; padding: 16px 24px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        .tarjeta-resumen .numero { font-size: 26px; font-weight: bold; color: #1a237e; }
-        .tarjeta-resumen .etiqueta { font-size: 12px; color: #666; }
+{% extends "reportes/base_panel.html" %}
 
-        .filtros { margin-bottom: 14px; }
-        .filtros select {
-            padding: 8px; border-radius: 6px; border: 1px solid #ccc; font-size: 13px;
-        }
+{% block titulo %}Pedidos activos{% endblock %}
+{% block encabezado %}Pedidos activos{% endblock %}
+{% block subtitulo %}Monitor de pedidos en curso — RF49{% endblock %}
+{% block titulo_modal %}Detalle del pedido{% endblock %}
 
-        table {
-            width: 100%; background: white; border-collapse: collapse;
-            border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        th, td { padding: 10px 12px; text-align: left; font-size: 13px; }
-        th { background: #1a237e; color: white; }
-        tr:nth-child(even) { background: #f7f7f9; }
+{% block estilos %}
+.tablero{display:grid;gap:14px;margin-bottom:20px;
+  grid-template-columns:repeat(auto-fit,minmax(186px,1fr))}
+.casilla{padding:15px 17px;background:var(--superficie);border:1px solid var(--borde);
+  border-radius:var(--radio);box-shadow:var(--sombra);cursor:pointer;
+  text-align:left;font-family:inherit;transition:border-color .15s,transform .12s}
+.casilla:hover{transform:translateY(-1px)}
+.casilla:focus-visible{outline:2px solid var(--primario);outline-offset:2px}
+.casilla.seleccionada{border-color:var(--primario);box-shadow:0 0 0 2px rgba(42,38,64,.14)}
+.casilla strong{display:block;margin-top:9px;font-size:27px;font-weight:680;
+  letter-spacing:-.4px;font-variant-numeric:tabular-nums}
+.casilla small{display:block;margin-top:2px;font-size:12px;color:var(--texto-tenue)}
 
-        .badge {
-            padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
-        }
-        .badge-pendiente { background: #fff3e0; color: #e65100; }
-        .badge-proceso { background: #e3f2fd; color: #1565c0; }
-        .badge-registrado { background: #e8f5e9; color: #2e7d32; }
-        .badge-surtido { background: #ede7f6; color: #5e35b1; }
-    </style>
-</head>
-<body>
-    <h1>Estado Actual de Pedidos Activos</h1>
-    <p class="subtitulo">RF49 — Vista de supervisión para administrador</p>
+tbody tr.alerta{background:#FDF6EC}
+tbody tr.alerta:hover{background:#FAEFDF}
+.dias{font-weight:650;font-variant-numeric:tabular-nums}
+.dias.tarde{color:var(--peligro)}
+.sin-asignar{color:var(--texto-tenue);font-style:italic}
 
-    <div class="resumen" id="resumen">
-        <div class="tarjeta-resumen">
-            <div class="numero" id="total-activos">--</div>
-            <div class="etiqueta">Pedidos activos</div>
-        </div>
+.barra-monitor{display:flex;justify-content:space-between;align-items:center;
+  gap:14px;flex-wrap:wrap;margin-bottom:16px}
+.reloj{font-size:17px;color:var(--texto);font-weight:550;line-height:1.6}
+.reloj .antiguo{color:var(--peligro);font-weight:700}
+.auto{display:flex;align-items:center;gap:8px;font-size:13.5px;
+  color:var(--texto-tenue);min-height:44px}
+.auto input{width:18px;height:18px}
+{% endblock %}
+
+{% block contenido %}
+<div class="barra-monitor">
+  <p class="reloj" id="reloj">—</p>
+  <label class="auto" for="autoRefresco">
+    <input type="checkbox" id="autoRefresco" checked>
+    Actualizar automáticamente cada 60 s
+  </label>
+</div>
+
+<section class="indicadores" aria-label="Situación general">
+  <article class="indicador">
+    <span>Pedidos activos</span><strong id="kpiActivos">—</strong>
+  </article>
+  <article class="indicador verde">
+    <span>Monto comprometido</span><strong id="kpiMonto">—</strong>
+  </article>
+  <article class="indicador ambar">
+    <span>Sin entrega asignada</span><strong id="kpiSinEntrega">—</strong>
+  </article>
+  <article class="indicador rojo">
+    <span>Rezagados</span><strong id="kpiRezagados">—</strong>
+  </article>
+</section>
+
+<section class="tablero" id="tablero" aria-label="Pedidos por estado"></section>
+
+<section class="panel filtros" aria-labelledby="tituloFiltros">
+  <p class="filtros-titulo" id="tituloFiltros">Acotar el monitor</p>
+  <div class="rejilla">
+    <div class="campo">
+      <label for="zona">Zona</label>
+      <select id="zona"><option value="">Todas</option></select>
     </div>
-
-    <div class="filtros">
-        <select id="filtro-zona" onchange="filtrar()">
-            <option value="">Todas las zonas</option>
-        </select>
-        <select id="filtro-estado" onchange="filtrar()">
-            <option value="">Todos los estados</option>
-        </select>
+    <div class="campo">
+      <label for="vendedor">Vendedor</label>
+      <select id="vendedor"><option value="">Todos</option></select>
     </div>
+    <div class="campo">
+      <label for="situacion">Situación</label>
+      <select id="situacion">
+        <option value="">Todos</option>
+        <option value="sin_entrega">Sin entrega asignada</option>
+        <option value="rezagados">Solo rezagados</option>
+      </select>
+    </div>
+  </div>
+  <div class="acciones">
+    <button class="boton boton-principal" id="btnAplicar">Aplicar</button>
+    <button class="boton boton-neutro" id="btnLimpiar">Limpiar todo</button>
+  </div>
+</section>
 
+<section class="panel">
+  <div class="envoltura-tabla">
     <table>
-        <thead>
-            <tr>
-                <th>Pedido</th><th>Fecha</th><th>Establecimiento</th><th>Zona</th>
-                <th>Vendedor</th><th>Estado</th><th>Total</th>
-            </tr>
-        </thead>
-        <tbody id="cuerpo-tabla">
-            <tr><td colspan="7">Cargando...</td></tr>
-        </tbody>
+      <caption>Pedidos en curso — los más antiguos primero</caption>
+      <thead>
+        <tr>
+          <th scope="col">Folio</th>
+          <th scope="col">Fecha</th>
+          <th scope="col" class="num">Días</th>
+          <th scope="col">Establecimiento</th>
+          <th scope="col">Zona</th>
+          <th scope="col">Vendedor</th>
+          <th scope="col" class="num">Total</th>
+          <th scope="col">Estado</th>
+          <th scope="col">Entrega</th>
+        </tr>
+      </thead>
+      <tbody id="cuerpoTabla">
+        <tr><td colspan="9" class="aviso"><span class="girando"></span></td></tr>
+      </tbody>
     </table>
+  </div>
+  <div class="paginacion">
+    <p id="textoPagina">—</p>
+    <div class="acciones pegada">
+      <button class="boton boton-neutro" id="btnAnterior" disabled>Anterior</button>
+      <button class="boton boton-neutro" id="btnSiguiente" disabled>Siguiente</button>
+    </div>
+  </div>
+</section>
+{% endblock %}
 
-    <script>
-        let pedidosCompletos = [];
+{% block script %}
+<script>
+(function () {
+  "use strict";
+  var P = Panel, $ = P.$;
+  var COLS = 9;
+  var estado = { pagina: 1, siguiente: null, filtroEstado: "", temporizador: null };
 
-        function claseBadge(estado) {
-            if (estado.includes('Pendiente')) return 'badge-pendiente';
-            if (estado.includes('proceso')) return 'badge-proceso';
-            if (estado.includes('Registrado')) return 'badge-registrado';
-            if (estado.includes('Surtido')) return 'badge-surtido';
-            return '';
-        }
+  var hora = new Intl.DateTimeFormat("es-MX", {
+    hour: "2-digit", minute: "2-digit", second: "2-digit"
+  });
 
-        function renderTabla(pedidos) {
-            const cuerpo = document.getElementById('cuerpo-tabla');
-            if (pedidos.length === 0) {
-                cuerpo.innerHTML = '<tr><td colspan="7">No hay pedidos activos con ese filtro.</td></tr>';
-                return;
-            }
-            cuerpo.innerHTML = pedidos.map(function(p) {
-                return '<tr>' +
-                    '<td>#' + p.pedido_id + '</td>' +
-                    '<td>' + p.fecha + '</td>' +
-                    '<td>' + p.establecimiento_nombre + '</td>' +
-                    '<td>' + p.zona_nombre + '</td>' +
-                    '<td>' + p.vendedor + '</td>' +
-                    '<td><span class="badge ' + claseBadge(p.estado) + '">' + p.estado + '</span></td>' +
-                    '<td>$' + p.total.toFixed(2) + '</td>' +
-                    '</tr>';
-            }).join('');
-        }
+  function filtros() {
+    var situacion = $("situacion").value;
+    return {
+      estado: estado.filtroEstado,
+      zona: $("zona").value,
+      vendedor: $("vendedor").value,
+      sin_entrega: situacion === "sin_entrega" ? "1" : "",
+      rezagados: situacion === "rezagados" ? "1" : ""
+    };
+  }
 
-        function llenarFiltros(pedidos) {
-            const zonas = pedidos.map(function(p) { return p.zona_nombre; })
-                .filter(function(v, i, arr) { return arr.indexOf(v) === i; });
-            const estados = pedidos.map(function(p) { return p.estado; })
-                .filter(function(v, i, arr) { return arr.indexOf(v) === i; });
+  function pintarTablero(lista) {
+    $("tablero").innerHTML = (lista || []).map(function (e) {
+      var activa = estado.filtroEstado === e.estado_id;
+      return '<button type="button" class="casilla' +
+        (activa ? " seleccionada" : "") + '" data-estado="' + e.estado_id + '"' +
+        (activa ? ' aria-pressed="true"' : ' aria-pressed="false"') + ">" +
+        P.etiqueta(e.estado, e.tono) +
+        "<strong>" + e.pedidos + "</strong>" +
+        "<small>" + (activa ? "Filtrando por este estado" : "Clic para filtrar") +
+        "</small></button>";
+    }).join("");
+  }
 
-            const selZona = document.getElementById('filtro-zona');
-            zonas.forEach(function(z) {
-                const opt = document.createElement('option');
-                opt.value = z; opt.textContent = z;
-                selZona.appendChild(opt);
-            });
+  function pintar(lista, umbral) {
+    if (!lista.length) {
+      P.mensaje("cuerpoTabla", COLS, "Sin pedidos activos",
+        "Todo lo registrado ya fue entregado o cancelado.");
+      return;
+    }
+    $("cuerpoTabla").innerHTML = lista.map(function (p) {
+      var dias = p.antiguedad_dias === null ? "—" : p.antiguedad_dias;
+      return '<tr tabindex="0" data-clave="' + p.num + '"' +
+        (p.rezagado ? ' class="alerta"' : "") + ">" +
+        '<td class="folio">#' + p.num + "</td>" +
+        "<td>" + P.aFecha(p.fecha) + "</td>" +
+        '<td class="num"><span class="dias' + (p.rezagado ? " tarde" : "") +
+          '" title="' + (p.rezagado ? "Lleva " + dias + " días sin cerrarse" : "") +
+          '">' + dias + "</span></td>" +
+        "<td>" + P.escapar(p.establecimiento || "—") + "</td>" +
+        "<td>" + P.escapar(p.zona || "—") + "</td>" +
+        "<td>" + P.escapar(p.vendedor || "—") + "</td>" +
+        '<td class="num"><strong>' + P.dinero.format(p.total || 0) + "</strong></td>" +
+        "<td>" + P.etiqueta(p.estado, p.estado_tono) + "</td>" +
+        "<td>" + (p.tiene_entrega
+          ? "#" + p.entrega_num + " " +
+            P.etiqueta(p.estado_entrega, p.estado_entrega_tono)
+          : '<span class="sin-asignar">Sin asignar</span>') +
+        "</td></tr>";
+    }).join("");
+  }
 
-            const selEstado = document.getElementById('filtro-estado');
-            estados.forEach(function(e) {
-                const opt = document.createElement('option');
-                opt.value = e; opt.textContent = e;
-                selEstado.appendChild(opt);
-            });
-        }
+  function cargar() {
+    P.cargando("cuerpoTabla", COLS);
+    P.pedir("/pedidos-activos/?" + P.parametros(filtros(), estado.pagina))
+      .then(function (d) {
+        var r = d.resumen || {};
+        pintar(d.results || [], r.dias_umbral);
+        pintarTablero(r.por_estado);
 
-        function filtrar() {
-            const zona = document.getElementById('filtro-zona').value;
-            const estado = document.getElementById('filtro-estado').value;
-            const filtrados = pedidosCompletos.filter(function(p) {
-                return (!zona || p.zona_nombre === zona) && (!estado || p.estado === estado);
-            });
-            renderTabla(filtrados);
-        }
+        $("kpiActivos").textContent = r.pedidos || 0;
+        $("kpiMonto").textContent = P.dinero.format(r.monto || 0);
+        $("kpiSinEntrega").textContent = r.sin_entrega || 0;
+        $("kpiRezagados").textContent = r.rezagados || 0;
 
-        fetch('/api/reportes/pedidos-activos/api/')
-            .then(function(res) { return res.json(); })
-            .then(function(data) {
-                pedidosCompletos = data.pedidos;
-                document.getElementById('total-activos').textContent = data.total_activos;
-                llenarFiltros(data.pedidos);
-                renderTabla(data.pedidos);
-            })
-            .catch(function() {
-                document.getElementById('cuerpo-tabla').innerHTML = '<tr><td colspan="7">Error al cargar los datos.</td></tr>';
-            });
-    </script>
-</body>
-</html>
+        $("reloj").innerHTML = "Actualizado a las " +
+          P.escapar(hora.format(new Date(r.actualizado))) +
+          " · rezagado = " + (r.dias_umbral || 3) + " días o más" +
+          (r.antiguedad_maxima
+            ? ' · <span class="antiguo">el más antiguo lleva ' +
+              r.antiguedad_maxima + " días</span>"
+            : "");
+
+        estado.siguiente = d.next;
+        $("btnAnterior").disabled = !d.previous;
+        $("btnSiguiente").disabled = !d.next;
+        var n = (d.results || []).length;
+        $("textoPagina").textContent = n
+          ? "Mostrando " + n + " de " + (d.count || 0) + " pedidos activos"
+          : "Sin pedidos que coincidan";
+      }).catch(function (e) {
+        P.mensaje("cuerpoTabla", COLS, "No se pudo cargar el monitor",
+          e.message, true);
+        ["kpiActivos", "kpiMonto", "kpiSinEntrega", "kpiRezagados", "textoPagina"]
+          .forEach(function (id) { $(id).textContent = "—"; });
+      });
+  }
+
+  function detalle(num) {
+    P.abrirModal("Folio #" + num);
+    P.pedir("/pedidos/" + num + "/").then(function (p) {
+      var filas = (p.detalles || []).map(function (d) {
+        return "<tr><td>" + P.escapar(d.producto) + "</td>" +
+          '<td class="num">' + d.cantidad + "</td>" +
+          '<td class="num">' + P.dinero.format(d.precio_unitario) + "</td>" +
+          '<td class="num">' + P.dinero.format(d.importe) + "</td></tr>";
+      }).join("");
+
+      $("cuerpoModal").innerHTML =
+        '<div class="ficha">' +
+          "<div><span>Fecha</span><strong>" + P.aFechaHora(p.fecha) + "</strong></div>" +
+          "<div><span>Establecimiento</span><strong>" +
+            P.escapar(p.establecimiento || "—") + "</strong></div>" +
+          "<div><span>Zona</span><strong>" + P.escapar(p.zona || "—") + "</strong></div>" +
+          "<div><span>Vendedor</span><strong>" +
+            P.escapar(p.vendedor || "—") + "</strong></div>" +
+          "<div><span>Estado</span><strong>" +
+            P.etiqueta(p.estado, p.estado_tono) + "</strong></div>" +
+          "<div><span>Entrega</span><strong>" +
+            (p.entrega_num ? "#" + p.entrega_num : "Sin asignar") + "</strong></div>" +
+        "</div>" +
+        (filas
+          ? '<table><thead><tr><th>Producto</th><th class="num">Cant.</th>' +
+            '<th class="num">P. unitario</th><th class="num">Importe</th>' +
+            "</tr></thead><tbody>" + filas + "</tbody></table>"
+          : '<p class="aviso">Este pedido no tiene productos registrados.</p>') +
+        '<div class="totales">' +
+          "<div><span>Subtotal</span><strong>" +
+            P.dinero.format(p.subtotal || 0) + "</strong></div>" +
+          "<div><span>IVA</span><strong>" +
+            P.dinero.format(p.iva || 0) + "</strong></div>" +
+          '<div class="final"><span>Total</span><strong>' +
+            P.dinero.format(p.total || 0) + "</strong></div>" +
+        "</div>";
+    }).catch(function (e) {
+      $("cuerpoModal").innerHTML =
+        '<p class="aviso error"><strong>No se pudo abrir el pedido</strong>' +
+        P.escapar(e.message) + "</p>";
+    });
+  }
+
+  function programarRefresco() {
+    if (estado.temporizador) { clearInterval(estado.temporizador); }
+    if ($("autoRefresco").checked) {
+      estado.temporizador = setInterval(cargar, 60000);
+    }
+  }
+
+  $("tablero").addEventListener("click", function (e) {
+    var casilla = e.target.closest("button[data-estado]");
+    if (!casilla) { return; }
+    var elegido = casilla.dataset.estado;
+    // Segundo clic sobre el mismo estado quita el filtro.
+    estado.filtroEstado = estado.filtroEstado === elegido ? "" : elegido;
+    estado.pagina = 1;
+    cargar();
+  });
+
+  $("btnAplicar").addEventListener("click", function () { estado.pagina = 1; cargar(); });
+  $("btnLimpiar").addEventListener("click", function () {
+    ["zona", "vendedor", "situacion"].forEach(function (id) { $(id).value = ""; });
+    estado.filtroEstado = "";
+    estado.pagina = 1;
+    cargar();
+  });
+  $("btnAnterior").addEventListener("click", function () {
+    if (estado.pagina > 1) { estado.pagina--; cargar(); }
+  });
+  $("btnSiguiente").addEventListener("click", function () {
+    if (estado.siguiente) { estado.pagina++; cargar(); }
+  });
+  $("autoRefresco").addEventListener("change", programarRefresco);
+  $("cuerpoTabla").addEventListener("click", function (e) {
+    var f = e.target.closest("tr[data-clave]");
+    if (f) { detalle(f.dataset.clave); }
+  });
+  $("cuerpoTabla").addEventListener("keydown", function (e) {
+    if (e.key !== "Enter") { return; }
+    var f = e.target.closest("tr[data-clave]");
+    if (f) { detalle(f.dataset.clave); }
+  });
+
+  P.pedir("/catalogos/").then(function (d) {
+    P.llenarSelect("zona", d.zonas, "Todas");
+    P.llenarSelect("vendedor", d.vendedores, "Todos");
+  }).catch(function () { /* los filtros quedan en "Todos" */ });
+
+  cargar();
+  programarRefresco();
+})();
+</script>
+{% endblock %}

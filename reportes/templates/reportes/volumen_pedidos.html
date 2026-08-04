@@ -1,0 +1,286 @@
+{% extends "reportes/base_panel.html" %}
+
+{% block titulo %}Volumen de pedidos{% endblock %}
+{% block encabezado %}Volumen de pedidos{% endblock %}
+{% block subtitulo %}Comportamiento de la demanda por periodo — RF50{% endblock %}
+
+{% block estilos %}
+.grafica{padding:20px 22px 14px;margin-bottom:20px}
+.grafica-titulo{display:flex;justify-content:space-between;align-items:baseline;
+  gap:14px;flex-wrap:wrap;margin-bottom:16px}
+.grafica-titulo h2{font-size:15px;font-weight:650;text-transform:uppercase;
+  letter-spacing:.6px;color:var(--texto-tenue)}
+.leyenda{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;
+  color:var(--texto-tenue)}
+.leyenda span{display:flex;align-items:center;gap:6px}
+.leyenda i{width:11px;height:11px;border-radius:3px;display:inline-block}
+.lienzo-grafica{width:100%;overflow-x:auto}
+.lienzo-grafica svg{display:block;min-width:520px;width:100%;height:auto}
+.barra-serie{transition:opacity .12s}
+.barra-serie:hover{opacity:.78}
+.eje{font-size:11px;fill:var(--texto-tenue)}
+.valor-barra{font-size:11px;font-weight:650;fill:var(--texto)}
+.malla{stroke:var(--borde);stroke-width:1}
+{% endblock %}
+
+{% block contenido %}
+<section class="panel filtros" aria-labelledby="tituloFiltros">
+  <p class="filtros-titulo" id="tituloFiltros">Parámetros del reporte</p>
+  <div class="rejilla">
+    <div class="campo">
+      <label for="agrupacion">Agrupar por</label>
+      <select id="agrupacion">
+        <option value="dia">Día</option>
+        <option value="semana">Semana</option>
+        <option value="mes">Mes</option>
+      </select>
+    </div>
+    <div class="campo">
+      <label for="fechaInicio">Desde</label>
+      <input type="date" id="fechaInicio">
+    </div>
+    <div class="campo">
+      <label for="fechaFin">Hasta</label>
+      <input type="date" id="fechaFin">
+    </div>
+    <div class="campo">
+      <label for="zona">Zona</label>
+      <select id="zona"><option value="">Todas</option></select>
+    </div>
+    <div class="campo">
+      <label for="vendedor">Vendedor</label>
+      <select id="vendedor"><option value="">Todos</option></select>
+    </div>
+  </div>
+  <div class="acciones">
+    <button class="boton boton-principal" id="btnAplicar">Generar reporte</button>
+    <button class="boton boton-neutro" id="btnLimpiar">Limpiar</button>
+  </div>
+</section>
+
+<section class="indicadores" aria-label="Resumen del periodo">
+  <article class="indicador">
+    <span>Pedidos totales</span><strong id="kpiPedidos">—</strong>
+  </article>
+  <article class="indicador verde">
+    <span>Monto total</span><strong id="kpiMonto">—</strong>
+  </article>
+  <article class="indicador ambar">
+    <span>Promedio por periodo</span><strong id="kpiMedia">—</strong>
+  </article>
+  <article class="indicador">
+    <span>Periodo pico</span><strong class="texto" id="kpiPico">—</strong>
+  </article>
+</section>
+
+<section class="panel grafica">
+  <div class="grafica-titulo">
+    <h2>Pedidos por periodo</h2>
+    <div class="leyenda">
+      <span><i style="background:#2A2640"></i> Pedidos del periodo</span>
+      <span><i style="background:#10B981"></i> Entregados</span>
+      <span><i style="background:#991B1B"></i> Cancelados</span>
+    </div>
+  </div>
+  <div class="lienzo-grafica" id="lienzo">
+    <p class="aviso"><span class="girando"></span></p>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="envoltura-tabla">
+    <table>
+      <caption>Desglose por periodo</caption>
+      <thead>
+        <tr>
+          <th scope="col">Periodo</th>
+          <th scope="col" class="num">Pedidos</th>
+          <th scope="col" class="num">Entregados</th>
+          <th scope="col" class="num">Cancelados</th>
+          <th scope="col" class="num">% cumplimiento</th>
+          <th scope="col" class="num">Monto</th>
+          <th scope="col" class="num">Ticket promedio</th>
+        </tr>
+      </thead>
+      <tbody id="cuerpoTabla">
+        <tr><td colspan="7" class="aviso"><span class="girando"></span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+
+{% block script %}
+<script>
+(function () {
+  "use strict";
+  var P = Panel, $ = P.$;
+  var COLS = 7;
+
+  function filtros() {
+    return {
+      agrupacion: $("agrupacion").value,
+      fecha_inicio: $("fechaInicio").value,
+      fecha_fin: $("fechaFin").value,
+      zona: $("zona").value,
+      vendedor: $("vendedor").value
+    };
+  }
+
+  /* Grafica de barras en SVG puro: el sistema debe operar sin internet,
+     asi que no se carga ninguna libreria externa. */
+  function dibujar(periodos) {
+    if (!periodos.length) {
+      $("lienzo").innerHTML =
+        '<p class="aviso"><strong>Sin datos para graficar</strong>' +
+        "Ajusta el rango de fechas.</p>";
+      return;
+    }
+
+    var ancho = Math.max(560, periodos.length * 74);
+    var alto = 300;
+    var margen = { arriba: 26, derecha: 14, abajo: 46, izquierda: 52 };
+    var util = {
+      ancho: ancho - margen.izquierda - margen.derecha,
+      alto: alto - margen.arriba - margen.abajo
+    };
+
+    var tope = Math.max.apply(null, periodos.map(function (p) {
+      return p.pedidos;
+    }));
+    if (tope <= 0) { tope = 1; }
+    // Redondea hacia arriba para que la escala termine en un numero limpio.
+    var paso = Math.max(1, Math.ceil(tope / 4));
+    var escalaTope = paso * 4;
+
+    var anchoRanura = util.ancho / periodos.length;
+    var anchoBarra = Math.min(38, anchoRanura * 0.56);
+
+    var piezas = [];
+
+    // Malla horizontal y eje Y
+    for (var i = 0; i <= 4; i++) {
+      var valor = paso * i;
+      var y = margen.arriba + util.alto - (valor / escalaTope) * util.alto;
+      piezas.push('<line class="malla" x1="' + margen.izquierda + '" y1="' + y +
+        '" x2="' + (margen.izquierda + util.ancho) + '" y2="' + y + '"/>');
+      piezas.push('<text class="eje" x="' + (margen.izquierda - 9) + '" y="' +
+        (y + 4) + '" text-anchor="end">' + valor + "</text>");
+    }
+
+    periodos.forEach(function (p, indice) {
+      var centro = margen.izquierda + anchoRanura * (indice + 0.5);
+      var x = centro - anchoBarra / 2;
+      var altoBarra = (p.pedidos / escalaTope) * util.alto;
+      var y = margen.arriba + util.alto - altoBarra;
+
+      // Barra total
+      piezas.push('<rect class="barra-serie" x="' + x + '" y="' + y +
+        '" width="' + anchoBarra + '" height="' + Math.max(altoBarra, 1) +
+        '" rx="3" fill="#2A2640"><title>' + P.escapar(p.etiqueta) + ": " +
+        p.pedidos + " pedidos · " + P.dinero.format(p.monto || 0) +
+        "</title></rect>");
+
+      // Segmentos de entregados y cancelados apilados en la base
+      var acumulado = 0;
+      [
+        { n: p.entregados, color: "#10B981", texto: "entregados" },
+        { n: p.cancelados, color: "#991B1B", texto: "cancelados" }
+      ].forEach(function (serie) {
+        if (!serie.n) { return; }
+        var altoSerie = (serie.n / escalaTope) * util.alto;
+        var ySerie = margen.arriba + util.alto - acumulado - altoSerie;
+        piezas.push('<rect class="barra-serie" x="' + x + '" y="' + ySerie +
+          '" width="' + anchoBarra + '" height="' + Math.max(altoSerie, 1) +
+          '" rx="3" fill="' + serie.color + '"><title>' + serie.n + " " +
+          serie.texto + "</title></rect>");
+        acumulado += altoSerie;
+      });
+
+      // Valor encima de la barra
+      piezas.push('<text class="valor-barra" x="' + centro + '" y="' +
+        (y - 7) + '" text-anchor="middle">' + p.pedidos + "</text>");
+
+      // Etiqueta del eje X
+      piezas.push('<text class="eje" x="' + centro + '" y="' +
+        (margen.arriba + util.alto + 19) + '" text-anchor="middle">' +
+        P.escapar(p.etiqueta) + "</text>");
+    });
+
+    // Eje X
+    piezas.push('<line class="malla" x1="' + margen.izquierda + '" y1="' +
+      (margen.arriba + util.alto) + '" x2="' + (margen.izquierda + util.ancho) +
+      '" y2="' + (margen.arriba + util.alto) + '"/>');
+
+    $("lienzo").innerHTML =
+      '<svg viewBox="0 0 ' + ancho + " " + alto + '" role="img" ' +
+      'aria-label="Gráfica de pedidos por periodo">' + piezas.join("") + "</svg>";
+  }
+
+  function pintarTabla(periodos) {
+    if (!periodos.length) {
+      P.mensaje("cuerpoTabla", COLS, "Sin resultados",
+        "No hay pedidos en el rango seleccionado.");
+      return;
+    }
+    $("cuerpoTabla").innerHTML = periodos.map(function (p) {
+      var cumplimiento = p.pedidos
+        ? Math.round((p.entregados / p.pedidos) * 1000) / 10
+        : 0;
+      var claseCumpl = cumplimiento >= 80 ? "verde"
+        : cumplimiento >= 50 ? "ambar" : "rojo";
+      return "<tr><td><strong>" + P.escapar(p.etiqueta) + "</strong></td>" +
+        '<td class="num"><strong>' + p.pedidos + "</strong></td>" +
+        '<td class="num">' + p.entregados + "</td>" +
+        '<td class="num">' + p.cancelados + "</td>" +
+        '<td class="num">' + P.etiqueta(cumplimiento + "%", claseCumpl) + "</td>" +
+        '<td class="num">' + P.dinero.format(p.monto || 0) + "</td>" +
+        '<td class="num">' + P.dinero.format(p.promedio || 0) + "</td></tr>";
+    }).join("");
+  }
+
+  function cargar() {
+    P.cargando("cuerpoTabla", COLS);
+    $("lienzo").innerHTML = '<p class="aviso"><span class="girando"></span></p>';
+
+    P.pedir("/volumen-pedidos/?" + P.parametros(filtros(), 1)).then(function (d) {
+      var periodos = d.periodos || [];
+      dibujar(periodos);
+      pintarTabla(periodos);
+
+      var r = d.resumen || {};
+      $("kpiPedidos").textContent = r.pedidos || 0;
+      $("kpiMonto").textContent = P.dinero.format(r.monto || 0);
+      $("kpiMedia").textContent = (r.media_por_periodo || 0) + " por periodo";
+      $("kpiPico").textContent = r.pico_etiqueta
+        ? r.pico_etiqueta + " · " + r.pico_pedidos + " pedidos"
+        : "Sin datos";
+    }).catch(function (e) {
+      P.mensaje("cuerpoTabla", COLS, "No se pudo generar el reporte",
+        e.message, true);
+      $("lienzo").innerHTML =
+        '<p class="aviso error"><strong>Sin gráfica</strong>' +
+        P.escapar(e.message) + "</p>";
+      ["kpiPedidos", "kpiMonto", "kpiMedia", "kpiPico"]
+        .forEach(function (id) { $(id).textContent = "—"; });
+    });
+  }
+
+  $("btnAplicar").addEventListener("click", cargar);
+  $("agrupacion").addEventListener("change", cargar);
+  $("btnLimpiar").addEventListener("click", function () {
+    ["fechaInicio", "fechaFin", "zona", "vendedor"]
+      .forEach(function (id) { $(id).value = ""; });
+    $("agrupacion").value = "dia";
+    cargar();
+  });
+
+  P.pedir("/catalogos/").then(function (d) {
+    P.llenarSelect("zona", d.zonas, "Todas");
+    P.llenarSelect("vendedor", d.vendedores, "Todos");
+  }).catch(function () { /* los filtros quedan en "Todos" */ });
+
+  cargar();
+})();
+</script>
+{% endblock %}

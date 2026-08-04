@@ -13,5 +13,6 @@ urlpatterns = [
     path('api/rutas/', include('rutas.urls')),
     path('api/entregas/', include('entregas.urls')),
     path('api/reportes/', include('reportes.urls')),
+    path('panel/reportes/', include('reportes.urls_panel')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

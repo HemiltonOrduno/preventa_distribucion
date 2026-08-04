@@ -1,0 +1,291 @@
+{% extends "reportes/base_panel.html" %}
+
+{% block titulo %}Productos más vendidos{% endblock %}
+{% block encabezado %}Productos más vendidos{% endblock %}
+{% block subtitulo %}Ranking del catálogo por unidades y monto — RF54{% endblock %}
+
+{% block estilos %}
+.ranking{padding:20px 22px 16px;margin-bottom:20px}
+.ranking-cabeza{display:flex;justify-content:space-between;align-items:center;
+  gap:14px;flex-wrap:wrap;margin-bottom:16px}
+.ranking-cabeza h2{font-size:15px;font-weight:650;text-transform:uppercase;
+  letter-spacing:.6px;color:var(--texto-tenue)}
+.conmutador{display:flex;gap:0;border:1px solid var(--borde);
+  border-radius:8px;overflow:hidden}
+.conmutador button{min-height:38px;padding:6px 15px;border:0;background:var(--superficie);
+  font-family:inherit;font-size:13px;font-weight:600;color:var(--texto-tenue);
+  cursor:pointer;transition:background .15s,color .15s}
+.conmutador button.activo{background:var(--primario);color:#fff}
+.conmutador button:focus-visible{outline:2px solid var(--primario);outline-offset:-2px}
+.linea{display:grid;grid-template-columns:26px 1fr 132px;gap:12px;
+  align-items:center;margin-bottom:11px}
+.puesto{width:26px;height:26px;border-radius:50%;background:var(--fondo);
+  color:var(--texto-tenue);display:grid;place-items:center;
+  font-size:12px;font-weight:700}
+.puesto.oro{background:#2A2640;color:#fff}
+.linea-nombre{font-size:13.5px;font-weight:600;margin-bottom:4px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.riel{height:11px;border-radius:99px;background:#EEF0F4;overflow:hidden}
+.riel i{display:block;height:100%;border-radius:99px;background:var(--alerta)}
+.linea-monto{text-align:right;font-weight:650;font-size:13.5px;
+  font-variant-numeric:tabular-nums}
+.linea-monto small{display:block;font-weight:500;font-size:11.5px;
+  color:var(--texto-tenue)}
+.indicador strong.texto{font-size:17px;letter-spacing:0;line-height:1.35}
+.podio{font-weight:700;color:var(--primario)}
+tbody tr.riesgo{background:#FDF6EC}
+tbody tr.riesgo:hover{background:#FAEFDF}
+{% endblock %}
+
+{% block contenido %}
+<section class="panel filtros" aria-labelledby="tituloFiltros">
+  <p class="filtros-titulo" id="tituloFiltros">Parámetros del reporte</p>
+  <div class="rejilla">
+    <div class="campo">
+      <label for="fechaInicio">Desde</label>
+      <input type="date" id="fechaInicio">
+    </div>
+    <div class="campo">
+      <label for="fechaFin">Hasta</label>
+      <input type="date" id="fechaFin">
+    </div>
+    <div class="campo">
+      <label for="universo">Qué cuenta como venta</label>
+      <select id="universo">
+        <option value="sin_cancelados">Todo menos cancelados</option>
+        <option value="entregados">Solo entregados</option>
+        <option value="todos">Todos los pedidos</option>
+      </select>
+    </div>
+    <div class="campo">
+      <label for="zona">Zona</label>
+      <select id="zona"><option value="">Todas</option></select>
+    </div>
+    <div class="campo">
+      <label for="vendedor">Vendedor</label>
+      <select id="vendedor"><option value="">Todos</option></select>
+    </div>
+    <div class="campo">
+      <label for="orden">Ordenar por</label>
+      <select id="orden">
+        <option value="unidades">Unidades vendidas</option>
+        <option value="monto">Monto vendido</option>
+        <option value="pedidos">Número de pedidos</option>
+        <option value="nombre">Nombre</option>
+      </select>
+    </div>
+  </div>
+  <div class="acciones">
+    <button class="boton boton-principal" id="btnAplicar">Generar reporte</button>
+    <button class="boton boton-neutro" id="btnLimpiar">Limpiar</button>
+  </div>
+</section>
+
+<section class="indicadores" aria-label="Resumen del catálogo">
+  <article class="indicador">
+    <span>Productos vendidos</span><strong id="kpiProductos">—</strong>
+  </article>
+  <article class="indicador ambar">
+    <span>Unidades totales</span><strong id="kpiUnidades">—</strong>
+  </article>
+  <article class="indicador verde">
+    <span>Monto total</span><strong id="kpiMonto">—</strong>
+  </article>
+  <article class="indicador">
+    <span>Producto líder</span>
+    <strong class="texto" id="kpiLider">—</strong>
+  </article>
+</section>
+
+<section class="panel ranking">
+  <div class="ranking-cabeza">
+    <h2>Top 10 del catálogo</h2>
+    <div class="conmutador" role="group" aria-label="Métrica del ranking">
+      <button type="button" id="porUnidades" class="activo">Por unidades</button>
+      <button type="button" id="porMonto">Por monto</button>
+    </div>
+  </div>
+  <div id="ranking">
+    <p class="aviso"><span class="girando"></span></p>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="envoltura-tabla">
+    <table>
+      <caption>Detalle por producto</caption>
+      <thead>
+        <tr>
+          <th scope="col">#</th>
+          <th scope="col">Producto</th>
+          <th scope="col" class="num">Unidades</th>
+          <th scope="col" class="num">% del total</th>
+          <th scope="col" class="num">Pedidos</th>
+          <th scope="col" class="num">Clientes</th>
+          <th scope="col" class="num">Precio prom.</th>
+          <th scope="col" class="num">Monto</th>
+          <th scope="col" class="num">Stock</th>
+        </tr>
+      </thead>
+      <tbody id="cuerpoTabla">
+        <tr><td colspan="9" class="aviso"><span class="girando"></span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+
+{% block script %}
+<script>
+(function () {
+  "use strict";
+  var P = Panel, $ = P.$;
+  var COLS = 9;
+  var TOPE_RANKING = 10;
+  var metrica = "unidades";
+  var ultimos = [];
+
+  function filtros() {
+    return {
+      fecha_inicio: $("fechaInicio").value,
+      fecha_fin: $("fechaFin").value,
+      universo: $("universo").value,
+      zona: $("zona").value,
+      vendedor: $("vendedor").value,
+      orden: $("orden").value
+    };
+  }
+
+  var miles = new Intl.NumberFormat("es-MX");
+
+  function pintarRanking(lista) {
+    if (!lista.length) {
+      $("ranking").innerHTML =
+        '<p class="aviso"><strong>Sin datos</strong>' +
+        "No hubo ventas en el periodo seleccionado.</p>";
+      return;
+    }
+    var porMonto = metrica === "monto";
+    var ordenada = lista.slice().sort(function (a, b) {
+      return porMonto
+        ? (Number(b.importe) || 0) - (Number(a.importe) || 0)
+        : b.unidades - a.unidades;
+    }).slice(0, TOPE_RANKING);
+
+    var tope = porMonto
+      ? Number(ordenada[0].importe) || 1
+      : ordenada[0].unidades || 1;
+
+    $("ranking").innerHTML = ordenada.map(function (p, indice) {
+      var valor = porMonto ? Number(p.importe) || 0 : p.unidades;
+      var principal = porMonto
+        ? P.dinero.format(valor)
+        : miles.format(valor) + " u";
+      var secundario = porMonto
+        ? miles.format(p.unidades) + " unidades"
+        : P.dinero.format(p.importe || 0);
+      return '<div class="linea">' +
+        '<span class="puesto' + (indice === 0 ? " oro" : "") + '">' +
+          (indice + 1) + "</span>" +
+        "<div>" +
+          '<p class="linea-nombre">' + P.escapar(p.nombre) + "</p>" +
+          '<div class="riel"><i style="width:' +
+            ((valor / tope) * 100) + '%"></i></div>' +
+        "</div>" +
+        '<div class="linea-monto">' + principal +
+          "<small>" + secundario + "</small></div>" +
+        "</div>";
+    }).join("");
+  }
+
+  /* Marca en ambar los productos cuyo stock no cubre lo vendido en el
+     periodo: son los candidatos a quedarse sin existencias. */
+  function enRiesgo(p) {
+    return p.cobertura !== null && p.cobertura !== undefined && p.cobertura < 1;
+  }
+
+  function pintarTabla(lista) {
+    if (!lista.length) {
+      P.mensaje("cuerpoTabla", COLS, "Sin resultados",
+        "No hubo ventas en el periodo seleccionado.");
+      return;
+    }
+    $("cuerpoTabla").innerHTML = lista.map(function (p) {
+      var claseStock = p.stock <= 0 ? "rojo"
+        : enRiesgo(p) ? "ambar" : "verde";
+      return "<tr" + (enRiesgo(p) ? ' class="riesgo"' : "") + ">" +
+        '<td class="podio">' + p.posicion + "</td>" +
+        "<td><strong>" + P.escapar(p.nombre) + "</strong></td>" +
+        '<td class="num"><strong>' + miles.format(p.unidades) + "</strong></td>" +
+        '<td class="num">' + p.parte_unidades + "%</td>" +
+        '<td class="num">' + p.pedidos + "</td>" +
+        '<td class="num">' + p.clientes + "</td>" +
+        '<td class="num">' + P.dinero.format(p.precio_promedio || 0) + "</td>" +
+        '<td class="num"><strong>' + P.dinero.format(p.importe || 0) + "</strong></td>" +
+        '<td class="num">' +
+          P.etiqueta(miles.format(p.stock), claseStock) + "</td></tr>";
+    }).join("");
+  }
+
+  function cargar() {
+    P.cargando("cuerpoTabla", COLS);
+    $("ranking").innerHTML = '<p class="aviso"><span class="girando"></span></p>';
+
+    P.pedir("/productos-vendidos/?" + P.parametros(filtros(), 1))
+      .then(function (d) {
+        ultimos = d.productos || [];
+        pintarRanking(ultimos);
+        pintarTabla(ultimos);
+
+        var r = d.resumen || {};
+        $("kpiProductos").textContent = r.productos || 0;
+        $("kpiUnidades").textContent = miles.format(r.unidades || 0);
+        $("kpiMonto").textContent = P.dinero.format(r.importe || 0);
+        $("kpiLider").textContent = r.lider_nombre
+          ? r.lider_nombre + " · " + r.lider_parte + "%"
+          : "Sin datos";
+      }).catch(function (e) {
+        P.mensaje("cuerpoTabla", COLS, "No se pudo generar el reporte",
+          e.message, true);
+        $("ranking").innerHTML =
+          '<p class="aviso error"><strong>Sin ranking</strong>' +
+          P.escapar(e.message) + "</p>";
+        ["kpiProductos", "kpiUnidades", "kpiMonto", "kpiLider"]
+          .forEach(function (id) { $(id).textContent = "—"; });
+      });
+  }
+
+  function cambiarMetrica(nueva) {
+    metrica = nueva;
+    $("porUnidades").classList.toggle("activo", nueva === "unidades");
+    $("porMonto").classList.toggle("activo", nueva === "monto");
+    pintarRanking(ultimos);
+  }
+
+  $("porUnidades").addEventListener("click", function () {
+    cambiarMetrica("unidades");
+  });
+  $("porMonto").addEventListener("click", function () {
+    cambiarMetrica("monto");
+  });
+
+  $("btnAplicar").addEventListener("click", cargar);
+  $("orden").addEventListener("change", cargar);
+  $("universo").addEventListener("change", cargar);
+  $("btnLimpiar").addEventListener("click", function () {
+    ["fechaInicio", "fechaFin", "zona", "vendedor"]
+      .forEach(function (id) { $(id).value = ""; });
+    $("universo").value = "sin_cancelados";
+    $("orden").value = "unidades";
+    cargar();
+  });
+
+  P.pedir("/catalogos/").then(function (d) {
+    P.llenarSelect("zona", d.zonas, "Todas");
+    P.llenarSelect("vendedor", d.vendedores, "Todos");
+  }).catch(function () { /* los filtros quedan en "Todos" */ });
+
+  cargar();
+})();
+</script>
+{% endblock %}

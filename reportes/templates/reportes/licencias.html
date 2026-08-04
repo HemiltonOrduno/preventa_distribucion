@@ -1,0 +1,125 @@
+{% extends "reportes/base_panel.html" %}
+
+{% block titulo %}Licencias{% endblock %}
+{% block encabezado %}Control de licencias{% endblock %}
+{% block subtitulo %}Vigencias del personal que opera vehículos — apoyo al RF58{% endblock %}
+
+{% block estilos %}
+.nota{padding:14px 18px;margin-bottom:20px;font-size:13.5px;
+  color:var(--texto-tenue)}
+.nota strong{color:var(--texto)}
+tbody tr.vencida{background:#FBEAEA}
+tbody tr.vencida:hover{background:#F7DFDF}
+tbody tr.cerca{background:#FDF6EC}
+tbody tr.cerca:hover{background:#FAEFDF}
+.sin-titular{color:var(--texto-tenue);font-style:italic}
+{% endblock %}
+
+{% block contenido %}
+<section class="indicadores" aria-label="Situación de licencias">
+  <article class="indicador">
+    <span>Licencias registradas</span><strong id="kpiTotal">—</strong>
+  </article>
+  <article class="indicador verde">
+    <span>Asignadas</span><strong id="kpiAsignadas">—</strong>
+  </article>
+  <article class="indicador ambar">
+    <span>Por vencer (30 días)</span><strong id="kpiPorVencer">—</strong>
+  </article>
+  <article class="indicador rojo">
+    <span>Vencidas</span><strong id="kpiVencidas">—</strong>
+  </article>
+</section>
+
+<section class="panel nota">
+  Las licencias se registran desde <strong>Gestión de usuarios</strong>, en el
+  botón de licencia de cada repartidor. Esta pantalla concentra las vigencias
+  para detectar a tiempo las que están por caducar.
+</section>
+
+<section class="panel">
+  <div class="envoltura-tabla">
+    <table>
+      <caption>Licencias ordenadas por vigencia</caption>
+      <thead>
+        <tr>
+          <th scope="col">Código</th>
+          <th scope="col">Número</th>
+          <th scope="col">Tipo</th>
+          <th scope="col">Titular</th>
+          <th scope="col">Rol</th>
+          <th scope="col">Vigencia</th>
+          <th scope="col">Situación</th>
+        </tr>
+      </thead>
+      <tbody id="cuerpoTabla">
+        <tr><td colspan="7" class="aviso"><span class="girando"></span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+
+{% block script %}
+<script>
+(function () {
+  "use strict";
+  var P = Panel, $ = P.$;
+  var COLS = 7;
+
+  function situacion(l) {
+    if (l.vencida) {
+      return P.etiqueta("Vencida hace " + Math.abs(l.dias_restantes) + " días", "rojo");
+    }
+    if (l.por_vencer) {
+      return P.etiqueta("Vence en " + l.dias_restantes + " días", "ambar");
+    }
+    if (l.dias_restantes === null || l.dias_restantes === undefined) {
+      return P.etiqueta("Sin vigencia", "gris");
+    }
+    return P.etiqueta("Vigente", "verde");
+  }
+
+  function pintar(lista) {
+    if (!lista.length) {
+      P.mensaje("cuerpoTabla", COLS, "Sin licencias registradas",
+        "Registra la primera desde Gestión de usuarios.");
+      return;
+    }
+    $("cuerpoTabla").innerHTML = lista.map(function (l) {
+      var clase = l.vencida ? " class=\"vencida\""
+        : l.por_vencer ? " class=\"cerca\"" : "";
+      return "<tr" + clase + ">" +
+        '<td class="folio">' + P.escapar(l.codigo) + "</td>" +
+        "<td><strong>" + P.escapar(l.numlicencia) + "</strong></td>" +
+        "<td>" + P.escapar(l.tipo || "—") + "</td>" +
+        "<td>" + (l.titular
+          ? P.escapar(l.titular)
+          : '<span class="sin-titular">Sin asignar</span>') + "</td>" +
+        "<td>" + (l.rol ? P.etiqueta(l.rol, "gris") : "—") + "</td>" +
+        "<td>" + P.aFecha(l.vigencia) + "</td>" +
+        "<td>" + situacion(l) + "</td></tr>";
+    }).join("");
+  }
+
+  function cargar() {
+    P.cargando("cuerpoTabla", COLS);
+    P.pedirAdmin("/licencias/").then(function (d) {
+      pintar(d.licencias || []);
+      var r = d.resumen || {};
+      $("kpiTotal").textContent = r.licencias || 0;
+      $("kpiAsignadas").textContent = r.asignadas || 0;
+      $("kpiPorVencer").textContent = r.por_vencer || 0;
+      $("kpiVencidas").textContent = r.vencidas || 0;
+    }).catch(function (e) {
+      P.mensaje("cuerpoTabla", COLS, "No se pudo cargar el listado",
+        e.message, true);
+      ["kpiTotal", "kpiAsignadas", "kpiPorVencer", "kpiVencidas"]
+        .forEach(function (id) { $(id).textContent = "—"; });
+    });
+  }
+
+  cargar();
+})();
+</script>
+{% endblock %}

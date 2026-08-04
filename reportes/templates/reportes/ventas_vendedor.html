@@ -1,0 +1,230 @@
+{% extends "reportes/base_panel.html" %}
+
+{% block titulo %}Ventas por vendedor{% endblock %}
+{% block encabezado %}Ventas por vendedor{% endblock %}
+{% block subtitulo %}Desempeño comercial del equipo de preventa — RF51{% endblock %}
+
+{% block estilos %}
+.ranking{padding:20px 22px 16px;margin-bottom:20px}
+.ranking h2{font-size:15px;font-weight:650;text-transform:uppercase;
+  letter-spacing:.6px;color:var(--texto-tenue);margin-bottom:16px}
+.linea{display:grid;grid-template-columns:26px 1fr 118px;gap:12px;
+  align-items:center;margin-bottom:11px}
+.puesto{width:26px;height:26px;border-radius:50%;background:var(--fondo);
+  color:var(--texto-tenue);display:grid;place-items:center;
+  font-size:12px;font-weight:700}
+.puesto.oro{background:#2A2640;color:#fff}
+.linea-nombre{font-size:13.5px;font-weight:600;margin-bottom:4px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.riel{height:11px;border-radius:99px;background:#EEF0F4;overflow:hidden}
+.riel i{display:block;height:100%;border-radius:99px;background:var(--primario)}
+.linea-monto{text-align:right;font-weight:650;font-size:13.5px;
+  font-variant-numeric:tabular-nums}
+.linea-monto small{display:block;font-weight:500;font-size:11.5px;
+  color:var(--texto-tenue)}
+.indicador strong.texto{font-size:17px;letter-spacing:0;line-height:1.35}
+.podio{font-weight:700;color:var(--primario)}
+{% endblock %}
+
+{% block contenido %}
+<section class="panel filtros" aria-labelledby="tituloFiltros">
+  <p class="filtros-titulo" id="tituloFiltros">Parámetros del reporte</p>
+  <div class="rejilla">
+    <div class="campo">
+      <label for="fechaInicio">Desde</label>
+      <input type="date" id="fechaInicio">
+    </div>
+    <div class="campo">
+      <label for="fechaFin">Hasta</label>
+      <input type="date" id="fechaFin">
+    </div>
+    <div class="campo">
+      <label for="zona">Zona</label>
+      <select id="zona"><option value="">Todas</option></select>
+    </div>
+    <div class="campo">
+      <label for="orden">Ordenar por</label>
+      <select id="orden">
+        <option value="monto">Monto vendido</option>
+        <option value="pedidos">Número de pedidos</option>
+        <option value="promedio">Ticket promedio</option>
+        <option value="nombre">Nombre</option>
+      </select>
+    </div>
+  </div>
+  <div class="acciones">
+    <button class="boton boton-principal" id="btnAplicar">Generar reporte</button>
+    <button class="boton boton-neutro" id="btnLimpiar">Limpiar</button>
+  </div>
+</section>
+
+<section class="indicadores" aria-label="Resumen del equipo">
+  <article class="indicador">
+    <span>Vendedores activos</span><strong id="kpiVendedores">—</strong>
+  </article>
+  <article class="indicador verde">
+    <span>Monto vendido</span><strong id="kpiMonto">—</strong>
+  </article>
+  <article class="indicador ambar">
+    <span>Ticket promedio</span><strong id="kpiPromedio">—</strong>
+  </article>
+  <article class="indicador">
+    <span>Mejor vendedor</span>
+    <strong class="texto" id="kpiLider">—</strong>
+  </article>
+</section>
+
+<section class="panel ranking">
+  <h2>Participación en las ventas</h2>
+  <div id="ranking">
+    <p class="aviso"><span class="girando"></span></p>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="envoltura-tabla">
+    <table>
+      <caption>Detalle por vendedor</caption>
+      <thead>
+        <tr>
+          <th scope="col">#</th>
+          <th scope="col">Vendedor</th>
+          <th scope="col" class="num">Visitas</th>
+          <th scope="col" class="num">Pedidos</th>
+          <th scope="col" class="num">Efectividad</th>
+          <th scope="col" class="num">Clientes</th>
+          <th scope="col" class="num">Entregados</th>
+          <th scope="col" class="num">Cancelados</th>
+          <th scope="col" class="num">Ticket prom.</th>
+          <th scope="col" class="num">Monto</th>
+        </tr>
+      </thead>
+      <tbody id="cuerpoTabla">
+        <tr><td colspan="10" class="aviso"><span class="girando"></span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+
+{% block script %}
+<script>
+(function () {
+  "use strict";
+  var P = Panel, $ = P.$;
+  var COLS = 10;
+
+  function filtros() {
+    return {
+      fecha_inicio: $("fechaInicio").value,
+      fecha_fin: $("fechaFin").value,
+      zona: $("zona").value,
+      orden: $("orden").value
+    };
+  }
+
+  function pintarRanking(lista) {
+    if (!lista.length) {
+      $("ranking").innerHTML =
+        '<p class="aviso"><strong>Sin datos</strong>' +
+        "No hay ventas en el periodo seleccionado.</p>";
+      return;
+    }
+    var tope = Math.max.apply(null, lista.map(function (v) {
+      return Number(v.monto) || 0;
+    })) || 1;
+    var total = lista.reduce(function (suma, v) {
+      return suma + (Number(v.monto) || 0);
+    }, 0) || 1;
+
+    $("ranking").innerHTML = lista.map(function (v, indice) {
+      var monto = Number(v.monto) || 0;
+      var ancho = (monto / tope) * 100;
+      var parte = Math.round((monto / total) * 1000) / 10;
+      return '<div class="linea">' +
+        '<span class="puesto' + (indice === 0 ? " oro" : "") + '">' +
+          (indice + 1) + "</span>" +
+        "<div>" +
+          '<p class="linea-nombre">' + P.escapar(v.nombre) + "</p>" +
+          '<div class="riel"><i style="width:' + ancho + '%"></i></div>' +
+        "</div>" +
+        '<div class="linea-monto">' + P.dinero.format(monto) +
+          "<small>" + parte + "% · " + v.pedidos + " pedidos</small></div>" +
+        "</div>";
+    }).join("");
+  }
+
+  function pintarTabla(lista) {
+    if (!lista.length) {
+      P.mensaje("cuerpoTabla", COLS, "Sin resultados",
+        "No hay ventas en el periodo seleccionado.");
+      return;
+    }
+    $("cuerpoTabla").innerHTML = lista.map(function (v) {
+      var efec = v.efectividad;
+      var claseEfec = efec === null ? "gris"
+        : efec >= 80 ? "verde" : efec >= 50 ? "ambar" : "rojo";
+      return "<tr>" +
+        '<td class="podio">' + v.posicion + "</td>" +
+        "<td><strong>" + P.escapar(v.nombre) + "</strong></td>" +
+        '<td class="num">' + v.visitas + "</td>" +
+        '<td class="num"><strong>' + v.pedidos + "</strong></td>" +
+        '<td class="num">' +
+          P.etiqueta(efec === null ? "s/d" : efec + "%", claseEfec) + "</td>" +
+        '<td class="num">' + v.establecimientos + "</td>" +
+        '<td class="num">' + v.entregados + "</td>" +
+        '<td class="num">' + v.cancelados + "</td>" +
+        '<td class="num">' + P.dinero.format(v.promedio || 0) + "</td>" +
+        '<td class="num"><strong>' + P.dinero.format(v.monto || 0) +
+        "</strong></td></tr>";
+    }).join("");
+  }
+
+  function cargar() {
+    P.cargando("cuerpoTabla", COLS);
+    $("ranking").innerHTML = '<p class="aviso"><span class="girando"></span></p>';
+
+    P.pedir("/ventas-vendedor/?" + P.parametros(filtros(), 1)).then(function (d) {
+      var lista = d.vendedores || [];
+      // El ranking siempre se muestra por monto, aunque la tabla vaya
+      // ordenada por otro criterio.
+      var porMonto = lista.slice().sort(function (a, b) {
+        return (Number(b.monto) || 0) - (Number(a.monto) || 0);
+      });
+      pintarRanking(porMonto);
+      pintarTabla(lista);
+
+      var r = d.resumen || {};
+      $("kpiVendedores").textContent = r.vendedores || 0;
+      $("kpiMonto").textContent = P.dinero.format(r.monto || 0);
+      $("kpiPromedio").textContent = P.dinero.format(r.promedio || 0);
+      $("kpiLider").textContent = r.lider_nombre
+        ? r.lider_nombre + " · " + P.dinero.format(r.lider_monto || 0)
+        : "Sin datos";
+    }).catch(function (e) {
+      P.mensaje("cuerpoTabla", COLS, "No se pudo generar el reporte",
+        e.message, true);
+      $("ranking").innerHTML =
+        '<p class="aviso error"><strong>Sin ranking</strong>' +
+        P.escapar(e.message) + "</p>";
+      ["kpiVendedores", "kpiMonto", "kpiPromedio", "kpiLider"]
+        .forEach(function (id) { $(id).textContent = "—"; });
+    });
+  }
+
+  $("btnAplicar").addEventListener("click", cargar);
+  $("orden").addEventListener("change", cargar);
+  $("btnLimpiar").addEventListener("click", function () {
+    ["fechaInicio", "fechaFin", "zona"].forEach(function (id) { $(id).value = ""; });
+    $("orden").value = "monto";
+    cargar();
+  });
+
+  P.pedir("/catalogos/").then(function (d) {
+    P.llenarSelect("zona", d.zonas, "Todas");
+  }).catch(function () { /* el filtro queda en "Todas" */ });
+
+  cargar();
+})();
+</script>
+{% endblock %}
