@@ -18,6 +18,9 @@
             <button class="btn-finalizar-ruta" id="btn-finalizar" onclick="finalizarRuta()">
                 ✓ Finalizar ruta
             </button>
+            <button class="btn-cancelar-modal" id="btn-regresar" onclick="regresarRuta()" style="display:none;">
+                ← Regresar ruta
+            </button>
         </div>
         <div class="ruta-panel__body">
             <div class="ruta-info-bar" id="info-bar" style="display:none;">
@@ -53,9 +56,8 @@
         <div id="modal-productos"></div>
 
         <div class="modal-acciones" id="modal-acciones">
-            <button class="btn-cobro" onclick="abrirCobro()">💳 Registrar cobro</button>
+            <button class="btn-cobro" onclick="abrirCobro()">💳 Registrar cobro y confirmar entrega</button>
             <button class="btn-devolucion" onclick="abrirDevolucion()">↩ Registrar devolución</button>
-            <button class="btn-confirmar" onclick="confirmarEntrega()">✓ Confirmar entrega</button>
             <button class="btn-cancelar-modal" onclick="cerrarModalParada()">Cancelar</button>
         </div>
     </div>

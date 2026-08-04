@@ -50,13 +50,13 @@ BEGIN
 
         IF capacidad_vehiculo > 0 THEN
 
-            SELECT COALESCE(SUM(dp.cantidad * pr.peso), 0) INTO peso_actual
+            SELECT COALESCE(SUM(dp.cantidad * pr.peso), 0) / 1000 INTO peso_actual
             FROM pedido p
             INNER JOIN detalle_pedido dp ON dp.num_pedido = p.num
             INNER JOIN producto pr ON pr.codigo = dp.cod_producto
             WHERE p.entrega = NEW.entrega;
 
-            SELECT COALESCE(SUM(dp.cantidad * pr.peso), 0) INTO peso_nuevo_pedido
+            SELECT COALESCE(SUM(dp.cantidad * pr.peso), 0) / 1000 INTO peso_nuevo_pedido
             FROM detalle_pedido dp
             INNER JOIN producto pr ON pr.codigo = dp.cod_producto
             WHERE dp.num_pedido = NEW.num;

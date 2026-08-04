@@ -19,5 +19,6 @@ urlpatterns = [
     path('confirmar-entrega/', views.confirmar_entrega_establecimiento, name='confirmar_entrega'),
     path('entregas-disponibles/', views.entregas_disponibles, name='entregas_disponibles'),
     path('tomar-entrega/', views.tomar_entrega, name='tomar_entrega'),
+    path('soltar-entrega/', views.soltar_entrega, name='soltar_entrega'),
 
 ]

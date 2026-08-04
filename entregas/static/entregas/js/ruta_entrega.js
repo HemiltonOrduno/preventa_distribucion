@@ -43,14 +43,17 @@ function cargarRuta() {
             paradas = data.paradas;
 
             // Verificar si la ruta ya está iniciada
+            // Verificar si la ruta ya está iniciada
             if (data.estado === 'En camino') {
                 rutaIniciada = true;
                 document.getElementById('btn-iniciar').style.display = 'none';
                 document.getElementById('btn-finalizar').style.display = 'block';
+                document.getElementById('btn-regresar').style.display = 'none';
             } else {
                 rutaIniciada = false;
                 document.getElementById('btn-iniciar').style.display = 'block';
                 document.getElementById('btn-finalizar').style.display = 'none';
+                document.getElementById('btn-regresar').style.display = 'block';
             }
 
             renderizarParadas();
@@ -61,6 +64,28 @@ function cargarRuta() {
                 '<p style="text-align:center;color:#c62828;padding:20px;font-size:13px;">Error cargando la ruta</p>';
         });
 }
+
+// ===== REGRESAR RUTA (soltar antes de iniciarla) =====
+function regresarRuta() {
+    if (!confirm('¿Seguro que no quieres realizar esta ruta? Quedará disponible para otro repartidor.')) return;
+    if (!rutaId) return;
+
+    fetch('/api/entregas/soltar-entrega/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ruta_entrega_id: rutaId })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.error) { alert('Error: ' + data.error); return; }
+        mostrarToast('✓ Ruta liberada');
+        entregaId = null;
+        rutaId = null;
+        cargarRuta();
+    })
+    .catch(() => alert('Error de conexión'));
+}
+
 
 // ===== ENTREGAS DISPONIBLES (sin repartidor asignado) =====
 function mostrarEntregasDisponibles() {
@@ -93,7 +118,12 @@ function mostrarEntregasDisponibles() {
                         <div class="parada-nombre">Entrega #${e.entrega_id}</div>
                         <div class="parada-sub">${e.total_pedidos} pedidos · ${e.peso_total_kg.toFixed(1)} kg · ${e.placas || 'sin vehículo'}</div>
                     </div>
+                    <button class="btn-iniciar-ruta" style="padding:6px 14px;font-size:12px;white-space:nowrap;"
+                        onclick="event.stopPropagation(); tomarYIniciarEntrega(${e.ruta_entrega_id}, ${e.entrega_id})">
+                        ▶ Iniciar
+                    </button>
                 `;
+                // Clic en la fila = solo tomarla y ver el detalle (con botón Iniciar arriba)
                 div.onclick = () => tomarEntrega(e.ruta_entrega_id);
                 lista.appendChild(div);
             });
@@ -101,6 +131,35 @@ function mostrarEntregasDisponibles() {
         .catch(() => {
             lista.innerHTML = '<p style="text-align:center;color:#c62828;padding:20px;font-size:13px;">No se pudieron cargar las entregas disponibles</p>';
         });
+}
+
+// Toma la entrega y arranca la ruta de una sola vez (botón "▶ Iniciar" de la lista)
+function tomarYIniciarEntrega(rutaEntregaId, entregaIdParam) {
+    fetch('/api/entregas/tomar-entrega/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ruta_entrega_id: rutaEntregaId })
+    })
+    .then(res => res.json().then(data => ({ ok: res.ok, data })))
+    .then(({ ok, data }) => {
+        if (!ok) {
+            alert(data.error || 'No se pudo tomar la entrega');
+            mostrarEntregasDisponibles();
+            return Promise.reject('ya-tomada');
+        }
+        return fetch('/api/entregas/iniciar-ruta/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ entrega_id: entregaIdParam })
+        }).then(res => res.json());
+    })
+    .then(data => {
+        if (!data) return;
+        if (data.error) { alert('Error: ' + data.error); return; }
+        mostrarToast('✓ Ruta tomada e iniciada');
+        cargarRuta();
+    })
+    .catch(err => { if (err !== 'ya-tomada') console.error(err); });
 }
 
 function tomarEntrega(rutaEntregaId) {
@@ -356,6 +415,8 @@ function guardarCobro() {
         if (data.error) { alert('Error: ' + data.error); return; }
         document.getElementById('modal-cobro').classList.remove('visible');
         mostrarToast('✓ Cobro registrado');
+        // El cobro ya implica que la entrega se completó, se confirma automáticamente
+        confirmarEntrega();
     });
 }
 

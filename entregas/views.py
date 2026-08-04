@@ -522,3 +522,39 @@ def tomar_entrega(request):
             return JsonResponse({"error": "Esta entrega ya fue tomada por otro repartidor"}, status=409)
 
     return JsonResponse({"mensaje": "Entrega tomada correctamente"})
+
+@csrf_exempt
+def soltar_entrega(request):
+    """
+    El repartidor suelta una entrega que había tomado, siempre y cuando
+    todavía no la haya iniciado (edo_ruta_entrega = 'ERET001'). La entrega
+    regresa a 'disponible' (empleado = NULL) para que cualquier otro
+    repartidor la pueda tomar.
+    """
+    if request.method != 'POST':
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+
+    empleado_id = request.session.get('empleado_num')
+    if not empleado_id:
+        return JsonResponse({"error": "Sesión no válida, inicia sesión de nuevo"}, status=401)
+
+    try:
+        body = json.loads(request.body)
+        ruta_entrega_id = body.get('ruta_entrega_id')
+    except Exception:
+        return JsonResponse({"error": "JSON inválido"}, status=400)
+
+    if not ruta_entrega_id:
+        return JsonResponse({"error": "Se requiere ruta_entrega_id"}, status=400)
+
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            UPDATE ruta_entrega
+            SET empleado = NULL
+            WHERE numero = %s AND empleado = %s AND edo_ruta_entrega = 'ERET001'
+        """, [ruta_entrega_id, empleado_id])
+
+        if cursor.rowcount == 0:
+            return JsonResponse({"error": "No se pudo soltar la ruta (ya la iniciaste, o no es tuya)"}, status=400)
+
+    return JsonResponse({"mensaje": "Ruta liberada correctamente"})
