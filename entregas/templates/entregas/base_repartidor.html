@@ -22,7 +22,8 @@
             📦 Pedidos
         </a>
     </div>
-    <div class="top-nav__avatar">👤</div>
+    <a href="{% url 'logout' %}" class="top-nav__avatar" title="Cerrar sesión"
+       onclick="return confirm('¿Cerrar sesión?');">🚪</a>
 </nav>
 
 <div class="page {% block page_class %}{% endblock %}">
@@ -35,6 +36,10 @@
     </a>
     <a href="/api/entregas/pedidos/" class="bottom-nav__item {% block nav_pedidos_m %}{% endblock %}">
         📦 <span>Pedidos</span>
+    </a>
+    <a href="{% url 'logout' %}" class="bottom-nav__item"
+       onclick="return confirm('¿Cerrar sesión?');">
+        🚪 <span>Salir</span>
     </a>
 </nav>
 
