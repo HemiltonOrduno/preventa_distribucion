@@ -68,6 +68,11 @@ class LoginView(APIView):
         request.session['usuario_num'] = usuario.num
         request.session['empleado_num'] = usuario.empleado.num
         request.session['rol'] = usuario.empleado.rol.nombre
+        # Se guarda el nombre para mostrarlo en el panel de perfil de cada
+        # modulo, sin volver a consultar la base en cada pantalla.
+        request.session['nombre_usuario'] = (
+            f"{usuario.empleado.nombre_de_pila} {usuario.empleado.apellido_paterno}"
+        )
 
         data = UsuarioDataSerializer(usuario).data
         data['redirect_url'] = ROL_REDIRECT.get(usuario.empleado.rol.nombre, '/')
