@@ -19,13 +19,16 @@ async function cargarProductos(){
 
         contenedor.innerHTML = data.productos.map(p => `
             <div class="product-item" data-codigo="${p.codigo}" data-precio="${p.precio}">
-                <div>
+                <img class="product-item__img" src="${p.imagen}" alt="${p.nombre}"
+                     onerror="this.style.visibility='hidden'">
+                <div class="product-item__info">
                     <span class="product-item__name">${p.nombre}</span><br>
                     <span class="product-item__price">$${p.precio.toFixed(2)}</span>
                 </div>
                 <div class="qty">
                     <button type="button" class="qty__btn" onclick="cambiarCantidad(this,-1)">-</button>
-                    <span class="qty__value">0</span>
+                    <input type="text" inputmode="numeric" class="qty__value" value="0"
+                           oninput="validarCantidad(this)" onblur="normalizarCantidad(this)">
                     <button type="button" class="qty__btn" onclick="cambiarCantidad(this,1)">+</button>
                 </div>
             </div>
@@ -36,12 +39,16 @@ async function cargarProductos(){
     }
 }
 
+const MAX_CANTIDAD = 999;
+
 function cambiarCantidad(boton, delta){
-    const contenedor = boton.closest(".qty");
-    const valorSpan = contenedor.querySelector(".qty__value");
-    let valor = parseInt(valorSpan.textContent, 10) + delta;
+    const input = boton.closest(".qty").querySelector(".qty__value");
+    let valor = parseInt(input.value, 10);
+    if (isNaN(valor)) valor = 0;
+    valor += delta;
     if (valor < 0) valor = 0;
-    valorSpan.textContent = valor;
+    if (valor > MAX_CANTIDAD) valor = MAX_CANTIDAD;
+    input.value = valor;
 }
 
 async function confirmarPedido(){
@@ -53,7 +60,7 @@ async function confirmarPedido(){
     const items = document.querySelectorAll('.product-item');
     const productos = [];
     items.forEach(item => {
-        const cantidad = parseInt(item.querySelector('.qty__value').textContent, 10);
+        const cantidad = parseInt(item.querySelector('.qty__value').value, 10);
         if (cantidad > 0){
             productos.push({ cod_producto: item.dataset.codigo, cantidad });
         }

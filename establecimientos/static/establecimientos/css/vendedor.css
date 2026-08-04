@@ -205,8 +205,29 @@ a{ text-decoration: none; color: inherit; }
     border-bottom: 1px solid var(--color-border);
 }
 .product-item:last-child{ border-bottom: none; }
+.product-item__img{
+    width: 52px;
+    height: 52px;
+    object-fit: cover;
+    border-radius: .5rem;
+    background: #f5f5f5;
+    flex-shrink: 0;
+}
+.product-item__info{ flex: 1; min-width: 0; }
 .product-item__name{ font-size: .85rem; font-weight: 500; display: block; }
 .product-item__price{ font-size: .72rem; color: var(--color-text-muted); }
+
+input.qty__value{
+    width: 46px;
+    text-align: center;
+    padding: 6px 2px;
+    border: 1px solid var(--color-border);
+    border-radius: .4rem;
+    font-size: .85rem;
+    font-family: inherit;
+    min-height: 44px;
+}
+
 .qty{
     display: flex;
     align-items: center;
