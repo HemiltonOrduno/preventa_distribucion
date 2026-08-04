@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pedidos Activos - Administrador</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, Helvetica, sans-serif; background: #f0f2f5; padding: 24px; }
+        h1 { color: #1a237e; font-size: 20px; margin-bottom: 4px; }
+        .subtitulo { color: #666; font-size: 13px; margin-bottom: 20px; }
+        .resumen {
+            display: flex; gap: 16px; margin-bottom: 20px;
+        }
+        .tarjeta-resumen {
+            background: white; border-radius: 8px; padding: 16px 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .tarjeta-resumen .numero { font-size: 26px; font-weight: bold; color: #1a237e; }
+        .tarjeta-resumen .etiqueta { font-size: 12px; color: #666; }
+
+        .filtros { margin-bottom: 14px; }
+        .filtros select {
+            padding: 8px; border-radius: 6px; border: 1px solid #ccc; font-size: 13px;
+        }
+
+        table {
+            width: 100%; background: white; border-collapse: collapse;
+            border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        th, td { padding: 10px 12px; text-align: left; font-size: 13px; }
+        th { background: #1a237e; color: white; }
+        tr:nth-child(even) { background: #f7f7f9; }
+
+        .badge {
+            padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
+        }
+        .badge-pendiente { background: #fff3e0; color: #e65100; }
+        .badge-proceso { background: #e3f2fd; color: #1565c0; }
+        .badge-registrado { background: #e8f5e9; color: #2e7d32; }
+        .badge-surtido { background: #ede7f6; color: #5e35b1; }
+    </style>
+</head>
+<body>
+    <h1>Estado Actual de Pedidos Activos</h1>
+    <p class="subtitulo">RF49 — Vista de supervisión para administrador</p>
+
+    <div class="resumen" id="resumen">
+        <div class="tarjeta-resumen">
+            <div class="numero" id="total-activos">--</div>
+            <div class="etiqueta">Pedidos activos</div>
+        </div>
+    </div>
+
+    <div class="filtros">
+        <select id="filtro-zona" onchange="filtrar()">
+            <option value="">Todas las zonas</option>
+        </select>
+        <select id="filtro-estado" onchange="filtrar()">
+            <option value="">Todos los estados</option>
+        </select>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Pedido</th><th>Fecha</th><th>Establecimiento</th><th>Zona</th>
+                <th>Vendedor</th><th>Estado</th><th>Total</th>
+            </tr>
+        </thead>
+        <tbody id="cuerpo-tabla">
+            <tr><td colspan="7">Cargando...</td></tr>
+        </tbody>
+    </table>
+
+    <script>
+        let pedidosCompletos = [];
+
+        function claseBadge(estado) {
+            if (estado.includes('Pendiente')) return 'badge-pendiente';
+            if (estado.includes('proceso')) return 'badge-proceso';
+            if (estado.includes('Registrado')) return 'badge-registrado';
+            if (estado.includes('Surtido')) return 'badge-surtido';
+            return '';
+        }
+
+        function renderTabla(pedidos) {
+            const cuerpo = document.getElementById('cuerpo-tabla');
+            if (pedidos.length === 0) {
+                cuerpo.innerHTML = '<tr><td colspan="7">No hay pedidos activos con ese filtro.</td></tr>';
+                return;
+            }
+            cuerpo.innerHTML = pedidos.map(function(p) {
+                return '<tr>' +
+                    '<td>#' + p.pedido_id + '</td>' +
+                    '<td>' + p.fecha + '</td>' +
+                    '<td>' + p.establecimiento_nombre + '</td>' +
+                    '<td>' + p.zona_nombre + '</td>' +
+                    '<td>' + p.vendedor + '</td>' +
+                    '<td><span class="badge ' + claseBadge(p.estado) + '">' + p.estado + '</span></td>' +
+                    '<td>$' + p.total.toFixed(2) + '</td>' +
+                    '</tr>';
+            }).join('');
+        }
+
+        function llenarFiltros(pedidos) {
+            const zonas = pedidos.map(function(p) { return p.zona_nombre; })
+                .filter(function(v, i, arr) { return arr.indexOf(v) === i; });
+            const estados = pedidos.map(function(p) { return p.estado; })
+                .filter(function(v, i, arr) { return arr.indexOf(v) === i; });
+
+            const selZona = document.getElementById('filtro-zona');
+            zonas.forEach(function(z) {
+                const opt = document.createElement('option');
+                opt.value = z; opt.textContent = z;
+                selZona.appendChild(opt);
+            });
+
+            const selEstado = document.getElementById('filtro-estado');
+            estados.forEach(function(e) {
+                const opt = document.createElement('option');
+                opt.value = e; opt.textContent = e;
+                selEstado.appendChild(opt);
+            });
+        }
+
+        function filtrar() {
+            const zona = document.getElementById('filtro-zona').value;
+            const estado = document.getElementById('filtro-estado').value;
+            const filtrados = pedidosCompletos.filter(function(p) {
+                return (!zona || p.zona_nombre === zona) && (!estado || p.estado === estado);
+            });
+            renderTabla(filtrados);
+        }
+
+        fetch('/api/reportes/pedidos-activos/api/')
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                pedidosCompletos = data.pedidos;
+                document.getElementById('total-activos').textContent = data.total_activos;
+                llenarFiltros(data.pedidos);
+                renderTabla(data.pedidos);
+            })
+            .catch(function() {
+                document.getElementById('cuerpo-tabla').innerHTML = '<tr><td colspan="7">Error al cargar los datos.</td></tr>';
+            });
+    </script>
+</body>
+</html>
