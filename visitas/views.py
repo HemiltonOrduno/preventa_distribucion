@@ -372,6 +372,8 @@ def pedidos_pendientes(request):
 def pedido_detalle(request, pedido_id):
     """
     RF17: Detalle de un pedido, incluyendo productos y cantidades.
+    RNF-14: se incluye la imagen de cada producto para que el almacenista
+    lo identifique visualmente antes de ajustar o cancelar.
     """
     with connection.cursor() as cursor:
         cursor.execute("""
@@ -399,6 +401,7 @@ def pedido_detalle(request, pedido_id):
             SELECT
                 dp.cod_producto,
                 pr.nombre AS producto_nombre,
+                pr.imagen,
                 dp.cantidad,
                 dp.precioUnitario AS precio_unitario,
                 dp.importe,
@@ -412,6 +415,8 @@ def pedido_detalle(request, pedido_id):
         for d in detalle:
             d['precio_unitario'] = float(d['precio_unitario'])
             d['importe'] = float(d['importe'])
+            if d.get('imagen') and d['imagen'].startswith('/img/'):
+                d['imagen'] = '/static' + d['imagen']
 
     pedido['detalle'] = detalle
     return JsonResponse(pedido, json_dumps_params={'ensure_ascii': False})

@@ -9,7 +9,7 @@
 <div id="lista-pedidos">Cargando pedidos...</div>
 
 <div id="modal-detalle" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); z-index:200; align-items:center; justify-content:center;">
-    <div style="background:white; border-radius:10px; padding:24px; width:500px; max-height:80vh; overflow-y:auto;">
+    <div style="background:white; border-radius:10px; padding:24px; width:640px; max-width:94vw; max-height:85vh; overflow-y:auto;">
         <div id="detalle-contenido">Cargando...</div>
         <div style="margin-top:16px; text-align:right;">
             <button class="btn btn-secondary" onclick="cerrarModal()">Cerrar</button>
@@ -59,10 +59,16 @@
             <p style="font-size:12px; color:#666;">Estado: ${p.estado}</p>
             <table style="width:100%; margin-top:12px; font-size:13px; border-collapse:collapse;">
                 <tr style="text-align:left; border-bottom:1px solid #ddd;">
+                    <th style="width:52px;"></th>
                     <th>Producto</th><th>Cant.</th><th>Stock</th><th>Importe</th><th></th>
                 </tr>
                 ${p.detalle.map(d => `
                     <tr style="border-bottom:1px solid #eee;">
+                        <td style="padding:6px 0;">
+                            <img src="${d.imagen || ''}" alt="${d.producto_nombre}"
+                                 onerror="this.style.visibility='hidden'"
+                                 style="width:44px;height:44px;object-fit:cover;border-radius:6px;background:#f5f5f5;display:block;">
+                        </td>
                         <td>${d.producto_nombre}</td>
                         <td>
                             <input type="number" id="cant-${d.cod_producto}" value="${d.cantidad}" min="1"
