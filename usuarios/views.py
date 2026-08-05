@@ -14,7 +14,7 @@ ROL_REDIRECT = {
     'Vendedor': '/api/visitas/ruta-del-dia/',
     'Coordinador': '/api/rutas/coordinador/',
     'Almacenista': '/api/inventario/almacenista/movimientos/',
-    'Administrador': '/api/reportes/pedidos-activos/',
+    'Administrador': 'panel_usuarios:gestion-usuarios',
     'Repartidor': '/api/entregas/ruta-entrega/',
 }
 
