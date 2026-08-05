@@ -56,12 +56,10 @@ function cargarRuta() {
             if (data.estado === 'En camino') {
                 rutaIniciada = true;
                 document.getElementById('btn-iniciar').style.display = 'none';
-                document.getElementById('btn-finalizar').style.display = 'block';
                 document.getElementById('btn-regresar').style.display = 'none';
             } else {
                 rutaIniciada = false;
                 document.getElementById('btn-iniciar').style.display = 'block';
-                document.getElementById('btn-finalizar').style.display = 'none';
                 document.getElementById('btn-regresar').style.display = 'block';
             }
 
@@ -99,7 +97,6 @@ function regresarRuta() {
 // ===== ENTREGAS DISPONIBLES (sin repartidor asignado) =====
 function mostrarEntregasDisponibles() {
     document.getElementById('btn-iniciar').style.display = 'none';
-    document.getElementById('btn-finalizar').style.display = 'none';
     document.getElementById('info-bar').style.display = 'none';
 
     const lista = document.getElementById('lista-paradas');
@@ -288,30 +285,11 @@ function iniciarRuta() {
         if (data.error) { alert('Error: ' + data.error); return; }
         rutaIniciada = true;
         document.getElementById('btn-iniciar').style.display = 'none';
-        document.getElementById('btn-finalizar').style.display = 'block';
         mostrarToast('✓ Ruta iniciada');
     });
 }
 
 // ===== FINALIZAR RUTA =====
-function finalizarRuta() {
-    const pendientes = paradas.filter(p => p.tipo === 'establecimiento' && !p.entregado).length;
-    if (pendientes > 0) {
-        if (!confirm(`Aún tienes ${pendientes} entregas pendientes. ¿Deseas finalizar la ruta?`)) return;
-    }
-
-    fetch('/api/entregas/finalizar-ruta/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ entrega_id: entregaId })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.error) { alert('Error: ' + data.error); return; }
-        mostrarToast('✓ Ruta finalizada');
-        setTimeout(() => location.reload(), 1500);
-    });
-}
 
 // ===== MODAL PARADA =====
 function abrirModalParada(parada) {
@@ -525,10 +503,12 @@ function confirmarEntrega() {
 
         mostrarToast('✓ Entrega confirmada');
 
-        // Si todas están entregadas, mostrar botón finalizar
-        const pendientes = paradas.filter(p => p.tipo === 'establecimiento' && !p.entregado).length;
-        if (pendientes === 0) {
-            mostrarToast('✓ Todas las entregas completadas. Puedes finalizar la ruta.');
+        // RF37: el sistema cerró la entrega al quedar todos los pedidos entregados
+        if (data.entrega_completada) {
+            setTimeout(() => {
+                alert('✓ Ruta completada\n\nTodos los pedidos fueron entregados. La entrega se cerró automáticamente.');
+                location.reload();
+            }, 800);
         }
     });
 }

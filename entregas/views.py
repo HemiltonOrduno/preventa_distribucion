@@ -448,7 +448,12 @@ def confirmar_entrega_establecimiento(request):
                 ON DUPLICATE KEY UPDATE fecha_entrega = CURDATE(), hora_entrega = TIME(NOW())
             """, [entrega_id, establecimiento_id])
 
-    return JsonResponse({"mensaje": "Entrega confirmada correctamente"})
+            entrega_cerrada = _cerrar_entrega_si_completa(cursor, entrega_id)
+
+    return JsonResponse({
+        "mensaje": "Entrega confirmada correctamente",
+        "entrega_completada": entrega_cerrada
+    })
 
 
 def ruta_entrega_view(request):
@@ -636,3 +641,32 @@ def _calcular_orden_entrega(ruta_entrega_id, entrega_id):
                 INSERT INTO ruta_entrega_orden (ruta_entrega, establecimiento, orden)
                 VALUES (%s, %s, %s)
             """, [ruta_entrega_id, est_id, i])
+            
+def _cerrar_entrega_si_completa(cursor, entrega_id):
+    """
+    RF37: cuando todos los pedidos de la entrega quedan entregados,
+    el sistema cierra la entrega y su ruta automaticamente, libera el
+    vehiculo y no espera ninguna accion del repartidor.
+    """
+    cursor.execute("""
+        SELECT COUNT(*) FROM pedido
+        WHERE entrega = %s AND edo_pedido <> 'EPD005'
+    """, [entrega_id])
+
+    if cursor.fetchone()[0] > 0:
+        return False
+
+    cursor.execute("""
+        UPDATE entrega SET edo_entrega = 'EEN004', fecha_entrega = NOW()
+        WHERE numero = %s AND edo_entrega <> 'EEN004'
+    """, [entrega_id])
+    if cursor.rowcount == 0:
+        return False
+
+    cursor.execute("""
+        UPDATE ruta_entrega SET edo_ruta_entrega = 'ERET003' WHERE entrega = %s
+    """, [entrega_id])
+    cursor.execute("""
+        UPDATE vehiculo SET edo_vehiculo = 'EV001', entrega = NULL WHERE entrega = %s
+    """, [entrega_id])
+    return True
