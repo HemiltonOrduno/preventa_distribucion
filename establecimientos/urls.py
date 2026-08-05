@@ -4,6 +4,7 @@ from .views import (
     registro_establecimiento_view,
     crear_cliente,
     crear_establecimiento,
+    clientes_registrados,
 )
 
 urlpatterns = [
@@ -11,4 +12,5 @@ urlpatterns = [
     path('registro-establecimiento/', registro_establecimiento_view, name='registro_establecimiento'),
     path('clientes/', crear_cliente, name='crear_cliente'),
     path('nuevo/', crear_establecimiento, name='crear_establecimiento'),
+    path('clientes-registrados/', clientes_registrados, name='clientes_registrados'),
 ]

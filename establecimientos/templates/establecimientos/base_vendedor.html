@@ -43,6 +43,9 @@
         <a href="{% url 'registro_cliente' %}" class="top-nav__link {% block nav_clientes_d %}{% endblock %}">
             <i class='bx bx-store'></i> Clientes
         </a>
+        <a href="{% url 'registro_establecimiento' %}" class="top-nav__link {% block nav_estab_d %}{% endblock %}">
+            <i class='bx bx-store-alt'></i> Establecimientos
+        </a>
     </div>
     <button class="btn-contraste" onclick="toggleAltoContraste()"
             title="Modo alto contraste" aria-label="Activar modo de alto contraste"
@@ -110,6 +113,10 @@
         <i class='bx bx-store'></i>
         <span>Clientes</span>
     </a>
+    <a href="{% url 'registro_establecimiento' %}" class="bottom-nav__item {% block nav_estab_m %}{% endblock %}">
+        <i class='bx bx-store-alt'></i>
+        <span>Estab.</span>
+    </a>
     <a href="#" class="bottom-nav__item" onclick="togglePerfil(event)">
         <i class='bx bx-user-circle'></i>
         <span>Perfil</span>
@@ -118,6 +125,7 @@
 
 
 <script>
+    /* Manejo de foco compartido para los labels flotantes (form__div) */
     /* Manejo de foco compartido para los labels flotantes (form__div) */
     document.querySelectorAll(".form__input, .form__textarea").forEach(function(input){
         input.addEventListener("focus", function(){
@@ -131,6 +139,12 @@
         if (input.value !== ""){
             input.closest(".form__div").classList.add("focus");
         }
+    });
+
+    /* Los <select> siempre muestran un valor, así que su label va
+       siempre arriba para que no se encime con el texto */
+    document.querySelectorAll(".form__div select.form__input").forEach(function(select){
+        select.closest(".form__div").classList.add("focus");
     });
 
     /*===== PANEL DE PERFIL =====*/

@@ -136,6 +136,32 @@ def crear_establecimiento(request):
     }, json_dumps_params={'ensure_ascii': False})
 
 
+@rol_requerido('Vendedor', 'Administrador')
+def clientes_registrados(request):
+    """
+    Lista los clientes activos para poder asociarles un establecimiento
+    adicional sin registrarlos de nuevo (RF02).
+    """
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT r.numero AS id,
+                   CONCAT(r.repNombre, ' ', r.repApellPat,
+                          COALESCE(CONCAT(' ', r.repApellMa), '')) AS nombre,
+                   r.rfc, r.telefono,
+                   COUNT(e.numero) AS establecimientos
+            FROM rep_establecimiento r
+            LEFT JOIN establecimiento e ON e.rep_establecimiento = r.numero
+            WHERE r.edo_rep_establecimiento = 'ERE001'
+            GROUP BY r.numero, r.repNombre, r.repApellPat, r.repApellMa, r.rfc, r.telefono
+            ORDER BY r.repApellPat, r.repNombre
+        """)
+        columns = [c[0] for c in cursor.description]
+        clientes = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+    return JsonResponse({"clientes": clientes}, json_dumps_params={'ensure_ascii': False})
+
+
+
 # --- Placeholders restantes, pendientes ---
 class EstablecimientoListCreate:
     pass

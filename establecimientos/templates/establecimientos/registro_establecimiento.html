@@ -1,9 +1,10 @@
+
 {% extends 'establecimientos/base_vendedor.html' %}
 {% load static %}
 
 {% block title %}Nuevo establecimiento{% endblock %}
-{% block nav_clientes_d %}active{% endblock %}
-{% block nav_clientes_m %}active{% endblock %}
+{% block nav_estab_d %}active{% endblock %}
+{% block nav_estab_m %}active{% endblock %}
 
 {% block content %}
 
@@ -12,6 +13,16 @@
 </div>
 
 <form id="formEstablecimiento" onsubmit="return guardarEstablecimiento(event)">
+
+    <div class="form__div" id="campoCliente" style="display:none;">
+        <div class="form__icon"><i class='bx bx-user'></i></div>
+        <div class="form__div-input">
+            <label class="form__label">Cliente</label>
+            <select id="cliente" class="form__input">
+                <option value="">Selecciona un cliente...</option>
+            </select>
+        </div>
+    </div>
 
     <div class="form__div">
         <div class="form__icon"><i class='bx bx-store'></i></div>

@@ -4,7 +4,25 @@
   obtenemos lat/lon con la geolocalización del navegador (RFN-25).
 */
 const params = new URLSearchParams(window.location.search);
-const repEstablecimientoId = params.get('rep_establecimiento_id');
+
+let repEstablecimientoId = params.get('rep_establecimiento_id');
+
+// Si no viene el cliente en la URL, se ofrece elegirlo de los ya registrados
+if (!repEstablecimientoId) {
+    document.getElementById("campoCliente").style.display = "";
+    fetch('/api/establecimientos/clientes-registrados/')
+        .then(r => r.json())
+        .then(d => {
+            const sel = document.getElementById("cliente");
+            (d.clientes || []).forEach(c => {
+                const o = document.createElement("option");
+                o.value = c.id;
+                o.innerText = `${c.nombre} — ${c.establecimientos} establecimiento(s)`;
+                sel.appendChild(o);
+            });
+        })
+        .catch(() => alert('No se pudo cargar la lista de clientes'));
+}
 
 let ubicacion = null;
 const estadoUbicacion = document.getElementById("estadoUbicacion");
@@ -36,8 +54,11 @@ if (navigator.geolocation){
 async function guardarEstablecimiento(event){
     event.preventDefault();
 
+    if (!repEstablecimientoId) {
+        repEstablecimientoId = document.getElementById("cliente").value;
+    }
     if (!repEstablecimientoId){
-        alert('Falta el cliente asociado, regresa al paso anterior');
+        alert('Selecciona el cliente al que pertenece este establecimiento');
         return false;
     }
     if (!ubicacion){
