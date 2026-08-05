@@ -836,3 +836,181 @@ def editar_ruta_visita(request, ruta_id):
         "mensaje": "Ruta actualizada correctamente",
         "ruta_id": ruta_id
     }, json_dumps_params={'ensure_ascii': False})
+    
+def historial_rutas(request):
+    """
+    Historial unificado de rutas de visita y de entrega, con filtros
+    por tipo, estado y responsable. El detalle de paradas se pide
+    aparte para no cargar todo de golpe.
+    """
+    tipo = request.GET.get('tipo', '')
+    estado = request.GET.get('estado', '')
+    empleado = request.GET.get('empleado', '')
+
+    rutas_visita = []
+    rutas_entrega = []
+
+    with connection.cursor() as cursor:
+        if tipo in ('', 'visita'):
+            sql = """
+                SELECT rv.numero AS id, rv.nombre, rv.dia,
+                       erv.nombre AS estado, z.nombre AS zona,
+                       COALESCE(CONCAT(em.empNombre, ' ', em.empApellPat), 'Sin asignar') AS responsable,
+                       em.num AS responsable_id,
+                       (SELECT COUNT(*) FROM ruta_visita_orden rvo
+                         WHERE rvo.ruta_visita = rv.numero) AS total_paradas,
+                       (SELECT COUNT(DISTINCT v.establecimiento) FROM visita v
+                         WHERE v.ruta_visita = rv.numero
+                           AND v.edo_visita IN ('EVI004','EVI005')) AS completadas,
+                       (SELECT COUNT(DISTINCT v.establecimiento) FROM visita v
+                         WHERE v.ruta_visita = rv.numero
+                           AND v.edo_visita = 'EVI005') AS sin_pedido,
+                       (SELECT MAX(v.fecha) FROM visita v
+                         WHERE v.ruta_visita = rv.numero) AS ultima_actividad
+                FROM ruta_visita rv
+                INNER JOIN edo_ruta_visita erv ON erv.codigo = rv.edo_ruta_visita
+                INNER JOIN zona z ON z.num = rv.zona
+                LEFT JOIN empleado em ON em.num = rv.empleado
+                WHERE 1 = 1
+            """
+            params = []
+            if estado:
+                sql += " AND erv.nombre = %s"
+                params.append(estado)
+            if empleado:
+                sql += " AND rv.empleado = %s"
+                params.append(empleado)
+            sql += " ORDER BY rv.numero DESC"
+
+            cursor.execute(sql, params)
+            columns = [c[0] for c in cursor.description]
+            rutas_visita = [dict(zip(columns, r)) for r in cursor.fetchall()]
+
+        if tipo in ('', 'entrega'):
+            sql = """
+                SELECT re.numero AS id, re.nombre,
+                       ere.nombre AS estado,
+                       en.numero AS entrega_id, en.fecha_creacion, en.fecha_entrega,
+                       COALESCE(CONCAT(em.empNombre, ' ', em.empApellPat), 'Sin asignar') AS responsable,
+                       em.num AS responsable_id,
+                       veh.placas,
+                       COUNT(DISTINCT p.num) AS total_paradas,
+                       SUM(CASE WHEN ep.nombre = 'Entregado' THEN 1 ELSE 0 END) AS completadas,
+                       COALESCE(SUM(p.total), 0) AS monto
+                FROM ruta_entrega re
+                INNER JOIN edo_ruta_entrega ere ON ere.codigo = re.edo_ruta_entrega
+                INNER JOIN entrega en ON en.numero = re.entrega
+                LEFT JOIN empleado em ON em.num = re.empleado
+                LEFT JOIN vehiculo veh ON veh.entrega = en.numero
+                LEFT JOIN pedido p ON p.entrega = en.numero
+                LEFT JOIN edo_pedido ep ON ep.codigo = p.edo_pedido
+                WHERE 1 = 1
+            """
+            params = []
+            if estado:
+                sql += " AND ere.nombre = %s"
+                params.append(estado)
+            if empleado:
+                sql += " AND re.empleado = %s"
+                params.append(empleado)
+            sql += """
+                GROUP BY re.numero, re.nombre, ere.nombre, en.numero,
+                         en.fecha_creacion, en.fecha_entrega,
+                         em.empNombre, em.empApellPat, em.num, veh.placas
+                ORDER BY re.numero DESC
+            """
+            cursor.execute(sql, params)
+            columns = [c[0] for c in cursor.description]
+            rutas_entrega = [dict(zip(columns, r)) for r in cursor.fetchall()]
+
+        # Responsables para el filtro (siempre la lista completa)
+        cursor.execute("""
+            SELECT em.num AS id,
+                   CONCAT(em.empNombre, ' ', em.empApellPat) AS nombre,
+                   r.nombre AS rol
+            FROM empleado em
+            INNER JOIN rol r ON r.codigo = em.rol
+            WHERE r.nombre IN ('Vendedor', 'Repartidor')
+            ORDER BY r.nombre, em.empNombre
+        """)
+        columns = [c[0] for c in cursor.description]
+        responsables = [dict(zip(columns, r)) for r in cursor.fetchall()]
+
+    for r in rutas_entrega:
+        r['monto'] = float(r['monto'] or 0)
+        r['fecha_creacion'] = r['fecha_creacion'].isoformat() if r['fecha_creacion'] else None
+        r['fecha_entrega'] = r['fecha_entrega'].isoformat() if r['fecha_entrega'] else None
+    for r in rutas_visita:
+        r['ultima_actividad'] = r['ultima_actividad'].isoformat() if r['ultima_actividad'] else None
+
+    return JsonResponse({
+        "rutas_visita": rutas_visita,
+        "rutas_entrega": rutas_entrega,
+        "responsables": responsables
+    }, json_dumps_params={'ensure_ascii': False})
+
+
+def paradas_ruta_visita(request, ruta_id):
+    """Paradas de una ruta de visita con el resultado de cada una."""
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT rvo.orden, e.numero AS establecimiento_id, e.nombre,
+                   e.estColonia AS colonia,
+                   COALESCE(ev.nombre, 'Pendiente') AS estado_visita,
+                   v.fecha, v.observaciones,
+                   p.num AS pedido_id, p.total
+            FROM ruta_visita_orden rvo
+            INNER JOIN establecimiento e ON e.numero = rvo.establecimiento
+            LEFT JOIN visita v ON v.ruta_visita = rvo.ruta_visita
+                              AND v.establecimiento = rvo.establecimiento
+            LEFT JOIN edo_visita ev ON ev.codigo = v.edo_visita
+            LEFT JOIN pedido p ON p.visita = v.numero
+            WHERE rvo.ruta_visita = %s
+            ORDER BY rvo.orden
+        """, [ruta_id])
+        columns = [c[0] for c in cursor.description]
+        paradas = [dict(zip(columns, r)) for r in cursor.fetchall()]
+
+    for p in paradas:
+        p['total'] = float(p['total']) if p['total'] else None
+        p['fecha'] = p['fecha'].isoformat() if p['fecha'] else None
+
+    return JsonResponse({"paradas": paradas}, json_dumps_params={'ensure_ascii': False})
+
+
+def paradas_ruta_entrega(request, ruta_id):
+    """Paradas de una ruta de entrega con su confirmación."""
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT COALESCE(reo.orden, 999) AS orden,
+                   e.numero AS establecimiento_id, e.nombre,
+                   e.estColonia AS colonia,
+                   p.num AS pedido_id, p.subtotal,
+                   ep.nombre AS estado_pedido,
+                   ee.fecha_entrega, ee.hora_entrega
+            FROM ruta_entrega re
+            INNER JOIN entrega en ON en.numero = re.entrega
+            INNER JOIN pedido p ON p.entrega = en.numero
+            INNER JOIN edo_pedido ep ON ep.codigo = p.edo_pedido
+            INNER JOIN visita v ON v.numero = p.visita
+            INNER JOIN establecimiento e ON e.numero = v.establecimiento
+            LEFT JOIN ruta_entrega_orden reo ON reo.ruta_entrega = re.numero
+                                            AND reo.establecimiento = e.numero
+            LEFT JOIN entrega_estable ee ON ee.entrega = en.numero
+                                        AND ee.establecimiento = e.numero
+            WHERE re.numero = %s
+            ORDER BY orden
+        """, [ruta_id])
+        columns = [c[0] for c in cursor.description]
+        paradas = [dict(zip(columns, r)) for r in cursor.fetchall()]
+
+    for p in paradas:
+        p['subtotal'] = float(p['subtotal']) if p['subtotal'] else 0
+        p['fecha_entrega'] = p['fecha_entrega'].isoformat() if p['fecha_entrega'] else None
+        p['hora_entrega'] = str(p['hora_entrega']) if p['hora_entrega'] else None
+
+    return JsonResponse({"paradas": paradas}, json_dumps_params={'ensure_ascii': False})
+
+
+def historial_rutas_view(request):
+    return render(request, 'rutas/historial_rutas.html')

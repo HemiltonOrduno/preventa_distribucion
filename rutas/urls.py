@@ -25,4 +25,9 @@ urlpatterns = [
     path('ruta-visita/crear/', views.crear_ruta_visita, name='crear_ruta_visita'),
     path('ruta-visita/<int:ruta_id>/datos/', views.ruta_visita_datos, name='ruta_visita_datos'),
     path('ruta-visita/<int:ruta_id>/editar/', views.editar_ruta_visita, name='editar_ruta_visita'),
+    path('historial-rutas/', views.historial_rutas_view, name='historial_rutas'),
+    path('historial-rutas-datos/', views.historial_rutas, name='historial_rutas_api'),
+    path('historial-rutas/visita/<int:ruta_id>/paradas/', views.paradas_ruta_visita, name='paradas_ruta_visita'),
+    path('historial-rutas/entrega/<int:ruta_id>/paradas/', views.paradas_ruta_entrega, name='paradas_ruta_entrega'),
+    
 ]

@@ -1,0 +1,368 @@
+{% extends 'rutas/base_coordinador.html' %}
+{% load static %}
+
+{% block title %}Historial de Rutas{% endblock %}
+{% block nav_historial %}active{% endblock %}
+
+{% block main_content %}
+<div id="contenido">
+    <div id="page-header">
+        📋 Historial de Rutas
+    </div>
+    <div id="page-body" style="overflow-y:auto;padding:16px;">
+
+        <div class="hist-filtros">
+            <div class="hist-campo">
+                <label>Tipo</label>
+                <select id="f-tipo" onchange="cargarHistorial()">
+                    <option value="">Todas</option>
+                    <option value="visita">Rutas de visita</option>
+                    <option value="entrega">Rutas de entrega</option>
+                </select>
+            </div>
+            <div class="hist-campo">
+                <label>Estado</label>
+                <select id="f-estado" onchange="cargarHistorial()">
+                    <option value="">Todos</option>
+                </select>
+            </div>
+            <div class="hist-campo">
+                <label>Responsable</label>
+                <select id="f-responsable" onchange="cargarHistorial()">
+                    <option value="">Todos</option>
+                </select>
+            </div>
+            <button class="btn-limpiar" onclick="limpiarFiltros()">Limpiar</button>
+        </div>
+
+        <div id="hist-resumen" class="hist-resumen"></div>
+        <div id="hist-lista">
+            <p style="text-align:center;color:#888;padding:30px;font-size:13px;">Cargando...</p>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: paradas de la ruta -->
+<div class="hist-modal-overlay" id="hist-modal" onclick="cerrarParadas(event)">
+    <div class="hist-modal">
+        <div class="hist-modal-header">
+            <div>
+                <div id="modal-titulo" class="hist-modal-titulo">Ruta</div>
+                <div id="modal-sub" class="hist-modal-sub"></div>
+            </div>
+            <button onclick="cerrarParadas()" class="hist-cerrar">✕</button>
+        </div>
+        <div id="modal-cuerpo" class="hist-modal-cuerpo"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<style>
+    .hist-filtros {
+        display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;
+        background: white; padding: 14px; border-radius: 10px;
+        border: 1px solid #dee2e6; margin-bottom: 16px;
+    }
+    .hist-campo { display: flex; flex-direction: column; gap: 4px; }
+    .hist-campo label { font-size: 11px; color: #888; font-weight: 600; }
+    .hist-campo select {
+        padding: 7px 10px; border: 1px solid #dee2e6; border-radius: 6px;
+        font-size: 12px; min-width: 160px; background: white;
+    }
+    .btn-limpiar {
+        padding: 8px 14px; background: #f0f2f5; border: 1px solid #dee2e6;
+        border-radius: 6px; font-size: 12px; cursor: pointer; color: #555;
+    }
+
+    .hist-resumen { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+    .hist-chip {
+        background: white; border: 1px solid #dee2e6; border-radius: 8px;
+        padding: 8px 14px; font-size: 12px; color: #555;
+    }
+    .hist-chip b { color: #1a237e; font-size: 15px; display: block; }
+
+    .hist-seccion {
+        font-size: 13px; font-weight: bold; color: #1a237e;
+        margin: 18px 0 10px; padding-bottom: 6px; border-bottom: 2px solid #e8eaf6;
+    }
+    .hist-card {
+        background: white; border: 1px solid #dee2e6; border-radius: 10px;
+        padding: 12px 14px; margin-bottom: 8px; cursor: pointer;
+        display: grid; grid-template-columns: 1fr auto; gap: 8px;
+        transition: box-shadow .15s;
+    }
+    .hist-card:hover { box-shadow: 0 3px 10px rgba(0,0,0,0.1); }
+    .hist-nombre { font-size: 14px; font-weight: 600; color: #333; }
+    .hist-meta {
+        display: flex; gap: 12px; flex-wrap: wrap;
+        font-size: 11px; color: #888; margin-top: 4px;
+    }
+    .hist-derecha { text-align: right; white-space: nowrap; }
+    .hist-progreso { font-size: 12px; color: #555; margin-bottom: 4px; }
+    .hist-barra { width: 90px; height: 5px; background: #eee; border-radius: 3px; overflow: hidden; }
+    .hist-barra div { height: 100%; background: #2e7d32; }
+
+    .hist-badge { padding: 2px 9px; border-radius: 10px; font-size: 10px; font-weight: bold; }
+    .b-completada { background: #e8f5e9; color: #2e7d32; }
+    .b-curso { background: #e3f2fd; color: #1565c0; }
+    .b-activa { background: #fff3e0; color: #e65100; }
+    .b-inactiva { background: #f0f2f5; color: #888; }
+    .b-sinpedido { background: #fff3e0; color: #e65100; }
+
+    .hist-modal-overlay {
+        display: none; position: fixed;
+        top: 0; left: 0; width: 100vw; height: 100vh;
+        background: rgba(0,0,0,0.5); z-index: 9999;
+        align-items: center; justify-content: center; padding: 20px;
+    }
+    .hist-modal-overlay.visible { display: flex; }
+    .hist-modal {
+        background: white; border-radius: 12px; width: 100%;
+        max-width: 640px; max-height: 85vh; display: flex; flex-direction: column;
+    }
+    .hist-modal-header {
+        display: flex; justify-content: space-between; align-items: flex-start;
+        padding: 16px; border-bottom: 1px solid #dee2e6;
+    }
+    .hist-modal-titulo { font-size: 15px; font-weight: bold; color: #1a237e; }
+    .hist-modal-sub { font-size: 11px; color: #888; margin-top: 3px; }
+    .hist-cerrar {
+        background: #f0f2f5; border: none; border-radius: 6px;
+        padding: 6px 10px; cursor: pointer; font-size: 12px;
+    }
+    .hist-modal-cuerpo { padding: 12px 16px; overflow-y: auto; }
+
+    .parada-fila {
+        display: flex; align-items: center; gap: 10px;
+        padding: 10px 0; border-bottom: 1px solid #f0f0f0;
+    }
+    .parada-fila:last-child { border-bottom: none; }
+    .parada-orden {
+        width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+        background: #e8eaf6; color: #1a237e; font-size: 11px; font-weight: bold;
+        display: flex; align-items: center; justify-content: center;
+    }
+    .parada-datos { flex: 1; min-width: 0; }
+    .parada-nom { font-size: 13px; font-weight: 600; color: #333; }
+    .parada-det { font-size: 11px; color: #888; margin-top: 2px; }
+    .parada-obs {
+        font-size: 11px; color: #e65100; margin-top: 3px;
+        background: #fff3e0; padding: 4px 8px; border-radius: 5px;
+        display: inline-block;
+    }
+    .parada-monto { font-size: 13px; font-weight: bold; color: #2e7d32; white-space: nowrap; }
+</style>
+
+<script>
+let datos = { rutas_visita: [], rutas_entrega: [], responsables: [] };
+let filtrosListos = false;
+
+const ESTADOS = [
+    'Activa', 'Asignada', 'Iniciada', 'Completada', 'Pausada', 'Inactiva',
+    'Creada', 'En camino', 'Entregada'
+];
+
+window.addEventListener('load', cargarHistorial);
+
+function badgeClase(estado) {
+    if (estado === 'Completada' || estado === 'Entregada') return 'b-completada';
+    if (estado === 'Iniciada' || estado === 'En camino') return 'b-curso';
+    if (estado === 'Inactiva') return 'b-inactiva';
+    return 'b-activa';
+}
+
+function cargarHistorial() {
+    const params = new URLSearchParams({
+        tipo: document.getElementById('f-tipo').value,
+        estado: document.getElementById('f-estado').value,
+        empleado: document.getElementById('f-responsable').value
+    });
+
+    fetch(`/api/rutas/historial-rutas-datos/?${params}`)
+        .then(r => r.json())
+        .then(d => {
+            datos = d;
+            if (!filtrosListos) llenarFiltros(d.responsables);
+            renderizar();
+        })
+        .catch(() => {
+            document.getElementById('hist-lista').innerHTML =
+                '<p style="text-align:center;color:#c62828;padding:30px;font-size:13px;">Error al cargar el historial</p>';
+        });
+}
+
+function llenarFiltros(responsables) {
+    const selEstado = document.getElementById('f-estado');
+    ESTADOS.forEach(e => {
+        const o = document.createElement('option');
+        o.value = e; o.innerText = e;
+        selEstado.appendChild(o);
+    });
+
+    const selResp = document.getElementById('f-responsable');
+    responsables.forEach(r => {
+        const o = document.createElement('option');
+        o.value = r.id;
+        o.innerText = `${r.nombre} (${r.rol})`;
+        selResp.appendChild(o);
+    });
+    filtrosListos = true;
+}
+
+function limpiarFiltros() {
+    ['f-tipo', 'f-estado', 'f-responsable'].forEach(id => {
+        document.getElementById(id).value = '';
+    });
+    cargarHistorial();
+}
+
+function renderizar() {
+    const visita = datos.rutas_visita || [];
+    const entrega = datos.rutas_entrega || [];
+
+    document.getElementById('hist-resumen').innerHTML = `
+        <div class="hist-chip"><b>${visita.length}</b>Rutas de visita</div>
+        <div class="hist-chip"><b>${entrega.length}</b>Rutas de entrega</div>
+        <div class="hist-chip"><b>${visita.reduce((a, r) => a + (r.sin_pedido || 0), 0)}</b>Visitas sin pedido</div>
+    `;
+
+    const lista = document.getElementById('hist-lista');
+    lista.innerHTML = '';
+
+    if (visita.length === 0 && entrega.length === 0) {
+        lista.innerHTML = '<p style="text-align:center;color:#888;padding:30px;font-size:13px;">No hay rutas con esos filtros</p>';
+        return;
+    }
+
+    if (visita.length) {
+        lista.innerHTML += '<div class="hist-seccion">🗓️ Rutas de visita</div>';
+        visita.forEach(r => {
+            const total = r.total_paradas || 0;
+            const pct = total ? Math.round(r.completadas / total * 100) : 0;
+            lista.innerHTML += `
+                <div class="hist-card" onclick="verParadas('visita', ${r.id}, '${escapar(r.nombre)}')">
+                    <div>
+                        <div class="hist-nombre">${r.nombre}</div>
+                        <div class="hist-meta">
+                            <span>📍 ${r.zona}</span>
+                            <span>📅 ${r.dia}</span>
+                            <span>👤 ${r.responsable}</span>
+                            ${r.sin_pedido ? `<span class="hist-badge b-sinpedido">${r.sin_pedido} sin pedido</span>` : ''}
+                        </div>
+                    </div>
+                    <div class="hist-derecha">
+                        <span class="hist-badge ${badgeClase(r.estado)}">${r.estado}</span>
+                        <div class="hist-progreso" style="margin-top:6px;">${r.completadas}/${total}</div>
+                        <div class="hist-barra"><div style="width:${pct}%"></div></div>
+                    </div>
+                </div>`;
+        });
+    }
+
+    if (entrega.length) {
+        lista.innerHTML += '<div class="hist-seccion">🚚 Rutas de entrega</div>';
+        entrega.forEach(r => {
+            const total = r.total_paradas || 0;
+            const hechas = parseInt(r.completadas) || 0;
+            const pct = total ? Math.round(hechas / total * 100) : 0;
+            const monto = (r.monto || 0).toLocaleString('es-MX', {
+                minimumFractionDigits: 2, maximumFractionDigits: 2
+            });
+            lista.innerHTML += `
+                <div class="hist-card" onclick="verParadas('entrega', ${r.id}, '${escapar(r.nombre)}')">
+                    <div>
+                        <div class="hist-nombre">${r.nombre}</div>
+                        <div class="hist-meta">
+                            <span>👤 ${r.responsable}</span>
+                            ${r.placas ? `<span>🚚 ${r.placas}</span>` : ''}
+                            <span>📅 ${r.fecha_creacion || '-'}</span>
+                            <span>💵 $${monto}</span>
+                        </div>
+                    </div>
+                    <div class="hist-derecha">
+                        <span class="hist-badge ${badgeClase(r.estado)}">${r.estado}</span>
+                        <div class="hist-progreso" style="margin-top:6px;">${hechas}/${total}</div>
+                        <div class="hist-barra"><div style="width:${pct}%"></div></div>
+                    </div>
+                </div>`;
+        });
+    }
+}
+
+function escapar(t) {
+    return String(t).replace(/'/g, "\\'");
+}
+
+function verParadas(tipo, rutaId, nombre) {
+    document.getElementById('modal-titulo').innerText = nombre;
+    document.getElementById('modal-sub').innerText =
+        tipo === 'visita' ? `Ruta de visita #${rutaId}` : `Ruta de entrega #${rutaId}`;
+    document.getElementById('modal-cuerpo').innerHTML =
+        '<p style="color:#888;font-size:12px;padding:10px;">Cargando paradas...</p>';
+    document.getElementById('hist-modal').classList.add('visible');
+
+    fetch(`/api/rutas/historial-rutas/${tipo}/${rutaId}/paradas/`)
+        .then(r => r.json())
+        .then(d => pintarParadas(d.paradas || [], tipo))
+        .catch(() => {
+            document.getElementById('modal-cuerpo').innerHTML =
+                '<p style="color:#c62828;font-size:12px;padding:10px;">Error al cargar las paradas</p>';
+        });
+}
+
+function pintarParadas(paradas, tipo) {
+    const cuerpo = document.getElementById('modal-cuerpo');
+
+    if (!paradas.length) {
+        cuerpo.innerHTML = '<p style="color:#888;font-size:12px;padding:10px;">Esta ruta no tiene paradas registradas</p>';
+        return;
+    }
+
+    cuerpo.innerHTML = paradas.map((p, i) => {
+        if (tipo === 'visita') {
+            const estado = p.estado_visita;
+            const sinPedido = estado === 'Completada sin pedido';
+            const monto = p.total
+                ? `<div class="parada-monto">$${p.total.toFixed(2)}</div>` : '';
+            return `
+                <div class="parada-fila">
+                    <div class="parada-orden">${p.orden}</div>
+                    <div class="parada-datos">
+                        <div class="parada-nom">${p.nombre}</div>
+                        <div class="parada-det">
+                            ${p.colonia} ·
+                            <span class="hist-badge ${sinPedido ? 'b-sinpedido' : badgeClase(estado)}">${estado}</span>
+                            ${p.pedido_id ? ` · Pedido #${p.pedido_id}` : ''}
+                        </div>
+                        ${sinPedido && p.observaciones
+                            ? `<div class="parada-obs">Motivo: ${p.observaciones}</div>` : ''}
+                    </div>
+                    ${monto}
+                </div>`;
+        }
+
+        const entregado = p.estado_pedido === 'Entregado';
+        return `
+            <div class="parada-fila">
+                <div class="parada-orden">${p.orden === 999 ? i + 1 : p.orden}</div>
+                <div class="parada-datos">
+                    <div class="parada-nom">${p.nombre}</div>
+                    <div class="parada-det">
+                        ${p.colonia} · Pedido #${p.pedido_id} ·
+                        <span class="hist-badge ${entregado ? 'b-completada' : 'b-activa'}">${p.estado_pedido}</span>
+                        ${p.fecha_entrega ? ` · ${p.fecha_entrega} ${p.hora_entrega || ''}` : ''}
+                    </div>
+                </div>
+                <div class="parada-monto">$${(p.subtotal || 0).toFixed(2)}</div>
+            </div>`;
+    }).join('');
+}
+
+function cerrarParadas(e) {
+    if (!e || e.target === document.getElementById('hist-modal')) {
+        document.getElementById('hist-modal').classList.remove('visible');
+    }
+}
+</script>
+{% endblock %}
