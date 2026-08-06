@@ -211,8 +211,8 @@ def mi_ruta(request):
         # Obtener paradas con orden
         cursor.execute("""
             SELECT e.numero AS establecimiento_id, e.nombre, e.latitud AS lat,
-                   e.longitud AS lon, e.estColonia AS colonia,
-                   p.num AS pedido_id, p.subtotal,
+                    e.longitud AS lon, e.estColonia AS colonia,
+                    p.num AS pedido_id, p.total AS subtotal,
                    CONCAT(rep.repNombre, ' ', rep.repApellPat) AS representante,
                    rep.telefono,
                    CASE WHEN ep.nombre = 'Entregado' THEN 1 ELSE 0 END AS entregado,

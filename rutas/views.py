@@ -147,7 +147,7 @@ def obtener_establecimientos_entrega(request, entrega_id):
                 e.longitud,
                 e.estColonia AS colonia,
                 p.num AS pedido_id,
-                p.subtotal,
+                p.total AS subtotal,
                 z.nombre AS zona
             FROM entrega en2
             INNER JOIN pedido p ON p.entrega = en2.numero

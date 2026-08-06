@@ -1,4 +1,4 @@
--- Active: 1785279407257@@127.0.0.1@3306@inpredis_db
+-- Active: 1772565691688@@127.0.0.1@3306@inpredis_db
 #################
 #####TRIGGERS####
 #################
@@ -158,19 +158,18 @@ DELIMITER ;
 
 
 DELIMITER $$
-CREATE OR REPLACE TRIGGER tg_campos_calculados_pedido_delete
-AFTER DELETE ON detalle_pedido
+CREATE OR REPLACE TRIGGER tg_campos_calculados_pedido
+AFTER INSERT ON detalle_pedido
 FOR EACH ROW
 BEGIN
     DECLARE nuevo_total DECIMAL(10,2);
 
-    -- Mismo motivo que arriba.
-    SET nuevo_total = (SELECT total FROM pedido WHERE num = OLD.num_pedido) - OLD.importe;
+    SET nuevo_total = (SELECT total FROM pedido WHERE num = NEW.num_pedido) + NEW.importe;
 
     UPDATE pedido
     SET total = nuevo_total,
         subtotal = (nuevo_total / 1.16),
         iva = ((nuevo_total / 1.16) * 0.16)
-    WHERE num = OLD.num_pedido;
+    WHERE num = NEW.num_pedido;
 END$$
 DELIMITER ;
