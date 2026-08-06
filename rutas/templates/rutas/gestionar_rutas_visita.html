@@ -513,7 +513,6 @@ function quitarParada(estId) {
     actualizarNumerosEnMarcadores();
     actualizarListaParadas();
 }
-
 function guardarRutaDesdePanel() {
     const nombre = document.getElementById('ruta-nombre').value.trim();
     const dia = document.getElementById('ruta-dia').value;
@@ -524,23 +523,11 @@ function guardarRutaDesdePanel() {
     if (!zonaId) { alert('Selecciona una zona'); return; }
     if (paradasSeleccionadas.length === 0) { alert('Selecciona al menos un establecimiento'); return; }
 
-    // Se guarda el modo ANTES de cerrar el panel, porque cerrarEdicion() lo pone en null
+    // Se respeta el orden en que el coordinador seleccionó las paradas,
+    // tanto al crear como al editar la ruta
     const eraEdicion = modoEdicion === 'editar';
-
-    // El orden óptimo de OSRM solo se aplica la PRIMERA VEZ que se crea la ruta.
-    // Si es una edición, se respeta el orden que el coordinador dejó manualmente.
-    if (eraEdicion) {
-        guardarRuta(nombre, dia, descripcion, zonaId, eraEdicion);
-    } else {
-        mostrarToast('Calculando el orden óptimo...');
-        ordenarConOSRM(() => {
-            actualizarNumerosEnMarcadores();
-            actualizarListaParadas();
-            guardarRuta(nombre, dia, descripcion, zonaId, eraEdicion);
-        });
-    }
+    guardarRuta(nombre, dia, descripcion, zonaId, eraEdicion);
 }
-
 function ordenarConOSRM(callback) {
     if (paradasSeleccionadas.length < 2) { callback(); return; }
 
