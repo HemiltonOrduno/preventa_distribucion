@@ -309,6 +309,10 @@ function abrirModalParada(parada) {
     document.getElementById('dev-est-nombre').innerText = parada.nombre;
 
     // Info del pedido
+    // RF36: la confirmación de entrega debe indicar fecha y hora.
+    // Se muestran aquí para que el repartidor vea el momento que se
+    // registrará al confirmar la entrega de este pedido.
+    const { fechaTexto, horaTexto } = obtenerFechaHoraActual();
     document.getElementById('modal-pedido-info').innerHTML = `
         <div class="pedido-row">
             <span class="label">Pedido</span>
@@ -325,6 +329,14 @@ function abrirModalParada(parada) {
         <div class="pedido-row">
             <span class="label">Teléfono</span>
             <span class="valor">${parada.telefono || '-'}</span>
+        </div>
+        <div class="pedido-row">
+            <span class="label">Fecha de entrega</span>
+            <span class="valor" id="modal-fecha-entrega">${fechaTexto}</span>
+        </div>
+        <div class="pedido-row">
+            <span class="label">Hora de entrega</span>
+            <span class="valor" id="modal-hora-entrega">${horaTexto}</span>
         </div>
     `;
 
@@ -468,15 +480,37 @@ function guardarDevolucion() {
     });
 }
 
+// ===== FECHA Y HORA (RF36) =====
+// Devuelve la fecha/hora actual en formato legible (para mostrar en el
+// modal) y en formato ISO (para enviar al backend).
+function obtenerFechaHoraActual() {
+    const ahora = new Date();
+
+    const pad = n => String(n).padStart(2, '0');
+    const fechaISO = `${ahora.getFullYear()}-${pad(ahora.getMonth() + 1)}-${pad(ahora.getDate())}`;
+    const horaISO = `${pad(ahora.getHours())}:${pad(ahora.getMinutes())}:${pad(ahora.getSeconds())}`;
+
+    const fechaTexto = ahora.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const horaTexto = ahora.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+
+    return { fechaISO, horaISO, fechaTexto, horaTexto };
+}
+
 // ===== CONFIRMAR ENTREGA =====
 function confirmarEntrega() {
+    // RF36: se registra la fecha y hora exactas en las que el repartidor
+    // confirma la entrega.
+    const { fechaISO, horaISO, fechaTexto, horaTexto } = obtenerFechaHoraActual();
+
     fetch('/api/entregas/confirmar-entrega/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             pedido_id: paradaActual.pedido_id,
             establecimiento_id: paradaActual.establecimiento_id,
-            entrega_id: entregaId
+            entrega_id: entregaId,
+            fecha_entrega: fechaISO,
+            hora_entrega: horaISO
         })
     })
     .then(res => res.json())
@@ -501,7 +535,7 @@ function confirmarEntrega() {
             m.setIcon(icono);
         }
 
-        mostrarToast('✓ Entrega confirmada');
+        mostrarToast(`✓ Entrega confirmada · ${fechaTexto} ${horaTexto}`);
 
         // RF37: el sistema cerró la entrega al quedar todos los pedidos entregados
         if (data.entrega_completada) {

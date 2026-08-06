@@ -1,4 +1,8 @@
 import requests
+<<<<<<< HEAD
+=======
+from datetime import datetime
+>>>>>>> dev-fonseca
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.db import connection, transaction
@@ -423,6 +427,13 @@ def confirmar_entrega_establecimiento(request):
     establecimiento_id = body.get('establecimiento_id')
     entrega_id = body.get('entrega_id')
 
+    # RF36: la confirmación de entrega debe indicar fecha y hora.
+    # El repartidor las ve y las envía desde el modal; si por algún motivo
+    # no llegan, se usa el momento actual del servidor como respaldo.
+    ahora = datetime.now()
+    fecha_entrega = body.get('fecha_entrega') or ahora.strftime('%Y-%m-%d')
+    hora_entrega = body.get('hora_entrega') or ahora.strftime('%H:%M:%S')
+
     with transaction.atomic():
         with connection.cursor() as cursor:
             # RF36: no se puede confirmar la entrega sin pago registrado
@@ -444,15 +455,18 @@ def confirmar_entrega_establecimiento(request):
 
             cursor.execute("""
                 INSERT INTO entrega_estable (entrega, establecimiento, fecha_entrega, hora_entrega)
-                VALUES (%s, %s, CURDATE(), TIME(NOW()))
-                ON DUPLICATE KEY UPDATE fecha_entrega = CURDATE(), hora_entrega = TIME(NOW())
-            """, [entrega_id, establecimiento_id])
+                VALUES (%s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE fecha_entrega = %s, hora_entrega = %s
+            """, [entrega_id, establecimiento_id, fecha_entrega, hora_entrega,
+                  fecha_entrega, hora_entrega])
 
             entrega_cerrada = _cerrar_entrega_si_completa(cursor, entrega_id)
 
     return JsonResponse({
         "mensaje": "Entrega confirmada correctamente",
-        "entrega_completada": entrega_cerrada
+        "entrega_completada": entrega_cerrada,
+        "fecha_entrega": fecha_entrega,
+        "hora_entrega": hora_entrega
     })
 
 
