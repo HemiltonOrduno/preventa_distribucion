@@ -38,10 +38,23 @@
             <span class="icon">📋</span> Historial de rutas
         </a>
     </nav>
-    <div id="sidebar-logout">
-        <a href="/api/usuarios/logout/" onclick="return abrirModalLogout(event);">
-            <span class="icon">🚪</span> Cerrar sesión
-        </a>
+    <div id="sidebar-user">
+        <button id="sidebar-user-btn" onclick="toggleSidebarPerfil(event)">
+            <span class="icon"><i class='bx bx-user'></i></span> Mi cuenta
+        </button>
+
+        <div class="sidebar-perfil" id="sidebarPerfil">
+            <div class="sidebar-perfil__avatar"><i class='bx bx-user'></i></div>
+            <div class="sidebar-perfil__datos">
+                <div class="sidebar-perfil__nombre">{{ request.session.nombre_usuario|default:"Usuario" }}</div>
+                <div class="sidebar-perfil__rol">{{ request.session.rol|default:"COORDINADOR" }}</div>
+            </div>
+            <a href="/api/usuarios/logout/" class="sidebar-perfil__logout"
+               title="Cerrar sesión" aria-label="Cerrar sesión"
+               onclick="return abrirModalLogout(event);">
+                <i class='bx bx-log-out'></i>
+            </a>
+        </div>
     </div>
 </div>
 
@@ -98,13 +111,14 @@
 {% endblock %}
 
 <script>
-/*===== MODAL DE CIERRE DE SESION =====*/
+/*===== MODAL DE CIERRE DE SESION + PANEL DE PERFIL =====*/
 document.addEventListener("DOMContentLoaded", function(){
     var modalLogout = document.getElementById("modalLogout");
 
     window.abrirModalLogout = function(e){
         e.preventDefault();
         e.stopPropagation();
+        cerrarSidebarPerfil();
         modalLogout.classList.add("modal--abierto");
         return false;
     };
@@ -117,8 +131,24 @@ document.addEventListener("DOMContentLoaded", function(){
         if (e.target === modalLogout){ cerrarModalLogout(); }
     });
     document.addEventListener("keydown", function(e){
-        if (e.key === "Escape"){ cerrarModalLogout(); }
+        if (e.key === "Escape"){ cerrarModalLogout(); cerrarSidebarPerfil(); }
     });
+
+    /*===== PANEL DE PERFIL EN SIDEBAR =====*/
+    var sidebarPerfil = document.getElementById("sidebarPerfil");
+
+    window.toggleSidebarPerfil = function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        sidebarPerfil.classList.toggle("sidebar-perfil--abierto");
+    };
+
+    window.cerrarSidebarPerfil = function(){
+        sidebarPerfil.classList.remove("sidebar-perfil--abierto");
+    };
+
+    sidebarPerfil.addEventListener("click", function(e){ e.stopPropagation(); });
+    document.addEventListener("click", cerrarSidebarPerfil);
 });
 </script>
 
@@ -335,7 +365,6 @@ function cerrarDetalleRuta() {
 
 window.addEventListener('load', cargarDatos);
 </script>
-
 {% endblock %}
 </body>
 </html>
