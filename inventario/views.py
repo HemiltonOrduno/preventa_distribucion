@@ -7,6 +7,7 @@ from usuarios.permissions import rol_requerido
 from django.core.cache import cache
 
 TIPOS_SALIDA = ('TM002', 'TM003')  # Salida por pedido, Salida por merma
+TIPO_ENTRADA_DEVOLUCION = 'TM004'  # Entrada por devolución — origen = Devolución (RF40)
 
 @rol_requerido('Almacenista', 'Administrador')
 @csrf_exempt
@@ -14,6 +15,14 @@ def registrar_movimiento(request):
     """
     RF40 (entrada) y RF42 (salida por merma): registra un movimiento de
     inventario con sus líneas de detalle.
+
+    RF40 pide capturar el "origen" de la entrada. En nuestro modelo el
+    origen se traduce directamente al tipo_movimiento:
+        - origen Producción  -> TM001 (Entrada)
+        - origen Devolución  -> TM004 (Entrada por devolución)
+    Cuando el origen es Devolución, además se exige y se guarda el FK
+    `devolucion` para dejar rastro de qué devolución generó la entrada
+    (ninguna devolución puede usarse dos veces, ver validación abajo).
 
     El stock de cada producto se actualiza solo (RF43) porque ya existe
     el trigger tg_actualizar_stock, que dispara AFTER INSERT ON
@@ -29,11 +38,15 @@ def registrar_movimiento(request):
         observaciones = body.get("observaciones", "")
         empleado = body.get("empleado")
         detalle = body.get("detalle", [])
+        devolucion = body.get("devolucion")  # solo aplica cuando tipo_movimiento == TM004
     except Exception:
         return JsonResponse({"error": "JSON inválido"}, status=400)
 
     if not tipo_movimiento or not empleado or not detalle:
         return JsonResponse({"error": "Se requiere tipo_movimiento, empleado y detalle"}, status=400)
+
+    if tipo_movimiento == TIPO_ENTRADA_DEVOLUCION and not devolucion:
+        return JsonResponse({"error": "El origen 'Devolución' requiere seleccionar la devolución que la originó"}, status=400)
 
     with transaction.atomic():
         with connection.cursor() as cursor:
@@ -50,15 +63,25 @@ def registrar_movimiento(request):
                             "error": f"Stock insuficiente para {linea['producto']}. Disponible: {row[0]}"
                         }, status=400)
 
+            if tipo_movimiento == TIPO_ENTRADA_DEVOLUCION:
+                # Una devolución solo puede convertirse en entrada de inventario una vez.
+                cursor.execute("SELECT codigo FROM devolucion WHERE codigo = %s", [devolucion])
+                if not cursor.fetchone():
+                    return JsonResponse({"error": f"La devolución {devolucion} no existe"}, status=404)
+                cursor.execute("SELECT codigo FROM movimientos WHERE devolucion = %s", [devolucion])
+                if cursor.fetchone():
+                    return JsonResponse({"error": f"La devolución {devolucion} ya fue registrada como entrada de inventario"}, status=400)
+
             # codigo no es autoincremental en el esquema real (igual que
             # pasó con usuario.num) -> lo calculamos nosotros.
             cursor.execute("SELECT COALESCE(MAX(codigo), 0) + 1 FROM movimientos")
             nuevo_codigo = cursor.fetchone()[0]
 
             cursor.execute("""
-                INSERT INTO movimientos (codigo, observaciones, fecha, tipo_movimiento, empleado)
-                VALUES (%s, %s, NOW(), %s, %s)
-            """, [nuevo_codigo, observaciones, tipo_movimiento, empleado])
+                INSERT INTO movimientos (codigo, observaciones, fecha, tipo_movimiento, devolucion, empleado)
+                VALUES (%s, %s, NOW(), %s, %s, %s)
+            """, [nuevo_codigo, observaciones, tipo_movimiento,
+                  devolucion if tipo_movimiento == TIPO_ENTRADA_DEVOLUCION else None, empleado])
 
             for linea in detalle:
                 subtotal = linea["cantidad"] * linea["precio_unitario"]
@@ -76,6 +99,29 @@ def registrar_movimiento(request):
         "tipo_movimiento": tipo_movimiento,
         "productos_afectados": len(detalle)
     }, status=201, json_dumps_params={'ensure_ascii': False})
+
+@rol_requerido('Almacenista', 'Administrador')
+def devoluciones_pendientes(request):
+    """
+    RF40 (origen = Devolución): lista las devoluciones que todavía no se
+    han convertido en una entrada de inventario (TM004), para que el
+    almacenista elija cuál está procesando.
+    """
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT d.codigo, d.fecha, d.cantidad, d.motivo, d.entrega
+            FROM devolucion d
+            LEFT JOIN movimientos m ON m.devolucion = d.codigo
+            WHERE m.codigo IS NULL
+            ORDER BY d.fecha DESC, d.codigo DESC
+        """)
+        columns = [col[0] for col in cursor.description]
+        devoluciones = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+    for dev in devoluciones:
+        dev['fecha'] = dev['fecha'].strftime('%d/%m/%Y') if dev['fecha'] else None
+
+    return JsonResponse({"devoluciones": devoluciones}, json_dumps_params={'ensure_ascii': False})
 
 @rol_requerido('Almacenista', 'Administrador')
 def consultar_stock(request, cod_producto):
