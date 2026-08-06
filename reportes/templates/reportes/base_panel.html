@@ -65,6 +65,16 @@ body{
   color:#fff;display:grid;place-items:center;font-size:13px;font-weight:600}
 .identidad small{display:block;color:var(--texto-tenue);font-size:12px}
 .identidad-nombre{font-size:13.5px}
+.identidad-separador{width:1px;align-self:stretch;background:var(--borde);margin:0 2px}
+.boton-salir{
+  display:flex;align-items:center;gap:6px;min-height:38px;padding:8px 13px;
+  border:1px solid var(--borde);border-radius:8px;background:var(--superficie);
+  color:var(--texto-tenue);font-size:13px;font-weight:600;font-family:inherit;
+  cursor:pointer;transition:background .15s,color .15s,border-color .15s;
+}
+.boton-salir:hover{background:#FBEAEA;color:var(--peligro);border-color:#F0C7C7}
+.boton-salir:focus-visible{outline:2px solid var(--primario);outline-offset:2px}
+.boton-salir svg{width:16px;height:16px;flex-shrink:0}
 .titulo-barra{display:flex;align-items:center;gap:12px}
 .acciones.pegada{margin-top:0}
 .columna-acciones{text-align:right}
@@ -287,6 +297,17 @@ tbody tr:focus-visible{outline:2px solid var(--primario);outline-offset:-2px}
         <strong class="identidad-nombre">Administrador</strong>
         <small>Sucursal Tijuana</small>
       </div>
+      <span class="identidad-separador" aria-hidden="true"></span>
+      <button type="button" class="boton-salir" id="btnCerrarSesion" title="Cerrar sesión"
+              data-url-login="{% url 'logout' %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+          <polyline points="16 17 21 12 16 7"></polyline>
+          <line x1="21" y1="12" x2="9" y2="12"></line>
+        </svg>
+        <span>Cerrar sesión</span>
+      </button>
     </div>
   </header>
 
@@ -384,18 +405,38 @@ var Panel = (function () {
     return d.innerHTML;
   }
 
+/* Convierte un valor ISO del backend a objeto Date SIN corrimiento.
+
+     Una cadena de solo fecha ("2026-07-21") la interpreta JavaScript como
+     medianoche UTC; al formatearla en Tijuana (UTC-7) retrocede al día
+     anterior. Por eso se construye componente por componente, que produce
+     medianoche LOCAL. Los valores con hora ya vienen completos. */
+  function aObjetoFecha(iso) {
+    if (!iso) { return null; }
+    var soloFecha = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso));
+    if (soloFecha) {
+      return new Date(
+        Number(soloFecha[1]),
+        Number(soloFecha[2]) - 1,
+        Number(soloFecha[3])
+      );
+    }
+    var d = new Date(iso);
+    return isNaN(d) ? null : d;
+  }
+
   function aFecha(iso) {
     if (!iso) { return "—"; }
-    var d = new Date(iso);
-    return isNaN(d) ? iso : fechaCorta.format(d);
+    var d = aObjetoFecha(iso);
+    return d ? fechaCorta.format(d) : iso;
   }
 
   function aFechaHora(iso) {
     if (!iso) { return "—"; }
-    var d = new Date(iso);
-    return isNaN(d) ? iso : fechaHora.format(d);
+    var d = aObjetoFecha(iso);
+    return d ? fechaHora.format(d) : iso;
   }
-
+  
   /* El tono lo decide el backend (reportes/catalogos.py). */
   function etiqueta(nombre, tono) {
     return '<span class="etiqueta ' + (tono || "gris") + '">' +
@@ -442,6 +483,19 @@ var Panel = (function () {
 
   function cerrarModal() { $("telon").classList.remove("visible"); }
 
+  /* Cierra la sesión del administrador y regresa a la pantalla de login.
+     TEMPORAL: mientras RF01-RF03 no emita un token real, aquí solo se
+     limpia cualquier rastro guardado en el cliente y se redirige.
+     Cuando exista sesión/token del backend, aquí debe ir además la
+     llamada a un endpoint tipo POST /api/auth/logout antes de redirigir. */
+  function cerrarSesion(urlLogin) {
+    try {
+      sessionStorage.clear();
+      localStorage.removeItem("empleadoId");
+    } catch (e) { /* almacenamiento no disponible, se ignora */ }
+    window.location.href = urlLogin;
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     $("btnCerrar").addEventListener("click", cerrarModal);
     $("telon").addEventListener("click", function (e) {
@@ -453,12 +507,20 @@ var Panel = (function () {
     $("alternarMenu").addEventListener("click", function () {
       $("menu").classList.toggle("desplegado");
     });
+
+    var btnSalir = $("btnCerrarSesion");
+    if (btnSalir) {
+      btnSalir.addEventListener("click", function () {
+        cerrarSesion(btnSalir.getAttribute("data-url-login"));
+      });
+    }
   });
 
   return {
     $: $, pedir: pedir, pedirAdmin: pedirAdmin, enviarAdmin: enviarAdmin,
     escapar: escapar, dinero: dinero,
-    aFecha: aFecha, aFechaHora: aFechaHora, etiqueta: etiqueta,
+    aFecha: aFecha, aFechaHora: aFechaHora, aObjetoFecha: aObjetoFecha,
+    etiqueta: etiqueta,
     parametros: parametros, llenarSelect: llenarSelect,
     cargando: cargando, mensaje: mensaje,
     abrirModal: abrirModal, cerrarModal: cerrarModal

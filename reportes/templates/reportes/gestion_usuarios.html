@@ -188,8 +188,12 @@ tbody tr.inactivo td{color:var(--texto-tenue)}
   /* Vigencia de la licencia: avisa cuando esta por vencer o ya vencio. */
   function avisoVigencia(u) {
     if (!u.licencia_vigencia) { return ""; }
-    var dias = Math.ceil(
-      (new Date(u.licencia_vigencia) - new Date()) / 86400000);
+    // aObjetoFecha evita el corrimiento de zona en valores de solo fecha.
+    var vence = P.aObjetoFecha(u.licencia_vigencia);
+    if (!vence) { return ""; }
+    var hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    var dias = Math.round((vence - hoy) / 86400000);
     if (dias < 0) { return " " + P.etiqueta("Vencida", "rojo"); }
     if (dias <= 30) { return " " + P.etiqueta("Por vencer", "ambar"); }
     return "";
