@@ -173,76 +173,84 @@ def obtener_establecimientos_entrega(request, entrega_id):
 @csrf_exempt
 def calcular_ruta_entrega_coordinador(request, entrega_id):
     """
-    Calcula la ruta óptima para una entrega específica.
+    Calcula la ruta de una entrega. Si el coordinador ya definió un orden
+    en ruta_entrega_orden se respeta (usando /route/); si no, se deja que
+    OSRM lo optimice (/trip/).
     """
     with connection.cursor() as cursor:
         cursor.execute("""
-            SELECT 
-                e.numero AS id,
-                e.nombre AS nombre,
-                e.latitud AS lat,
-                e.longitud AS lon,
-                p.num AS pedido_id,
-                p.subtotal,
-                e.estColonia AS colonia
+            SELECT DISTINCT
+                e.numero AS id, e.nombre, e.latitud AS lat, e.longitud AS lon,
+                p.num AS pedido_id, p.subtotal, e.estColonia AS colonia,
+                reo.orden
             FROM entrega en2
             INNER JOIN pedido p ON p.entrega = en2.numero
             INNER JOIN visita v ON v.numero = p.visita
             INNER JOIN establecimiento e ON e.numero = v.establecimiento
+            INNER JOIN ruta_entrega re ON re.entrega = en2.numero
+            LEFT JOIN ruta_entrega_orden reo ON reo.ruta_entrega = re.numero
+                                            AND reo.establecimiento = e.numero
             WHERE en2.numero = %s
+            ORDER BY reo.orden IS NULL, reo.orden
         """, [entrega_id])
-
         columns = [col[0] for col in cursor.description]
-        rows = cursor.fetchall()
-        establecimientos = [dict(zip(columns, row)) for row in rows]
+        establecimientos = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
     if not establecimientos:
         return JsonResponse({"error": "No se encontraron establecimientos para esta entrega"}, status=404)
 
+    tiene_orden = all(e['orden'] is not None for e in establecimientos)
+
     coordenadas = [(ALMACEN["lon"], ALMACEN["lat"])] + [
         (float(e["lon"]), float(e["lat"])) for e in establecimientos
     ]
-
     coords_str = ";".join(f"{lon},{lat}" for lon, lat in coordenadas)
-    url = f"{OSRM_URL}/trip/v1/driving/{coords_str}"
 
     try:
-        response = requests.get(url, params={
-            "roundtrip": "false",
-            "source": "first",
-            "destination": "last",
-            "geometries": "geojson",
-            "overview": "full"
-        }, timeout=10)
-        data = response.json()
+        if tiene_orden:
+            # El coordinador ya fijó el orden: se traza tal cual
+            response = requests.get(
+                f"{OSRM_URL}/route/v1/driving/{coords_str}",
+                params={"geometries": "geojson", "overview": "full"},
+                timeout=10
+            )
+            data = response.json()
+            if data.get("code") != "Ok":
+                return JsonResponse({"error": "OSRM no pudo calcular la ruta"}, status=400)
+            trip = data["routes"][0]
+            orden_final = list(range(len(coordenadas)))
+        else:
+            # Sin orden guardado, OSRM propone el recorrido más corto
+            response = requests.get(
+                f"{OSRM_URL}/trip/v1/driving/{coords_str}",
+                params={
+                    "roundtrip": "false", "source": "first", "destination": "last",
+                    "geometries": "geojson", "overview": "full"
+                },
+                timeout=10
+            )
+            data = response.json()
+            if data.get("code") != "Ok":
+                return JsonResponse({"error": "OSRM no pudo calcular la ruta"}, status=400)
+            trip = data["trips"][0]
+            orden_final = [wp["waypoint_index"] for wp in data["waypoints"]]
     except requests.exceptions.ConnectionError:
         return JsonResponse({"error": "No se pudo conectar al servidor OSRM"}, status=500)
-
-    if data.get("code") != "Ok":
-        return JsonResponse({"error": "OSRM no pudo calcular la ruta", "detalle": data}, status=400)
-
-    trip = data["trips"][0]
-    waypoints = data["waypoints"]
-    orden = [wp["waypoint_index"] for wp in waypoints]
 
     paradas = []
     for i, (lon, lat) in enumerate(coordenadas):
         if i == 0:
             paradas.append({
-                "lon": lon,
-                "lat": lat,
-                "nombre": ALMACEN["nombre"],
-                "tipo": "almacen",
-                "orden": 0
+                "lon": lon, "lat": lat, "nombre": ALMACEN["nombre"],
+                "tipo": "almacen", "orden": 0
             })
         else:
             est = establecimientos[i - 1]
             paradas.append({
-                "lon": lon,
-                "lat": lat,
+                "lon": lon, "lat": lat,
                 "nombre": est["nombre"],
                 "tipo": "establecimiento",
-                "orden": orden[i],
+                "orden": orden_final[i],
                 "establecimiento_id": est["id"],
                 "pedido_id": est["pedido_id"],
                 "subtotal": float(est["subtotal"]),
@@ -291,6 +299,7 @@ def rutas_activas(request):
                 re.numero AS id,
                 re.nombre,
                 er.nombre AS estado,
+                een.nombre AS estado_entrega,
                 COALESCE(CONCAT(em.empNombre, ' ', em.empApellPat), 'Sin asignar') AS repartidor,
                 ve.placas AS vehiculo,
                 COUNT(p.num) AS total_pedidos,
@@ -302,6 +311,7 @@ def rutas_activas(request):
             INNER JOIN edo_ruta_entrega er ON er.codigo = re.edo_ruta_entrega
             LEFT JOIN empleado em ON em.num = re.empleado
             INNER JOIN entrega en2 ON en2.numero = re.entrega
+            INNER JOIN edo_entrega een ON een.codigo = en2.edo_entrega
             LEFT JOIN vehiculo ve ON ve.entrega = en2.numero
             LEFT JOIN pedido p ON p.entrega = en2.numero
             LEFT JOIN edo_pedido ep ON ep.codigo = p.edo_pedido
@@ -309,7 +319,7 @@ def rutas_activas(request):
             LEFT JOIN establecimiento e ON e.numero = v.establecimiento
             LEFT JOIN zona z ON z.num = e.zona
             WHERE er.nombre NOT IN ('Entregada')
-            GROUP BY re.numero, re.nombre, er.nombre, em.empNombre, em.empApellPat, ve.placas, z.nombre, re.entrega
+            GROUP BY re.numero, re.nombre, er.nombre, een.nombre, em.empNombre, em.empApellPat, ve.placas, z.nombre, re.entrega
         """)
         columns = [col[0] for col in cursor.description]
         rutas_entrega = [dict(zip(columns, row)) for row in cursor.fetchall()]
@@ -1014,3 +1024,140 @@ def paradas_ruta_entrega(request, ruta_id):
 
 def historial_rutas_view(request):
     return render(request, 'rutas/historial_rutas.html')
+
+def repartidores_disponibles(request):
+    """
+    RF32: repartidores activos con la carga de trabajo que traen hoy,
+    para que el coordinador decida a quién asignarle una ruta.
+    """
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT em.num AS id,
+                   CONCAT(em.empNombre, ' ', em.empApellPat) AS nombre,
+                   (SELECT COUNT(*) FROM ruta_entrega re
+                     WHERE re.empleado = em.num
+                       AND re.edo_ruta_entrega IN ('ERET001','ERET002')) AS rutas_activas
+            FROM empleado em
+            INNER JOIN rol r ON r.codigo = em.rol
+            INNER JOIN edo_empleado ee ON ee.codigo = em.edo_empleado
+            WHERE r.nombre = 'Repartidor' AND ee.nombre = 'Activo'
+            ORDER BY rutas_activas ASC, em.empNombre
+        """)
+        columns = [c[0] for c in cursor.description]
+        repartidores = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+    for r in repartidores:
+        r['disponible'] = r['rutas_activas'] == 0
+
+    return JsonResponse({"repartidores": repartidores},
+                        json_dumps_params={'ensure_ascii': False})
+
+
+@csrf_exempt
+def aprobar_ruta_entrega(request, ruta_id):
+    """
+    RF30 + RF33: el coordinador revisa la ruta que armó el almacenista,
+    le pone nombre y descripción, y la libera para los repartidores
+    (entrega Creada -> Cargada). Puede asignarla a un repartidor
+    específico o dejarla disponible para que la tome cualquiera.
+    """
+    if request.method != 'POST':
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+
+    try:
+        body = json.loads(request.body)
+    except Exception:
+        return JsonResponse({"error": "JSON inválido"}, status=400)
+
+    nombre = (body.get('nombre') or '').strip()
+    descripcion = (body.get('descripcion') or '').strip() or None
+    repartidor_id = body.get('repartidor_id') or None
+
+    if not nombre:
+        return JsonResponse({"error": "El nombre de la ruta es requerido"}, status=400)
+
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT re.entrega, en.edo_entrega
+            FROM ruta_entrega re
+            INNER JOIN entrega en ON en.numero = re.entrega
+            WHERE re.numero = %s
+        """, [ruta_id])
+        row = cursor.fetchone()
+        if not row:
+            return JsonResponse({"error": "Ruta no encontrada"}, status=404)
+
+        entrega_id, edo_actual = row
+        if edo_actual != 'EEN001':
+            return JsonResponse({"error": "Esta ruta ya fue liberada"}, status=409)
+
+        # Un repartidor solo puede llevar una ruta a la vez: una entrega
+        # equivale a un camión y no puede manejar dos al mismo tiempo
+        if repartidor_id:
+            cursor.execute("""
+                SELECT COUNT(*) FROM ruta_entrega
+                WHERE empleado = %s AND edo_ruta_entrega IN ('ERET001','ERET002')
+            """, [repartidor_id])
+            if cursor.fetchone()[0] > 0:
+                return JsonResponse({
+                    "error": "Ese repartidor ya tiene una ruta activa"
+                }, status=409)
+
+        cursor.execute("""
+            UPDATE ruta_entrega SET nombre = %s, descripcion = %s, empleado = %s
+            WHERE numero = %s
+        """, [nombre, descripcion, repartidor_id, ruta_id])
+
+        cursor.execute("""
+            UPDATE entrega SET edo_entrega = 'EEN003' WHERE numero = %s
+        """, [entrega_id])
+
+    return JsonResponse({
+        "mensaje": "Ruta liberada correctamente",
+        "ruta_id": ruta_id,
+        "asignada": bool(repartidor_id)
+    }, json_dumps_params={'ensure_ascii': False})
+    
+@csrf_exempt
+def trazar_ruta_orden(request):
+    """
+    Traza la ruta respetando el orden exacto de los puntos recibidos.
+    A diferencia de calcular_ruta_entrega (que usa /trip/ y reoptimiza),
+    aquí se usa /route/ porque el orden ya lo definió el coordinador.
+    """
+    if request.method != "POST":
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+
+    try:
+        body = json.loads(request.body)
+        establecimientos = body.get("establecimientos", [])
+    except Exception:
+        return JsonResponse({"error": "JSON inválido"}, status=400)
+
+    if not establecimientos:
+        return JsonResponse({"error": "No se proporcionaron establecimientos"}, status=400)
+
+    coordenadas = [(ALMACEN["lon"], ALMACEN["lat"])] + [
+        (float(e["lon"]), float(e["lat"])) for e in establecimientos
+    ]
+    coords_str = ";".join(f"{lon},{lat}" for lon, lat in coordenadas)
+
+    try:
+        response = requests.get(
+            f"{OSRM_URL}/route/v1/driving/{coords_str}",
+            params={"geometries": "geojson", "overview": "full"},
+            timeout=10
+        )
+        data = response.json()
+    except requests.exceptions.ConnectionError:
+        return JsonResponse({"error": "No se pudo conectar al servidor OSRM"}, status=500)
+
+    if data.get("code") != "Ok":
+        return JsonResponse({"error": "OSRM no pudo calcular la ruta"}, status=400)
+
+    ruta = data["routes"][0]
+    return JsonResponse({
+        "distancia_total_km": round(ruta["distance"] / 1000, 2),
+        "duracion_total_min": round(ruta["duration"] / 60, 2),
+        "geometria": ruta["geometry"]
+    }, json_dumps_params={'ensure_ascii': False})

@@ -502,6 +502,7 @@ def entregas_disponibles(request):
             LEFT JOIN vehiculo veh ON veh.entrega = en.numero
             LEFT JOIN modelo mdl ON mdl.numero = veh.modelo
             WHERE re.empleado IS NULL AND re.edo_ruta_entrega = 'ERET001'
+              AND en.edo_entrega = 'EEN003'
             GROUP BY re.numero, re.entrega, en.fecha_creacion, veh.placas, mdl.nombre, mdl.capacidad
             ORDER BY en.fecha_creacion ASC
         """)

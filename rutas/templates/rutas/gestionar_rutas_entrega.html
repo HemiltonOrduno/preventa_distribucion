@@ -10,8 +10,8 @@
     </div>
     <div id="page-body">
         <div class="filtro-estado">
-            <button class="active" onclick="filtrar('todas', this)">Todas</button>
-            <button onclick="filtrar('Creada', this)">Creadas</button>
+            <button class="active" onclick="filtrar('por-crear', this)">📦 Por crear ruta</button>
+            <button onclick="filtrar('todas', this)">Todas</button>
             <button onclick="filtrar('En camino', this)">En camino</button>
             <button onclick="filtrar('Pausada', this)">Pausadas</button>
         </div>
@@ -34,6 +34,26 @@
                             <span>Arrastra para reordenar</span>
                         </div>
                         <div id="sortable-paradas"></div>
+                        <div id="panel-aprobar" style="display:none;padding:12px;border-top:1px solid #dee2e6;background:#f8f9fa;">
+                            <div class="form-group" style="margin-bottom:10px;">
+                                <label>Nombre de la ruta</label>
+                                <input type="text" id="apr-nombre" readonly
+                                       style="background:#f0f2f5;color:#555;cursor:not-allowed;">
+                            </div>
+                            <div class="form-group" style="margin-bottom:10px;">
+                                <label>Descripción</label>
+                                <textarea id="apr-descripcion" placeholder="Opcional..."></textarea>
+                            </div>
+                            <div class="form-group" style="margin-bottom:10px;">
+                                <label>Repartidor</label>
+                                <select id="apr-repartidor">
+                                    <option value="">Dejar disponible para cualquiera</option>
+                                </select>
+                            </div>
+                            <button class="btn-guardar" style="width:100%;padding:10px;"
+                                    onclick="aprobarRuta()">✓ Liberar ruta</button>
+                        </div>
+
                         <div id="modal-footer">
                             <button class="btn-resetear" onclick="resetearOrden()">↺ Resetear</button>
                             <button class="btn-guardar" onclick="guardarOrden()">✓ Guardar orden</button>
@@ -61,8 +81,15 @@ let paradasOriginales = [];
 let rutaActualId = null;
 let entregaActualId = null;
 let sortable = null;
+let repartidores = [];
+let estadoRutaActual = null;
 
-window.addEventListener('load', cargarRutas);
+window.addEventListener('load', () => {
+    cargarRutas();
+    fetch('/api/rutas/repartidores-disponibles/')
+        .then(r => r.json())
+        .then(d => { repartidores = d.repartidores || []; });
+});
 
 function cargarRutas() {
     fetch('/api/rutas/rutas-activas/')
@@ -70,14 +97,24 @@ function cargarRutas() {
         .then(data => {
             todasLasRutas = data.rutas_entrega;
             document.getElementById('loading').style.display = 'none';
-            renderizar(todasLasRutas);
+            renderizar(todasLasRutas.filter(r => r.estado_entrega === 'Creada'), true);
         });
 }
 
 function filtrar(estado, btn) {
     document.querySelectorAll('.filtro-estado button').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    renderizar(estado === 'todas' ? todasLasRutas : todasLasRutas.filter(r => r.estado === estado));
+
+    // "Por crear" = entregas cargadas por el almacenista que todavía
+    // no tienen ruta generada por el coordinador
+    if (estado === 'por-crear') {
+        renderizar(todasLasRutas.filter(r => r.estado_entrega === 'Creada'), true);
+        return;
+    }
+
+    // En los demás filtros las pendientes no aparecen: su ruta aún no existe
+    const yaCreadas = todasLasRutas.filter(r => r.estado_entrega !== 'Creada');
+    renderizar(estado === 'todas' ? yaCreadas : yaCreadas.filter(r => r.estado === estado), false);
 }
 
 function getBadgeClass(estado) {
@@ -87,13 +124,20 @@ function getBadgeClass(estado) {
     return 'badge-activa';
 }
 
-function renderizar(rutas) {
+function renderizar(rutas, porCrear) {
     const lista = document.getElementById('lista-rutas');
     lista.innerHTML = '';
 
     if (rutas.length === 0) {
-        lista.innerHTML = '<p style="text-align:center;color:#888;padding:40px;">No hay rutas con ese filtro</p>';
+        lista.innerHTML = porCrear
+            ? '<p style="text-align:center;color:#888;padding:40px;">No hay entregas cargadas pendientes de ruta</p>'
+            : '<p style="text-align:center;color:#888;padding:40px;">No hay rutas con ese filtro</p>';
         return;
+    }
+
+    if (porCrear) {
+        lista.innerHTML = '<p style="font-size:12px;color:#888;margin-bottom:12px;">' +
+            'Entregas cargadas por el almacenista, listas para generar su ruta de entrega.</p>';
     }
 
     rutas.forEach(r => {
@@ -105,20 +149,20 @@ function renderizar(rutas) {
         div.className = 'card';
         div.innerHTML = `
             <div class="card-header">
-                <div class="card-title">${r.nombre}</div>
-                <span class="badge ${getBadgeClass(r.estado)}">${r.estado}</span>
+                <div class="card-title">${porCrear ? 'Entrega #' + r.entrega_id : r.nombre}</div>
+                <span class="badge ${getBadgeClass(r.estado)}">${porCrear ? 'Pendiente de ruta' : r.estado}</span>
             </div>
             <div class="info-grid">
                 <div><div class="label">Repartidor</div><div class="valor">${r.repartidor}</div></div>
                 <div><div class="label">Zona</div><div class="valor">${r.zona || '-'}</div></div>
                 <div><div class="label">Vehículo</div><div class="valor">${r.vehiculo || '-'}</div></div>
-                <div><div class="label">Pedidos</div><div class="valor">${entregados}/${total}</div></div>
+                <div><div class="label">Pedidos</div><div class="valor">${porCrear ? total : entregados + '/' + total}</div></div>
                 <div><div class="label">Total a cobrar</div><div class="valor">$${parseFloat(r.total || 0).toFixed(2)}</div></div>
-                <div><div class="label">Progreso</div><div class="valor">${progreso}%</div></div>
+                ${porCrear ? '' : `<div><div class="label">Progreso</div><div class="valor">${progreso}%</div></div>`}
             </div>
-            <div class="progress-bar"><div class="fill" style="width:${progreso}%"></div></div>
-            <button class="btn-ver-mapa" onclick="abrirMapa(${r.id}, ${r.entrega_id}, '${r.nombre}')">
-                🗺️ Ver y editar ruta en mapa
+            ${porCrear ? '' : `<div class="progress-bar"><div class="fill" style="width:${progreso}%"></div></div>`}
+            <button class="btn-ver-mapa" onclick="abrirMapa(${r.id}, ${r.entrega_id}, '${r.nombre}', '${r.estado_entrega}')">
+                ${porCrear ? '➕ Generar ruta de entrega' : '🗺️ Ver y editar ruta en mapa'}
             </button>
         `;
         lista.appendChild(div);
@@ -126,13 +170,38 @@ function renderizar(rutas) {
 }
 
 // ===== MODAL MAPA =====
-function abrirMapa(rutaId, entregaId, nombre) {
+function abrirMapa(rutaId, entregaId, nombre, estado) {
     rutaActualId = rutaId;
     entregaActualId = entregaId;
+    estadoRutaActual = estado;
     document.getElementById('modal-titulo').innerText = nombre;
     document.getElementById('modal-overlay').classList.add('visible');
 
-    // Destruir mapa anterior si existe
+    // Solo las rutas recién creadas por el almacenista se pueden liberar
+    const panel = document.getElementById('panel-aprobar');
+    const footer = document.getElementById('modal-footer');
+    if (estado === 'Creada') {
+        panel.style.display = 'block';
+        footer.style.display = 'none';
+        document.getElementById('apr-nombre').value = nombre;
+        document.getElementById('apr-descripcion').value = '';
+
+        const sel = document.getElementById('apr-repartidor');
+        sel.innerHTML = '<option value="">Dejar disponible para cualquiera</option>';
+        repartidores.forEach(rep => {
+            const o = document.createElement('option');
+            o.value = rep.id;
+            o.disabled = !rep.disponible;
+            o.innerText = rep.disponible
+                ? `${rep.nombre} — disponible`
+                : `${rep.nombre} — ocupado (${rep.rutas_activas} ruta activa)`;
+            sel.appendChild(o);
+        });
+    } else {
+        panel.style.display = 'none';
+        footer.style.display = 'flex';
+    }
+
     if (mapaModal) {
         mapaModal.remove();
         mapaModal = null;
@@ -141,7 +210,6 @@ function abrirMapa(rutaId, entregaId, nombre) {
     }
 
     setTimeout(() => {
-        const tijuanaBounds = L.latLngBounds([32.38, -117.15], [32.62, -116.88]);
         mapaModal = L.map('modal-map', {
             center: [32.5149, -117.0382],
             zoom: 12, minZoom: 11, maxZoom: 18
@@ -201,6 +269,7 @@ function renderizarSortable(paradas) {
     paradas.forEach((p, i) => {
         const div = document.createElement('div');
         div.className = 'parada-sortable';
+        if (p.tipo === 'almacen') div.style.cursor = 'default';
         div.dataset.establecimientoId = p.establecimiento_id || '';
         div.dataset.tipo = p.tipo;
         div.dataset.lat = p.lat;
@@ -210,7 +279,7 @@ function renderizarSortable(paradas) {
         div.dataset.subtotal = p.subtotal || '';
 
         div.innerHTML = `
-            <span class="drag-icon">⠿</span>
+            <span class="drag-icon">${['Creada','Cargada'].includes(estadoRutaActual) && p.tipo !== 'almacen' ? '⠿' : ''}</span>
             <div class="num ${p.tipo === 'almacen' ? 'almacen' : ''}">${i}</div>
             <div class="parada-info">
                 <div class="parada-nombre">${p.nombre}</div>
@@ -220,15 +289,20 @@ function renderizarSortable(paradas) {
         contenedor.appendChild(div);
     });
 
-    // Inicializar SortableJS
-    if (sortable) sortable.destroy();
+    if (sortable) { sortable.destroy(); sortable = null; }
+
+    // El orden solo se puede ajustar mientras el coordinador no libera la ruta
+    if (!['Creada', 'Cargada'].includes(estadoRutaActual)) return;
+
     sortable = new Sortable(contenedor, {
         animation: 150,
         ghostClass: 'sortable-ghost',
         dragClass: 'sortable-drag',
+        draggable: '.parada-sortable:not([data-tipo="almacen"])',
         onEnd: actualizarNumerosYMapa
     });
 }
+
 
 function actualizarNumerosYMapa() {
     const items = document.querySelectorAll('.parada-sortable');
@@ -252,7 +326,7 @@ function actualizarNumerosYMapa() {
         }
     });
 
-    fetch('/api/rutas/calcular-ruta-entrega/', {
+    fetch('/api/rutas/trazar-ruta-orden/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ establecimientos })
@@ -330,6 +404,46 @@ function cerrarModal() {
 
 function cerrarModalClick(e) {
     if (e.target === document.getElementById('modal-overlay')) cerrarModal();
+}
+
+function aprobarRuta() {
+    const nombre = document.getElementById('apr-nombre').value.trim();
+    const descripcion = document.getElementById('apr-descripcion').value.trim();
+    const repartidorId = document.getElementById('apr-repartidor').value;
+
+    if (!nombre) { alert('El nombre de la ruta es requerido'); return; }
+
+    // Primero se guarda el orden que dejó el coordinador, luego se libera
+    const items = document.querySelectorAll('.parada-sortable');
+    const paradas = [];
+    items.forEach((item, i) => {
+        paradas.push({
+            tipo: item.dataset.tipo,
+            establecimiento_id: item.dataset.establecimientoId,
+            orden: i
+        });
+    });
+
+    fetch(`/api/rutas/ruta-entrega/${rutaActualId}/guardar-orden/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paradas })
+    })
+    .then(() => fetch(`/api/rutas/ruta-entrega/${rutaActualId}/aprobar/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre, descripcion, repartidor_id: repartidorId || null })
+    }))
+    .then(res => res.json())
+    .then(data => {
+        if (data.error) { alert('Error: ' + data.error); return; }
+        mostrarToast(data.asignada
+            ? '✓ Ruta creada y asignada al repartidor'
+            : '✓ Ruta creada, disponible para cualquier repartidor');
+        cerrarModal();
+        setTimeout(() => location.reload(), 1200);
+    })
+    .catch(() => alert('Error de conexión'));
 }
 
 function mostrarToast(msg) {
