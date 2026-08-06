@@ -211,8 +211,8 @@ def mi_ruta(request):
         # Obtener paradas con orden
         cursor.execute("""
             SELECT e.numero AS establecimiento_id, e.nombre, e.latitud AS lat,
-                   e.longitud AS lon, e.estColonia AS colonia,
-                   p.num AS pedido_id, p.subtotal,
+                    e.longitud AS lon, e.estColonia AS colonia,
+                    p.num AS pedido_id, p.total AS subtotal,
                    CONCAT(rep.repNombre, ' ', rep.repApellPat) AS representante,
                    rep.telefono,
                    CASE WHEN ep.nombre = 'Entregado' THEN 1 ELSE 0 END AS entregado,
@@ -502,6 +502,7 @@ def entregas_disponibles(request):
             LEFT JOIN vehiculo veh ON veh.entrega = en.numero
             LEFT JOIN modelo mdl ON mdl.numero = veh.modelo
             WHERE re.empleado IS NULL AND re.edo_ruta_entrega = 'ERET001'
+              AND en.edo_entrega = 'EEN003'
             GROUP BY re.numero, re.entrega, en.fecha_creacion, veh.placas, mdl.nombre, mdl.capacidad
             ORDER BY en.fecha_creacion ASC
         """)

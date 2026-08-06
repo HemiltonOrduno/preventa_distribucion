@@ -546,6 +546,8 @@ body {
 
 #panel-est-header { background: var(--color-primary); color: white; padding: 12px 15px; font-size: 13px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
 #panel-est-header button { background: none; border: none; color: white; font-size: 18px; cursor: pointer; line-height: 1; }
+#panel-est-acciones { display: flex; flex-wrap: nowrap; gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--color-border); flex-shrink: 0; }
+#panel-est-acciones .btn-nueva-ruta { flex: 1; text-align: center; padding: 7px 4px; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #panel-est-body { flex: 1; overflow-y: auto; padding: 10px; }
 
 /* ===== LOADING ===== */
@@ -794,3 +796,169 @@ body {
 }
 
 #page-body { flex: 1; overflow-y: auto; padding: 20px; }
+
+/* ===== MODAL LOGOUT ===== */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 4000;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal.modal--abierto { display: flex; }
+
+.modal__caja {
+    background: white;
+    border-radius: var(--radius-xl);
+    padding: 28px 24px;
+    width: 320px;
+    max-width: 90vw;
+    text-align: center;
+    box-shadow: var(--shadow-lg);
+}
+
+.modal__icono {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--color-danger-bg);
+    color: var(--color-danger);
+    font-size: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 14px;
+}
+
+.modal__titulo {
+    font-family: var(--font-display);
+    font-size: 16px;
+    color: var(--color-text);
+    margin-bottom: 6px;
+}
+
+.modal__texto {
+    font-size: 13px;
+    color: var(--color-text-muted);
+    margin-bottom: 20px;
+}
+
+.modal__acciones {
+    display: flex;
+    gap: 10px;
+}
+
+.modal__btn {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    font-weight: bold;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.modal__btn--cancelar { background: var(--color-bg); color: #555; }
+.modal__btn--cancelar:hover { background: var(--color-border); }
+
+.modal__btn--confirmar { background: var(--color-danger); color: white; }
+.modal__btn--confirmar:hover { background: #b71c1c; }
+
+/* ===== USUARIO / PERFIL EN SIDEBAR ===== */
+#sidebar-user {
+    position: relative;
+    padding: 12px 0;
+    border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+#sidebar-user-btn {
+    display: block;
+    width: 100%;
+    padding: 12px 20px;
+    background: none;
+    border: none;
+    color: rgba(255,255,255,0.8);
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-left: 3px solid transparent;
+}
+
+#sidebar-user-btn:hover {
+    background: rgba(255,255,255,0.1);
+    color: white;
+    border-left-color: #90caf9;
+}
+
+.sidebar-perfil {
+    display: none;
+    position: absolute;
+    bottom: calc(100% - 4px);
+    left: 12px;
+    width: 220px;
+    background: white;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    padding: 14px;
+    align-items: center;
+    gap: 10px;
+    z-index: 500;
+}
+
+.sidebar-perfil.sidebar-perfil--abierto { display: flex; }
+
+.sidebar-perfil__avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.sidebar-perfil__datos { flex: 1; overflow: hidden; }
+
+.sidebar-perfil__nombre {
+    font-size: 13px;
+    font-weight: bold;
+    color: var(--color-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sidebar-perfil__rol {
+    font-size: 10px;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 2px;
+}
+
+.sidebar-perfil__logout {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--color-danger-bg);
+    color: var(--color-danger);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    text-decoration: none;
+    font-size: 16px;
+    transition: background 0.2s;
+}
+
+.sidebar-perfil__logout:hover { background: var(--color-danger); color: white; }

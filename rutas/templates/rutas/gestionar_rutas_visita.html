@@ -154,6 +154,14 @@ function cargarDatos() {
         const btnActivo = document.querySelector('.filtro-dia button.active')
             || document.querySelector('.filtro-dia button');
         filtrarDia('hoy', btnActivo);
+
+        // Si llegamos desde "Gestionar zonas" con una zona ya elegida, abre
+        // directamente el panel de nueva ruta con esa zona preseleccionada
+        const params = new URLSearchParams(window.location.search);
+        const zonaParam = params.get('zona');
+        if (zonaParam) {
+            abrirCrearRuta(parseInt(zonaParam));
+        }
     });
 }
 
@@ -316,7 +324,7 @@ function iconoEstNumerado(num) {
 }
 
 // ===== MODO EDICION =====
-function abrirCrearRuta() {
+function abrirCrearRuta(zonaIdPreseleccionada) {
     modoEdicion = 'crear';
     rutaEditandoId = null;
     paradasSeleccionadas = [];
@@ -334,7 +342,14 @@ function abrirCrearRuta() {
 
     limpiarRutaVisualizada();
     limpiarMarcadoresEdicion();
-    setTimeout(() => mapaRutas.invalidateSize(), 100);
+
+    setTimeout(() => {
+        mapaRutas.invalidateSize();
+        if (zonaIdPreseleccionada) {
+            document.getElementById('ruta-zona').value = zonaIdPreseleccionada;
+            cargarEstablecimientosZona();
+        }
+    }, 100);
 }
 
 function abrirEditarRuta(rutaId) {

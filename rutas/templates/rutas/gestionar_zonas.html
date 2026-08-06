@@ -25,6 +25,10 @@
                     <span id="panel-est-titulo">Establecimientos</span>
                     <button onclick="cerrarPanelEst()">×</button>
                 </div>
+                <div id="panel-est-acciones">
+                    <button class="btn-nueva-ruta" onclick="crearRutaConZona('visita')">🗓️ Ruta de visita</button>
+                    <button class="btn-nueva-ruta" onclick="crearRutaConZona('entrega')">🚚 Ruta de entrega</button>
+                </div>
                 <div id="panel-est-body"></div>
             </div>
         </div>
@@ -50,6 +54,7 @@ let establecimientos = [];
 let capasZonas = {};
 let marcadoresEst = {};
 let zonaSeleccionada = null;
+let zonaParaCrearRuta = null;
 
 window.addEventListener('load', () => {
     inicializarMapa();
@@ -180,6 +185,7 @@ function seleccionarZona(zonaId) {
 
 function verEstablecimientos(zonaId, zonaNombre, event) {
     event.stopPropagation();
+    zonaParaCrearRuta = zonaId;
 
     // Limpiar marcadores anteriores
     Object.values(marcadoresEst).forEach(m => mapa.removeLayer(m));
@@ -242,6 +248,13 @@ function cerrarPanelEst() {
     Object.values(marcadoresEst).forEach(m => mapa.removeLayer(m));
     marcadoresEst = {};
     setTimeout(() => mapa.invalidateSize(), 100);
+}
+function crearRutaConZona(tipo) {
+    if (!zonaParaCrearRuta) return;
+    const url = tipo === 'visita'
+        ? `/api/rutas/gestionar-rutas-visita/?zona=${zonaParaCrearRuta}`
+        : `/api/rutas/gestionar-rutas-entrega/?zona=${zonaParaCrearRuta}`;
+    window.location.href = url;
 }
 
 function guardarZona(zonaId, event) {

@@ -38,10 +38,39 @@
             <span class="icon">📋</span> Historial de rutas
         </a>
     </nav>
-    <div id="sidebar-logout">
-        <a href="/api/usuarios/logout/">
-            <span class="icon">🚪</span> Cerrar sesión
-        </a>
+    <div id="sidebar-user">
+        <button id="sidebar-user-btn" onclick="toggleSidebarPerfil(event)">
+            <span class="icon"><i class='bx bx-user'></i></span> Mi cuenta
+        </button>
+
+        <div class="sidebar-perfil" id="sidebarPerfil">
+            <div class="sidebar-perfil__avatar"><i class='bx bx-user'></i></div>
+            <div class="sidebar-perfil__datos">
+                <div class="sidebar-perfil__nombre">{{ request.session.nombre_usuario|default:"Usuario" }}</div>
+                <div class="sidebar-perfil__rol">{{ request.session.rol|default:"COORDINADOR" }}</div>
+            </div>
+            <a href="/api/usuarios/logout/" class="sidebar-perfil__logout"
+               title="Cerrar sesión" aria-label="Cerrar sesión"
+               onclick="return abrirModalLogout(event);">
+                <i class='bx bx-log-out'></i>
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL DE CONFIRMACION DE CIERRE DE SESION -->
+<div class="modal" id="modalLogout">
+    <div class="modal__caja">
+        <div class="modal__icono"><i class='bx bx-log-out'></i></div>
+        <h3 class="modal__titulo">Cerrar sesión</h3>
+        <p class="modal__texto">¿Seguro que quieres salir del sistema?</p>
+        <div class="modal__acciones">
+            <button type="button" class="modal__btn modal__btn--cancelar"
+                    onclick="cerrarModalLogout()">Cancelar</button>
+            <a href="/api/usuarios/logout/" class="modal__btn modal__btn--confirmar">
+                Sí, salir
+            </a>
+        </div>
     </div>
 </div>
 
@@ -80,6 +109,48 @@
     </div>
 </div>
 {% endblock %}
+
+<script>
+/*===== MODAL DE CIERRE DE SESION + PANEL DE PERFIL =====*/
+document.addEventListener("DOMContentLoaded", function(){
+    var modalLogout = document.getElementById("modalLogout");
+
+    window.abrirModalLogout = function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        cerrarSidebarPerfil();
+        modalLogout.classList.add("modal--abierto");
+        return false;
+    };
+
+    window.cerrarModalLogout = function(){
+        modalLogout.classList.remove("modal--abierto");
+    };
+
+    modalLogout.addEventListener("click", function(e){
+        if (e.target === modalLogout){ cerrarModalLogout(); }
+    });
+    document.addEventListener("keydown", function(e){
+        if (e.key === "Escape"){ cerrarModalLogout(); cerrarSidebarPerfil(); }
+    });
+
+    /*===== PANEL DE PERFIL EN SIDEBAR =====*/
+    var sidebarPerfil = document.getElementById("sidebarPerfil");
+
+    window.toggleSidebarPerfil = function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        sidebarPerfil.classList.toggle("sidebar-perfil--abierto");
+    };
+
+    window.cerrarSidebarPerfil = function(){
+        sidebarPerfil.classList.remove("sidebar-perfil--abierto");
+    };
+
+    sidebarPerfil.addEventListener("click", function(e){ e.stopPropagation(); });
+    document.addEventListener("click", cerrarSidebarPerfil);
+});
+</script>
 
 <script src="{% static 'rutas/js/leaflet.js' %}"></script>
 
@@ -294,7 +365,6 @@ function cerrarDetalleRuta() {
 
 window.addEventListener('load', cargarDatos);
 </script>
-
 {% endblock %}
 </body>
 </html>
