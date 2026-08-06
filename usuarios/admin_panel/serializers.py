@@ -1,5 +1,6 @@
 """Serializers del Modulo 9 - Gestion de Usuarios (RF56 a RF62)."""
 
+import re
 from datetime import date
 
 from django.contrib.auth.hashers import make_password
@@ -43,6 +44,37 @@ def siguiente_id(modelo):
     llave = modelo._meta.pk.attname
     actual = modelo.objects.aggregate(maximo=Max(llave))['maximo'] or 0
     return actual + 1
+
+
+def validar_telefono(valor):
+    """Valida y normaliza un telefono a 10 digitos.
+
+    La columna es VARCHAR(15) y acepta cualquier texto, asi que la regla
+    se aplica aqui. Se descartan los separadores que la persona escriba
+    —parentesis, guiones, espacios— y se exige que queden exactamente 10
+    digitos, el largo de un numero nacional en Mexico (lada + numero).
+
+    Devuelve el formato canonico (664) 123-4567 para que todos los
+    registros queden consistentes sin importar como se capturaron.
+    """
+    digitos = re.sub(r'\D', '', valor or '')
+
+    if not digitos:
+        raise serializers.ValidationError('Captura el numero telefonico.')
+
+    # Tolera el 52 de Mexico o un 1 de larga distancia al inicio.
+    if len(digitos) == 12 and digitos.startswith('52'):
+        digitos = digitos[2:]
+    elif len(digitos) == 11 and digitos.startswith('1'):
+        digitos = digitos[1:]
+
+    if len(digitos) != 10:
+        raise serializers.ValidationError(
+            'El telefono debe tener exactamente 10 digitos '
+            '(lada + numero). Capturaste {}.'.format(len(digitos))
+        )
+
+    return '({}) {}-{}'.format(digitos[:3], digitos[3:6], digitos[6:])
 
 
 def nombre_completo(empleado):
@@ -184,6 +216,9 @@ class AltaUsuarioSerializer(serializers.Serializer):
             )
         return valor
 
+    def validate_telefono(self, valor):
+        return validar_telefono(valor)
+
     def validate_licencia(self, valor):
         if not valor:
             return None
@@ -229,7 +264,7 @@ class AltaUsuarioSerializer(serializers.Serializer):
                 validated_data.get('apellido_materno') or ''
             ).strip() or None,
             'fecha_nacimiento': validated_data['fecha_nacimiento'],
-            'telefono': validated_data['telefono'].strip(),
+            'telefono': validated_data['telefono'],
             'email': validated_data['email'],
             'rol_id': rol,
             'edo_empleado_id': EMPLEADO_ACTIVO,
@@ -300,6 +335,15 @@ class LicenciaSerializer(serializers.Serializer):
 
     def validate_numlicencia(self, valor):
         valor = valor.strip().upper()
+
+        # RF58: la licencia debe seguir el formato de Baja California:
+        # 'BC' + exactamente 7 digitos numericos (ej. BC2071357).
+        if not re.match(r'^BC\d{7}$', valor):
+            raise serializers.ValidationError(
+                'El numero de licencia debe iniciar con "BC" seguido de '
+                'exactamente 7 digitos (ejemplo: BC1234567).'
+            )
+
         existentes = Licencia.objects.filter(numlicencia=valor)
         # Al renovar, la propia licencia del empleado no cuenta como choque.
         if self.empleado is not None and self.empleado.licencia_id:
@@ -382,6 +426,9 @@ class EditarDatosSerializer(serializers.Serializer):
             )
         return valor
 
+    def validate_telefono(self, valor):
+        return validar_telefono(valor)
+
     @transaction.atomic
     def guardar(self):
         datos = self.validated_data
@@ -392,7 +439,7 @@ class EditarDatosSerializer(serializers.Serializer):
             datos.get('apellido_materno') or ''
         ).strip() or None
         empleado.fecha_nacimiento = datos['fecha_nacimiento']
-        empleado.telefono = datos['telefono'].strip()
+        empleado.telefono = datos['telefono']
         empleado.email = datos['email']
         empleado.rol_id = datos['rol']
         empleado.save()

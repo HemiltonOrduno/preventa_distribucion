@@ -30,16 +30,8 @@
       <select id="responsable"><option value="">Todos</option></select>
     </div>
     <div class="campo">
-      <label for="tipo">Tipo</label>
+      <label for="tipo">Tipo de movimiento</label>
       <select id="tipo"><option value="">Todos</option></select>
-    </div>
-    <div class="campo">
-      <label for="sentido">Sentido</label>
-      <select id="sentido">
-        <option value="">Todos</option>
-        <option value="entrada">Solo entradas</option>
-        <option value="salida">Solo salidas</option>
-      </select>
     </div>
     <div class="campo">
       <label for="producto">Producto</label>
@@ -113,7 +105,6 @@
       fecha_fin: $("fechaFin").value,
       responsable: $("responsable").value,
       tipo: $("tipo").value,
-      sentido: $("sentido").value,
       producto: $("producto").value
     };
   }
@@ -227,7 +218,7 @@
 
   $("btnAplicar").addEventListener("click", function () { estado.pagina = 1; cargar(); });
   $("btnLimpiar").addEventListener("click", function () {
-    ["fechaInicio", "fechaFin", "responsable", "tipo", "sentido", "producto"]
+    ["fechaInicio", "fechaFin", "responsable", "tipo", "producto"]
       .forEach(function (id) { $(id).value = ""; });
     estado.pagina = 1; cargar();
   });
@@ -247,9 +238,26 @@
     if (f) { detalle(f.dataset.clave); }
   });
 
+  /* Un solo selector con optgroups: la primera opcion de cada grupo
+     filtra el sentido completo, y dentro estan los tipos puntuales. */
+  function llenarTipos(grupos) {
+    var piezas = ['<option value="">Todos</option>'];
+    (grupos || []).forEach(function (g) {
+      piezas.push('<optgroup label="' + P.escapar(g.grupo) + '">');
+      piezas.push('<option value="' + P.escapar(g.id_grupo) + '">Todas las ' +
+        P.escapar(g.grupo.toLowerCase()) + "</option>");
+      (g.tipos || []).forEach(function (t) {
+        piezas.push('<option value="' + P.escapar(t.id) + '">' +
+          P.escapar(t.nombre) + "</option>");
+      });
+      piezas.push("</optgroup>");
+    });
+    $("tipo").innerHTML = piezas.join("");
+  }
+
   P.pedir("/catalogos/").then(function (d) {
     P.llenarSelect("responsable", d.responsables, "Todos");
-    P.llenarSelect("tipo", d.tipos_movimiento, "Todos");
+    llenarTipos(d.grupos_movimiento);
     P.llenarSelect("producto", d.productos, "Todos");
   }).catch(function () { /* los filtros quedan en "Todos" */ });
 

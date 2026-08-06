@@ -255,11 +255,31 @@ tbody tr.riesgo:hover{background:#FAEFDF}
       });
   }
 
-  function cambiarMetrica(nueva) {
+  /* Mantiene sincronizados el conmutador del ranking (arriba) y el select
+     "Ordenar por" (abajo): ambos deben reflejar el mismo criterio para que
+     el Top 10 y la tabla de detalle siempre muestren el mismo primer lugar.
+     sincronizarOrden=false evita el bucle cuando la llamada viene ya desde
+     el propio cambio del select. */
+  function cambiarMetrica(nueva, sincronizarOrden) {
     metrica = nueva;
     $("porUnidades").classList.toggle("activo", nueva === "unidades");
     $("porMonto").classList.toggle("activo", nueva === "monto");
     pintarRanking(ultimos);
+
+    if (sincronizarOrden !== false && $("orden").value !== nueva) {
+      $("orden").value = nueva;
+      cargar();
+    }
+  }
+
+  /* El select tambien acepta "pedidos" y "nombre", criterios que el
+     ranking no soporta (solo compara unidades o monto). En esos casos el
+     conmutador conserva el ultimo criterio elegido en vez de apagarse. */
+  function sincronizarConmutador() {
+    var valor = $("orden").value;
+    if (valor === "unidades" || valor === "monto") {
+      cambiarMetrica(valor, false);
+    }
   }
 
   $("porUnidades").addEventListener("click", function () {
@@ -270,13 +290,17 @@ tbody tr.riesgo:hover{background:#FAEFDF}
   });
 
   $("btnAplicar").addEventListener("click", cargar);
-  $("orden").addEventListener("change", cargar);
+  $("orden").addEventListener("change", function () {
+    sincronizarConmutador();
+    cargar();
+  });
   $("universo").addEventListener("change", cargar);
   $("btnLimpiar").addEventListener("click", function () {
     ["fechaInicio", "fechaFin", "zona", "vendedor"]
       .forEach(function (id) { $(id).value = ""; });
     $("universo").value = "sin_cancelados";
     $("orden").value = "unidades";
+    cambiarMetrica("unidades", false);
     cargar();
   });
 

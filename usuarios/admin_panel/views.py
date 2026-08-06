@@ -49,7 +49,7 @@ def _consulta_base():
             'empleado__licencia__tipo_licencia',
             'edo_usuario',
         )
-        .order_by('empleado__apellido_paterno', 'empleado__nombre_de_pila')
+        .order_by('empleado__num')
     )
 
 

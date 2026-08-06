@@ -305,9 +305,30 @@ class CatalogosFiltrosAPIView(APIView):
                 .order_by('apellido_paterno', 'nombre_de_pila')
         ]
 
+        # Tipos de movimiento agrupados por sentido: el frontend los pinta
+        # como optgroups para que un solo selector permita elegir un tipo
+        # puntual o un grupo completo (entradas / salidas).
         tipos_movimiento = [
             {'id': t.codigo, 'nombre': t.nombre}
             for t in TipoMovimiento.objects.order_by('codigo')
+        ]
+        grupos_movimiento = [
+            {
+                'grupo': 'Entradas',
+                'id_grupo': 'entrada',
+                'tipos': [
+                    t for t in tipos_movimiento
+                    if t['id'] in MOVIMIENTOS_ENTRADA
+                ],
+            },
+            {
+                'grupo': 'Salidas',
+                'id_grupo': 'salida',
+                'tipos': [
+                    t for t in tipos_movimiento
+                    if t['id'] in MOVIMIENTOS_SALIDA
+                ],
+            },
         ]
 
         productos = [
@@ -336,6 +357,7 @@ class CatalogosFiltrosAPIView(APIView):
             'motivos': OpcionSerializer(motivos, many=True).data,
             'responsables': OpcionSerializer(responsables, many=True).data,
             'tipos_movimiento': OpcionSerializer(tipos_movimiento, many=True).data,
+            'grupos_movimiento': grupos_movimiento,
             'productos': OpcionSerializer(productos, many=True).data,
             'estados_pedido': OpcionSerializer(estados_pedido, many=True).data,
             'estados_entrega': OpcionSerializer(estados_entrega, many=True).data,
@@ -826,10 +848,25 @@ class HistorialMovimientosAPIView(ListAPIView):
         if responsable:
             consulta = consulta.filter(empleado_id=responsable)
 
+        # 'tipo' acepta un codigo puntual (TM003) o un sentido completo
+        # ('entrada' / 'salida'). Antes eran dos filtros separados, pero
+        # con solo cuatro tipos resultaban redundantes en la interfaz.
         tipo = _leer_texto(self.request, 'tipo')
         if tipo:
-            consulta = consulta.filter(tipo_movimiento_id=tipo)
+            clave = tipo.lower()
+            if clave == 'entrada':
+                consulta = consulta.filter(
+                    tipo_movimiento_id__in=MOVIMIENTOS_ENTRADA
+                )
+            elif clave == 'salida':
+                consulta = consulta.filter(
+                    tipo_movimiento_id__in=MOVIMIENTOS_SALIDA
+                )
+            else:
+                consulta = consulta.filter(tipo_movimiento_id=tipo)
 
+        # Compatibilidad: 'sentido' sigue aceptandose por si algun enlace
+        # guardado lo usa, aunque la interfaz ya no lo envie.
         sentido = (_leer_texto(self.request, 'sentido') or '').lower()
         if sentido == 'entrada':
             consulta = consulta.filter(tipo_movimiento_id__in=MOVIMIENTOS_ENTRADA)

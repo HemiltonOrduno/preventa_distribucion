@@ -22,6 +22,7 @@
 .aviso-linea.alerta{background:#FEF2E0;color:#8A4D00;border:1px solid #F8DDB4;display:block}
 .aviso-linea.mal{background:#FBEAEA;color:var(--peligro);border:1px solid #F0C7C7;display:block}
 .campo textarea, .campo .error{color:var(--peligro);font-size:12px;margin-top:3px}
+.campo .pista{color:var(--texto-tenue);font-size:11.5px;margin-top:3px}
 .campo input.invalido, .campo select.invalido{border-color:var(--peligro)}
 .requerido::after{content:" *";color:var(--peligro)}
 .nota-form{grid-column:1/-1;font-size:12.5px;color:var(--texto-tenue);
@@ -262,7 +263,8 @@ tbody tr.inactivo td{color:var(--texto-tenue)}
     { id: "apellido_paterno", etiqueta: "Apellido paterno", tipo: "text", req: true, max: 25 },
     { id: "apellido_materno", etiqueta: "Apellido materno", tipo: "text", req: false, max: 25 },
     { id: "fecha_nacimiento", etiqueta: "Fecha de nacimiento", tipo: "date", req: true },
-    { id: "telefono", etiqueta: "Teléfono", tipo: "tel", req: true, max: 15 },
+    { id: "telefono", etiqueta: "Teléfono", tipo: "tel", req: true, max: 15,
+      pista: "10 dígitos (lada + número)" },
     { id: "email", etiqueta: "Correo electrónico", tipo: "email", req: true, max: 50 }
   ];
 
@@ -271,7 +273,9 @@ tbody tr.inactivo td{color:var(--texto-tenue)}
       return '<div class="campo"><label for="f_' + c.id + '"' +
         (c.req ? ' class="requerido"' : "") + ">" + c.etiqueta + "</label>" +
         '<input type="' + c.tipo + '" id="f_' + c.id + '"' +
-        (c.max ? ' maxlength="' + c.max + '"' : "") + ">" +
+        (c.max ? ' maxlength="' + c.max + '"' : "") +
+        (c.pista ? ' placeholder="' + c.pista + '"' : "") + ">" +
+        (c.pista ? '<span class="pista">' + c.pista + "</span>" : "") +
         '<span class="error" id="e_' + c.id + '"></span></div>';
     }).join("");
 
@@ -319,8 +323,38 @@ tbody tr.inactivo td{color:var(--texto-tenue)}
     });
   }
 
+  /* Cuenta los digitos reales, ignorando parentesis, guiones y espacios.
+     La validacion definitiva la hace el backend; esto solo evita un viaje
+     al servidor cuando el error es evidente. */
+  function digitosDe(valor) {
+    return (valor || "").replace(/\D/g, "").length;
+  }
+
+  function telefonoValido(valor) {
+    var n = digitosDe(valor);
+    return n === 10 || (n === 12 && /^\D*52/.test(valor)) ||
+      (n === 11 && /^\D*1/.test(valor));
+  }
+
+  /* La validacion definitiva la hace el backend; esto solo evita un viaje
+     al servidor cuando el formato es evidentemente incorrecto. */
+  function licenciaValida(valor) {
+    return /^BC\d{7}$/.test((valor || "").trim().toUpperCase());
+  }
+
   function guardar() {
     limpiarErrores();
+
+    if (!telefonoValido($("f_telefono").value)) {
+      marcarErrores({
+        telefono: "El teléfono debe tener exactamente 10 dígitos " +
+          "(lada + número). Capturaste " + digitosDe($("f_telefono").value) + "."
+      });
+      avisar("Revisa los campos marcados.", "mal");
+      $("f_telefono").focus();
+      return;
+    }
+
     var cuerpo = {};
     CAMPOS.forEach(function (c) { cuerpo[c.id] = $("f_" + c.id).value; });
     cuerpo.rol = $("f_rol").value;
@@ -406,7 +440,8 @@ tbody tr.inactivo td{color:var(--texto-tenue)}
           '<span class="error" id="e_apellido_materno"></span></div>' +
         campoTexto("fecha_nacimiento", "Fecha de nacimiento", "date",
           u.fecha_nacimiento) +
-        campoTexto("telefono", "Teléfono", "tel", u.telefono, ' maxlength="15"') +
+        campoTexto("telefono", "Teléfono", "tel", u.telefono,
+          ' maxlength="15" placeholder="10 dígitos (lada + número)"') +
         campoTexto("email", "Correo electrónico", "email", u.email,
           ' maxlength="50"') +
         '<div class="campo"><label for="f_rol" class="requerido">Rol</label>' +
@@ -423,6 +458,18 @@ tbody tr.inactivo td{color:var(--texto-tenue)}
     $("btnCancelar").addEventListener("click", P.cerrarModal);
     $("btnGuardar").addEventListener("click", function () {
       limpiarErrores();
+
+      if (!telefonoValido($("f_telefono").value)) {
+        marcarErrores({
+          telefono: "El teléfono debe tener exactamente 10 dígitos " +
+            "(lada + número). Capturaste " +
+            digitosDe($("f_telefono").value) + "."
+        });
+        avisar("Revisa los campos marcados.", "mal");
+        $("f_telefono").focus();
+        return;
+      }
+
       var boton = this;
       boton.disabled = true;
       P.enviarAdmin("/usuarios/" + u.usuario_id + "/datos/", {
@@ -484,7 +531,8 @@ tbody tr.inactivo td{color:var(--texto-tenue)}
     $("cuerpoModal").innerHTML =
       '<div class="rejilla">' +
         campoTexto("numlicencia", "Número de licencia", "text",
-          u.licencia_num || "", ' maxlength="20"') +
+          u.licencia_num || "", ' maxlength="9" placeholder="BC1234567"') +
+        '<span class="pista">Formato: BC seguido de 7 dígitos</span>' +
         '<div class="campo"><label for="f_tipo_licencia" class="requerido">' +
           "Tipo</label><select id=\"f_tipo_licencia\">" +
           '<option value="">Selecciona…</option>' +
@@ -506,6 +554,17 @@ tbody tr.inactivo td{color:var(--texto-tenue)}
     $("btnCancelar").addEventListener("click", P.cerrarModal);
     $("btnGuardar").addEventListener("click", function () {
       limpiarErrores();
+
+      if (!licenciaValida($("f_numlicencia").value)) {
+        marcarErrores({
+          numlicencia: 'La licencia debe iniciar con "BC" seguido de ' +
+            "exactamente 7 dígitos (ejemplo: BC1234567)."
+        });
+        avisar("Revisa los campos marcados.", "mal");
+        $("f_numlicencia").focus();
+        return;
+      }
+
       var boton = this;
       boton.disabled = true;
       P.enviarAdmin("/usuarios/" + u.usuario_id + "/licencia/", {
