@@ -136,13 +136,20 @@ tbody tr.inactivo td{color:var(--texto-tenue)}
     };
   }
 
+  var avisoTimer = null;
+
   function avisar(texto, clase) {
     var caja = $("avisoLinea");
     caja.textContent = texto;
     caja.className = "aviso-linea " + clase;
-    if (clase === "ok") {
-      setTimeout(function () { caja.className = "aviso-linea"; }, 6000);
-    }
+    if (avisoTimer) { clearTimeout(avisoTimer); }
+    // Los avisos de exito se leen rapido; los de error/alerta se dejan
+    // mas tiempo en pantalla, pero ambos deben desaparecer solos.
+    var demora = clase === "ok" ? 6000 : 9000;
+    avisoTimer = setTimeout(function () {
+      caja.className = "aviso-linea";
+      avisoTimer = null;
+    }, demora);
   }
 
   function pintarSesion(s) {
