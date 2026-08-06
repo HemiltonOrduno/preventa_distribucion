@@ -38,7 +38,8 @@ function cargarRuta() {
         .then(res => res.json())
         .then(data => {
             if (data.error) {
-                if (data.error === 'No tienes una ruta asignada para hoy') {
+                // Si no trae ruta propia, se ofrecen las entregas disponibles
+                if (data.error.includes('ruta asignada')) {
                     mostrarEntregasDisponibles();
                 } else {
                     document.getElementById('lista-paradas').innerHTML =
@@ -51,17 +52,14 @@ function cargarRuta() {
             rutaId = data.ruta_id;
             paradas = data.paradas;
 
-            // Verificar si la ruta ya está iniciada
-            // Verificar si la ruta ya está iniciada
+            // Si ya está en camino solo se puede finalizar; si no, iniciar o regresar
             if (data.estado === 'En camino') {
                 rutaIniciada = true;
                 document.getElementById('btn-iniciar').style.display = 'none';
-                document.getElementById('btn-finalizar').style.display = 'block';
                 document.getElementById('btn-regresar').style.display = 'none';
             } else {
                 rutaIniciada = false;
                 document.getElementById('btn-iniciar').style.display = 'block';
-                document.getElementById('btn-finalizar').style.display = 'none';
                 document.getElementById('btn-regresar').style.display = 'block';
             }
 
@@ -99,7 +97,6 @@ function regresarRuta() {
 // ===== ENTREGAS DISPONIBLES (sin repartidor asignado) =====
 function mostrarEntregasDisponibles() {
     document.getElementById('btn-iniciar').style.display = 'none';
-    document.getElementById('btn-finalizar').style.display = 'none';
     document.getElementById('info-bar').style.display = 'none';
 
     const lista = document.getElementById('lista-paradas');
@@ -125,7 +122,8 @@ function mostrarEntregasDisponibles() {
                     <div class="parada-num almacen">📦</div>
                     <div class="parada-info">
                         <div class="parada-nombre">Entrega #${e.entrega_id}</div>
-                        <div class="parada-sub">${e.total_pedidos} pedidos · ${e.peso_total_kg.toFixed(1)} kg · ${e.placas || 'sin vehículo'}</div>
+                        <div class="parada-sub">Ruta #${e.ruta_entrega_id} · ${e.total_pedidos} pedidos · ${e.peso_total_kg.toFixed(1)} kg</div>
+                        <div class="parada-sub">🚚 ${e.placas || 'sin vehículo'} · ${e.modelo || ''}</div>
                     </div>
                     <button class="btn-iniciar-ruta" style="padding:6px 14px;font-size:12px;white-space:nowrap;"
                         onclick="event.stopPropagation(); tomarYIniciarEntrega(${e.ruta_entrega_id}, ${e.entrega_id})">
@@ -287,30 +285,11 @@ function iniciarRuta() {
         if (data.error) { alert('Error: ' + data.error); return; }
         rutaIniciada = true;
         document.getElementById('btn-iniciar').style.display = 'none';
-        document.getElementById('btn-finalizar').style.display = 'block';
         mostrarToast('✓ Ruta iniciada');
     });
 }
 
 // ===== FINALIZAR RUTA =====
-function finalizarRuta() {
-    const pendientes = paradas.filter(p => p.tipo === 'establecimiento' && !p.entregado).length;
-    if (pendientes > 0) {
-        if (!confirm(`Aún tienes ${pendientes} entregas pendientes. ¿Deseas finalizar la ruta?`)) return;
-    }
-
-    fetch('/api/entregas/finalizar-ruta/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ entrega_id: entregaId })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.error) { alert('Error: ' + data.error); return; }
-        mostrarToast('✓ Ruta finalizada');
-        setTimeout(() => location.reload(), 1500);
-    });
-}
 
 // ===== MODAL PARADA =====
 function abrirModalParada(parada) {
@@ -330,6 +309,10 @@ function abrirModalParada(parada) {
     document.getElementById('dev-est-nombre').innerText = parada.nombre;
 
     // Info del pedido
+    // RF36: la confirmación de entrega debe indicar fecha y hora.
+    // Se muestran aquí para que el repartidor vea el momento que se
+    // registrará al confirmar la entrega de este pedido.
+    const { fechaTexto, horaTexto } = obtenerFechaHoraActual();
     document.getElementById('modal-pedido-info').innerHTML = `
         <div class="pedido-row">
             <span class="label">Pedido</span>
@@ -346,6 +329,14 @@ function abrirModalParada(parada) {
         <div class="pedido-row">
             <span class="label">Teléfono</span>
             <span class="valor">${parada.telefono || '-'}</span>
+        </div>
+        <div class="pedido-row">
+            <span class="label">Fecha de entrega</span>
+            <span class="valor" id="modal-fecha-entrega">${fechaTexto}</span>
+        </div>
+        <div class="pedido-row">
+            <span class="label">Hora de entrega</span>
+            <span class="valor" id="modal-hora-entrega">${horaTexto}</span>
         </div>
     `;
 
@@ -489,15 +480,37 @@ function guardarDevolucion() {
     });
 }
 
+// ===== FECHA Y HORA (RF36) =====
+// Devuelve la fecha/hora actual en formato legible (para mostrar en el
+// modal) y en formato ISO (para enviar al backend).
+function obtenerFechaHoraActual() {
+    const ahora = new Date();
+
+    const pad = n => String(n).padStart(2, '0');
+    const fechaISO = `${ahora.getFullYear()}-${pad(ahora.getMonth() + 1)}-${pad(ahora.getDate())}`;
+    const horaISO = `${pad(ahora.getHours())}:${pad(ahora.getMinutes())}:${pad(ahora.getSeconds())}`;
+
+    const fechaTexto = ahora.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const horaTexto = ahora.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+
+    return { fechaISO, horaISO, fechaTexto, horaTexto };
+}
+
 // ===== CONFIRMAR ENTREGA =====
 function confirmarEntrega() {
+    // RF36: se registra la fecha y hora exactas en las que el repartidor
+    // confirma la entrega.
+    const { fechaISO, horaISO, fechaTexto, horaTexto } = obtenerFechaHoraActual();
+
     fetch('/api/entregas/confirmar-entrega/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             pedido_id: paradaActual.pedido_id,
             establecimiento_id: paradaActual.establecimiento_id,
-            entrega_id: entregaId
+            entrega_id: entregaId,
+            fecha_entrega: fechaISO,
+            hora_entrega: horaISO
         })
     })
     .then(res => res.json())
@@ -522,12 +535,14 @@ function confirmarEntrega() {
             m.setIcon(icono);
         }
 
-        mostrarToast('✓ Entrega confirmada');
+        mostrarToast(`✓ Entrega confirmada · ${fechaTexto} ${horaTexto}`);
 
-        // Si todas están entregadas, mostrar botón finalizar
-        const pendientes = paradas.filter(p => p.tipo === 'establecimiento' && !p.entregado).length;
-        if (pendientes === 0) {
-            mostrarToast('✓ Todas las entregas completadas. Puedes finalizar la ruta.');
+        // RF37: el sistema cerró la entrega al quedar todos los pedidos entregados
+        if (data.entrega_completada) {
+            setTimeout(() => {
+                alert('✓ Ruta completada\n\nTodos los pedidos fueron entregados. La entrega se cerró automáticamente.');
+                location.reload();
+            }, 800);
         }
     });
 }

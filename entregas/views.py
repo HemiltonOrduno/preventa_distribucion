@@ -1,7 +1,10 @@
+import requests
+from datetime import datetime
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.db import connection, transaction
 from django.shortcuts import render  
+from rutas.views import ALMACEN, OSRM_URL
 from usuarios.permissions import rol_requerido
 import json
 
@@ -77,8 +80,6 @@ def pedidos_validados_por_zona(request):
 
 @rol_requerido('Almacenista', 'Administrador')
 @csrf_exempt
-@rol_requerido('Almacenista', 'Administrador')
-@csrf_exempt
 def crear_entrega(request):
     """
     RF24-26: agrupa pedidos validados de una misma zona, los asigna a un
@@ -90,7 +91,8 @@ def crear_entrega(request):
 
     También crea la RUTA_ENTREGA asociada, sin repartidor asignado
     (empleado = NULL) para que quede disponible y cualquier repartidor
-    la pueda tomar desde su pantalla.
+    la pueda tomar desde su pantalla, y calcula un orden de visita
+    propuesto que el coordinador puede reordenar después.
     """
     if request.method != 'POST':
         return JsonResponse({"error": "Método no permitido"}, status=405)
@@ -157,10 +159,19 @@ def crear_entrega(request):
     except Exception as e:
         return JsonResponse({"error": f"No se pudo crear la entrega: {str(e)}"}, status=400)
 
+    # Orden de visita propuesto por el sistema. Va fuera del try principal
+    # para que un fallo aquí no invalide una entrega ya creada.
+    if pedidos_incluidos:
+        try:
+            _calcular_orden_entrega(nueva_ruta_entrega, nueva_entrega)
+        except Exception:
+            pass
+
     status = 201 if pedidos_incluidos else 400
     return JsonResponse({
         "mensaje": "Entrega creada correctamente" if pedidos_incluidos else "Ningún pedido pudo agregarse",
         "entrega_id": nueva_entrega,
+        "ruta_entrega_id": nueva_ruta_entrega,
         "vehiculo": vehiculo_id,
         "pedidos_incluidos": pedidos_incluidos,
         "pedidos_rechazados": pedidos_rechazados
@@ -413,6 +424,13 @@ def confirmar_entrega_establecimiento(request):
     establecimiento_id = body.get('establecimiento_id')
     entrega_id = body.get('entrega_id')
 
+    # RF36: la confirmación de entrega debe indicar fecha y hora.
+    # El repartidor las ve y las envía desde el modal; si por algún motivo
+    # no llegan, se usa el momento actual del servidor como respaldo.
+    ahora = datetime.now()
+    fecha_entrega = body.get('fecha_entrega') or ahora.strftime('%Y-%m-%d')
+    hora_entrega = body.get('hora_entrega') or ahora.strftime('%H:%M:%S')
+
     with transaction.atomic():
         with connection.cursor() as cursor:
             # RF36: no se puede confirmar la entrega sin pago registrado
@@ -434,11 +452,19 @@ def confirmar_entrega_establecimiento(request):
 
             cursor.execute("""
                 INSERT INTO entrega_estable (entrega, establecimiento, fecha_entrega, hora_entrega)
-                VALUES (%s, %s, CURDATE(), TIME(NOW()))
-                ON DUPLICATE KEY UPDATE fecha_entrega = CURDATE(), hora_entrega = TIME(NOW())
-            """, [entrega_id, establecimiento_id])
+                VALUES (%s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE fecha_entrega = %s, hora_entrega = %s
+            """, [entrega_id, establecimiento_id, fecha_entrega, hora_entrega,
+                  fecha_entrega, hora_entrega])
 
-    return JsonResponse({"mensaje": "Entrega confirmada correctamente"})
+            entrega_cerrada = _cerrar_entrega_si_completa(cursor, entrega_id)
+
+    return JsonResponse({
+        "mensaje": "Entrega confirmada correctamente",
+        "entrega_completada": entrega_cerrada,
+        "fecha_entrega": fecha_entrega,
+        "hora_entrega": hora_entrega
+    })
 
 
 def ruta_entrega_view(request):
@@ -487,6 +513,7 @@ def entregas_disponibles(request):
             LEFT JOIN vehiculo veh ON veh.entrega = en.numero
             LEFT JOIN modelo mdl ON mdl.numero = veh.modelo
             WHERE re.empleado IS NULL AND re.edo_ruta_entrega = 'ERET001'
+              AND en.edo_entrega = 'EEN003'
             GROUP BY re.numero, re.entrega, en.fecha_creacion, veh.placas, mdl.nombre, mdl.capacidad
             ORDER BY en.fecha_creacion ASC
         """)
@@ -570,3 +597,88 @@ def soltar_entrega(request):
             return JsonResponse({"error": "No se pudo soltar la ruta (ya la iniciaste, o no es tuya)"}, status=400)
 
     return JsonResponse({"mensaje": "Ruta liberada correctamente"})
+
+def _calcular_orden_entrega(ruta_entrega_id, entrega_id):
+    """
+    Propone el orden de visita de los establecimientos usando el
+    servicio /trip/ de OSRM, que resuelve el recorrido más corto
+    partiendo del almacén. Si OSRM falla, ordena por cercanía simple
+    para no dejar la ruta sin orden.
+    """
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT DISTINCT e.numero, e.latitud, e.longitud
+            FROM pedido p
+            INNER JOIN visita v ON v.numero = p.visita
+            INNER JOIN establecimiento e ON e.numero = v.establecimiento
+            WHERE p.entrega = %s AND e.latitud IS NOT NULL AND e.longitud IS NOT NULL
+        """, [entrega_id])
+        ests = [{"id": r[0], "lat": float(r[1]), "lon": float(r[2])}
+                for r in cursor.fetchall()]
+
+    if not ests:
+        return
+
+    orden_ids = None
+
+    # OSRM /trip/: primer punto fijo (almacén), regreso libre
+    if len(ests) >= 2:
+        puntos = [(ALMACEN["lon"], ALMACEN["lat"])] + [(e["lon"], e["lat"]) for e in ests]
+        coords_str = ";".join(f"{lon},{lat}" for lon, lat in puntos)
+        try:
+            r = requests.get(
+                f"{OSRM_URL}/trip/v1/driving/{coords_str}",
+                params={"source": "first", "roundtrip": "false", "overview": "false"},
+                timeout=15
+            )
+            data = r.json()
+            if data.get("code") == "Ok":
+                # waypoint_index dice en qué posición del recorrido quedó cada punto
+                wps = data["waypoints"]
+                sin_almacen = [(wps[i + 1]["waypoint_index"], e) for i, e in enumerate(ests)]
+                sin_almacen.sort(key=lambda x: x[0])
+                orden_ids = [e["id"] for _, e in sin_almacen]
+        except Exception:
+            pass
+
+    # Respaldo: por distancia al almacén, del más cercano al más lejano
+    if orden_ids is None:
+        ests.sort(key=lambda e: (e["lat"] - ALMACEN["lat"]) ** 2 + (e["lon"] - ALMACEN["lon"]) ** 2)
+        orden_ids = [e["id"] for e in ests]
+
+    with connection.cursor() as cursor:
+        cursor.execute("DELETE FROM ruta_entrega_orden WHERE ruta_entrega = %s", [ruta_entrega_id])
+        for i, est_id in enumerate(orden_ids, start=1):
+            cursor.execute("""
+                INSERT INTO ruta_entrega_orden (ruta_entrega, establecimiento, orden)
+                VALUES (%s, %s, %s)
+            """, [ruta_entrega_id, est_id, i])
+            
+def _cerrar_entrega_si_completa(cursor, entrega_id):
+    """
+    RF37: cuando todos los pedidos de la entrega quedan entregados,
+    el sistema cierra la entrega y su ruta automaticamente, libera el
+    vehiculo y no espera ninguna accion del repartidor.
+    """
+    cursor.execute("""
+        SELECT COUNT(*) FROM pedido
+        WHERE entrega = %s AND edo_pedido <> 'EPD005'
+    """, [entrega_id])
+
+    if cursor.fetchone()[0] > 0:
+        return False
+
+    cursor.execute("""
+        UPDATE entrega SET edo_entrega = 'EEN004', fecha_entrega = NOW()
+        WHERE numero = %s AND edo_entrega <> 'EEN004'
+    """, [entrega_id])
+    if cursor.rowcount == 0:
+        return False
+
+    cursor.execute("""
+        UPDATE ruta_entrega SET edo_ruta_entrega = 'ERET003' WHERE entrega = %s
+    """, [entrega_id])
+    cursor.execute("""
+        UPDATE vehiculo SET edo_vehiculo = 'EV001', entrega = NULL WHERE entrega = %s
+    """, [entrega_id])
+    return True
