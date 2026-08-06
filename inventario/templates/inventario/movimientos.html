@@ -77,10 +77,25 @@
 {% block content %}
 <div class="card" style="max-width:600px;">
     <label style="font-size:13px; font-weight:600;">Tipo de movimiento</label>
-    <select id="tipo-movimiento" style="width:100%; padding:8px; margin:6px 0 14px; border-radius:6px; border:1px solid #ccc;">
+    <select id="tipo-movimiento" style="width:100%; padding:8px; margin:6px 0 14px; border-radius:6px; border:1px solid #ccc;" onchange="onCambioTipoMovimiento()">
         <option value="TM001">Entrada</option>
         <option value="TM003">Salida por merma</option>
     </select>
+
+    <div id="bloque-origen">
+        <label style="font-size:13px; font-weight:600;">Origen</label>
+        <select id="origen-entrada" style="width:100%; padding:8px; margin:6px 0 14px; border-radius:6px; border:1px solid #ccc;" onchange="onCambioOrigen()">
+            <option value="produccion">Producción</option>
+            <option value="devolucion">Devolución</option>
+        </select>
+
+        <div id="bloque-devolucion" style="display:none;">
+            <label style="font-size:13px; font-weight:600;">Devolución</label>
+            <select id="devolucion-id" style="width:100%; padding:8px; margin:6px 0 14px; border-radius:6px; border:1px solid #ccc;">
+                <option value="">Cargando devoluciones pendientes...</option>
+            </select>
+        </div>
+    </div>
 
     <label style="font-size:13px; font-weight:600;">Número de empleado</label>
     <input type="number" id="empleado" placeholder="Ej. 4" style="width:100%; padding:8px; margin:6px 0 14px; border-radius:6px; border:1px solid #ccc;">
@@ -109,6 +124,44 @@
 <script>
     let contadorLineas = 0;
     let catalogoProductos = [];
+    let devolucionesPendientes = [];
+
+    function onCambioTipoMovimiento() {
+        const esEntrada = document.getElementById('tipo-movimiento').value === 'TM001';
+        document.getElementById('bloque-origen').style.display = esEntrada ? 'block' : 'none';
+        if (esEntrada) {
+            onCambioOrigen();
+        }
+    }
+
+    function onCambioOrigen() {
+        const esDevolucion = document.getElementById('origen-entrada').value === 'devolucion';
+        document.getElementById('bloque-devolucion').style.display = esDevolucion ? 'block' : 'none';
+        if (esDevolucion && devolucionesPendientes.length === 0) {
+            cargarDevolucionesPendientes();
+        }
+    }
+
+    async function cargarDevolucionesPendientes() {
+        const select = document.getElementById('devolucion-id');
+        try {
+            const res = await fetch('/api/inventario/devoluciones-pendientes/');
+            const data = await res.json();
+            devolucionesPendientes = data.devoluciones || [];
+
+            if (devolucionesPendientes.length === 0) {
+                select.innerHTML = '<option value="">No hay devoluciones pendientes</option>';
+                return;
+            }
+
+            select.innerHTML = '<option value="">Selecciona una devolución...</option>' +
+                devolucionesPendientes.map(d =>
+                    `<option value="${d.codigo}">Devolución #${d.codigo} — Entrega #${d.entrega} — ${d.cantidad} pza(s) — ${d.motivo} (${d.fecha})</option>`
+                ).join('');
+        } catch (e) {
+            select.innerHTML = '<option value="">Error al cargar devoluciones</option>';
+        }
+    }
 
     function agregarLinea(codigoPreseleccionado = null) {
         contadorLineas++;
@@ -152,9 +205,24 @@
     }
 
     async function registrarMovimiento() {
-        const tipo_movimiento = document.getElementById('tipo-movimiento').value;
+        let tipo_movimiento = document.getElementById('tipo-movimiento').value;
         const empleado = document.getElementById('empleado').value;
         const observaciones = document.getElementById('observaciones').value;
+
+        // RF40: el origen define el tipo_movimiento real cuando es Entrada.
+        // Producción -> TM001, Devolución -> TM004.
+        let devolucion = null;
+        if (tipo_movimiento === 'TM001') {
+            const origen = document.getElementById('origen-entrada').value;
+            if (origen === 'devolucion') {
+                tipo_movimiento = 'TM004';
+                devolucion = document.getElementById('devolucion-id').value;
+                if (!devolucion) {
+                    mostrarToast('Selecciona la devolución que originó esta entrada', 'error');
+                    return;
+                }
+            }
+        }
 
         const detalle = [];
         document.querySelectorAll('#lineas-detalle > div').forEach(linea => {
@@ -171,10 +239,15 @@
             return;
         }
 
+        const payload = { tipo_movimiento, empleado: parseInt(empleado), observaciones, detalle };
+        if (devolucion) {
+            payload.devolucion = parseInt(devolucion);
+        }
+
         const res = await fetch('/api/inventario/movimientos/', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tipo_movimiento, empleado: parseInt(empleado), observaciones, detalle })
+            body: JSON.stringify(payload)
         });
         const data = await res.json();
 
@@ -182,6 +255,9 @@
             mostrarToast(`Movimiento #${data.movimiento_id} registrado correctamente`, 'success');
             document.getElementById('lineas-detalle').innerHTML = '';
             document.getElementById('observaciones').value = '';
+            document.getElementById('origen-entrada').value = 'produccion';
+            onCambioOrigen();
+            devolucionesPendientes = []; // fuerza recarga si vuelven a elegir Devolución
             agregarLinea();
             cargarCatalogoStock();
         } else {
@@ -240,6 +316,7 @@
     }
 
     // Cargamos primero el catálogo, y hasta que esté listo agregamos la primera línea del formulario
+    onCambioTipoMovimiento(); // sincroniza el bloque Origen con el <select> tipo-movimiento al cargar
     cargarCatalogoStock().then(() => agregarLinea());
 </script>
 {% endblock %}
