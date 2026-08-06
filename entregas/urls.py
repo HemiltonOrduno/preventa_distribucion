@@ -20,5 +20,8 @@ urlpatterns = [
     path('entregas-disponibles/', views.entregas_disponibles, name='entregas_disponibles'),
     path('tomar-entrega/', views.tomar_entrega, name='tomar_entrega'),
     path('soltar-entrega/', views.soltar_entrega, name='soltar_entrega'),
+    path('entregas-en-carga/', views.entregas_en_carga, name='entregas_en_carga'),
+    path('entrega/<int:entrega_id>/agregar-pedidos/', views.agregar_pedidos_entrega, name='agregar_pedidos_entrega'),
+    path('entrega/<int:entrega_id>/confirmar-carga/', views.confirmar_carga_camion, name='confirmar_carga_camion'),
 
 ]
