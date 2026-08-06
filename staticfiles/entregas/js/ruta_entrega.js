@@ -38,7 +38,8 @@ function cargarRuta() {
         .then(res => res.json())
         .then(data => {
             if (data.error) {
-                if (data.error === 'No tienes una ruta asignada para hoy') {
+                // Si no trae ruta propia, se ofrecen las entregas disponibles
+                if (data.error.includes('ruta asignada')) {
                     mostrarEntregasDisponibles();
                 } else {
                     document.getElementById('lista-paradas').innerHTML =
@@ -51,17 +52,14 @@ function cargarRuta() {
             rutaId = data.ruta_id;
             paradas = data.paradas;
 
-            // Verificar si la ruta ya está iniciada
-            // Verificar si la ruta ya está iniciada
+            // Si ya está en camino solo se puede finalizar; si no, iniciar o regresar
             if (data.estado === 'En camino') {
                 rutaIniciada = true;
                 document.getElementById('btn-iniciar').style.display = 'none';
-                document.getElementById('btn-finalizar').style.display = 'block';
                 document.getElementById('btn-regresar').style.display = 'none';
             } else {
                 rutaIniciada = false;
                 document.getElementById('btn-iniciar').style.display = 'block';
-                document.getElementById('btn-finalizar').style.display = 'none';
                 document.getElementById('btn-regresar').style.display = 'block';
             }
 
@@ -99,7 +97,6 @@ function regresarRuta() {
 // ===== ENTREGAS DISPONIBLES (sin repartidor asignado) =====
 function mostrarEntregasDisponibles() {
     document.getElementById('btn-iniciar').style.display = 'none';
-    document.getElementById('btn-finalizar').style.display = 'none';
     document.getElementById('info-bar').style.display = 'none';
 
     const lista = document.getElementById('lista-paradas');
@@ -125,7 +122,8 @@ function mostrarEntregasDisponibles() {
                     <div class="parada-num almacen">📦</div>
                     <div class="parada-info">
                         <div class="parada-nombre">Entrega #${e.entrega_id}</div>
-                        <div class="parada-sub">${e.total_pedidos} pedidos · ${e.peso_total_kg.toFixed(1)} kg · ${e.placas || 'sin vehículo'}</div>
+                        <div class="parada-sub">Ruta #${e.ruta_entrega_id} · ${e.total_pedidos} pedidos · ${e.peso_total_kg.toFixed(1)} kg</div>
+                        <div class="parada-sub">🚚 ${e.placas || 'sin vehículo'} · ${e.modelo || ''}</div>
                     </div>
                     <button class="btn-iniciar-ruta" style="padding:6px 14px;font-size:12px;white-space:nowrap;"
                         onclick="event.stopPropagation(); tomarYIniciarEntrega(${e.ruta_entrega_id}, ${e.entrega_id})">
@@ -287,30 +285,11 @@ function iniciarRuta() {
         if (data.error) { alert('Error: ' + data.error); return; }
         rutaIniciada = true;
         document.getElementById('btn-iniciar').style.display = 'none';
-        document.getElementById('btn-finalizar').style.display = 'block';
         mostrarToast('✓ Ruta iniciada');
     });
 }
 
 // ===== FINALIZAR RUTA =====
-function finalizarRuta() {
-    const pendientes = paradas.filter(p => p.tipo === 'establecimiento' && !p.entregado).length;
-    if (pendientes > 0) {
-        if (!confirm(`Aún tienes ${pendientes} entregas pendientes. ¿Deseas finalizar la ruta?`)) return;
-    }
-
-    fetch('/api/entregas/finalizar-ruta/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ entrega_id: entregaId })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.error) { alert('Error: ' + data.error); return; }
-        mostrarToast('✓ Ruta finalizada');
-        setTimeout(() => location.reload(), 1500);
-    });
-}
 
 // ===== MODAL PARADA =====
 function abrirModalParada(parada) {
@@ -320,6 +299,9 @@ function abrirModalParada(parada) {
     }
 
     paradaActual = parada;
+
+    habilitarConfirmacion(false);
+    document.getElementById('cobro-monto').value = parseFloat(parada.subtotal || 0).toFixed(2);
 
     document.getElementById('modal-est-nombre').innerText = parada.nombre;
     document.getElementById('modal-est-direccion').innerText = parada.colonia;
@@ -347,6 +329,7 @@ function abrirModalParada(parada) {
     `;
 
     // Cargar detalle del pedido
+    document.getElementById('modal-productos').innerHTML = '';
     fetch(`/api/entregas/pedido/${parada.pedido_id}/detalle/`)
         .then(res => res.json())
         .then(data => {
@@ -424,9 +407,19 @@ function guardarCobro() {
         if (data.error) { alert('Error: ' + data.error); return; }
         document.getElementById('modal-cobro').classList.remove('visible');
         mostrarToast('✓ Cobro registrado');
-        // El cobro ya implica que la entrega se completó, se confirma automáticamente
-        confirmarEntrega();
+        // Regresa al detalle de la parada y desbloquea la confirmación
+        document.getElementById('modal-parada').classList.add('visible');
+        habilitarConfirmacion(true);
     });
+}
+
+
+function habilitarConfirmacion(habilitado) {
+    const btn = document.getElementById('btn-confirmar-entrega');
+    const aviso = document.getElementById('aviso-cobro');
+    if (!btn) return;
+    btn.disabled = !habilitado;
+    if (aviso) aviso.style.display = habilitado ? 'none' : 'block';
 }
 
 // ===== MODAL DEVOLUCION =====
@@ -510,10 +503,12 @@ function confirmarEntrega() {
 
         mostrarToast('✓ Entrega confirmada');
 
-        // Si todas están entregadas, mostrar botón finalizar
-        const pendientes = paradas.filter(p => p.tipo === 'establecimiento' && !p.entregado).length;
-        if (pendientes === 0) {
-            mostrarToast('✓ Todas las entregas completadas. Puedes finalizar la ruta.');
+        // RF37: el sistema cerró la entrega al quedar todos los pedidos entregados
+        if (data.entrega_completada) {
+            setTimeout(() => {
+                alert('✓ Ruta completada\n\nTodos los pedidos fueron entregados. La entrega se cerró automáticamente.');
+                location.reload();
+            }, 800);
         }
     });
 }

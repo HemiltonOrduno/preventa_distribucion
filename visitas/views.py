@@ -145,6 +145,20 @@ def ruta_del_dia_api(request):
         destino['ruta_visita_id'] = ruta_visita_id
         destino['ruta_iniciada'] = (edo_ruta_visita == 'ERV003')
 
+        # RF08-RF10: si ya hay una visita abierta para este destino se
+        # devuelve su estado, para que la pantalla retome el paso donde
+        # se quedo aunque el vendedor haya cerrado el navegador.
+        cursor.execute("""
+            SELECT numero, edo_visita FROM visita
+            WHERE ruta_visita = %s AND establecimiento = %s
+              AND edo_visita IN ('EVI002', 'EVI003')
+            ORDER BY numero DESC
+            LIMIT 1
+        """, [ruta_visita_id, destino['numero']])
+        visita_row = cursor.fetchone()
+        destino['visita_id'] = visita_row[0] if visita_row else None
+        destino['visita_estado'] = visita_row[1] if visita_row else None
+
     return JsonResponse(destino, json_dumps_params={'ensure_ascii': False})
 
 @csrf_exempt
@@ -261,6 +275,19 @@ def levantar_pedido(request, visita_id):
 
     with transaction.atomic():
         with connection.cursor() as cursor:
+            # RF11: solo se puede levantar pedido si la visita ya esta
+            # En proceso (EVI003). Esto impide saltarse el paso de
+            # "Realizar visita" y evita que una recarga de la pagina
+            # genere un segundo pedido para la misma visita.
+            cursor.execute("SELECT edo_visita FROM visita WHERE numero = %s", [visita_id])
+            estado_row = cursor.fetchone()
+            if not estado_row:
+                return JsonResponse({"error": "Visita no encontrada"}, status=404)
+            if estado_row[0] != 'EVI003':
+                return JsonResponse(
+                    {"error": "La visita debe estar en proceso para levantar el pedido"},
+                    status=409)
+
             cursor.execute("SELECT COALESCE(MAX(num), 0) + 1 FROM pedido")
             nuevo_pedido = cursor.fetchone()[0]
 
@@ -286,7 +313,8 @@ def levantar_pedido(request, visita_id):
                 """, [nuevo_pedido, cod_producto, cantidad, precio, importe])
 
             cursor.execute("""
-                UPDATE visita SET edo_visita = 'EVI004' WHERE numero = %s
+                UPDATE visita SET edo_visita = 'EVI004'
+                WHERE numero = %s AND edo_visita = 'EVI003'
             """, [visita_id])
 
             ruta_cerrada = _cerrar_ruta_si_completa(cursor, visita_id)
@@ -318,11 +346,17 @@ def visita_sin_pedido(request, visita_id):
 
     with transaction.atomic():
         with connection.cursor() as cursor:
+            # RF11 aplicado al cierre sin pedido: la visita tambien debe
+            # estar En proceso, y asi no se cierra dos veces si el
+            # vendedor recarga la pagina.
             cursor.execute("""
-                UPDATE visita SET edo_visita = 'EVI005', observaciones = %s WHERE numero = %s
+                UPDATE visita SET edo_visita = 'EVI005', observaciones = %s
+                WHERE numero = %s AND edo_visita = 'EVI003'
             """, [motivo, visita_id])
             if cursor.rowcount == 0:
-                return JsonResponse({"error": "Visita no encontrada"}, status=404)
+                return JsonResponse(
+                    {"error": "La visita debe estar en proceso para cerrarla sin pedido"},
+                    status=409)
 
             ruta_cerrada = _cerrar_ruta_si_completa(cursor, visita_id)
 

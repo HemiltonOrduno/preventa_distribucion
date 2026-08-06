@@ -205,8 +205,29 @@ a{ text-decoration: none; color: inherit; }
     border-bottom: 1px solid var(--color-border);
 }
 .product-item:last-child{ border-bottom: none; }
+.product-item__img{
+    width: 52px;
+    height: 52px;
+    object-fit: cover;
+    border-radius: .5rem;
+    background: #f5f5f5;
+    flex-shrink: 0;
+}
+.product-item__info{ flex: 1; min-width: 0; }
 .product-item__name{ font-size: .85rem; font-weight: 500; display: block; }
 .product-item__price{ font-size: .72rem; color: var(--color-text-muted); }
+
+input.qty__value{
+    width: 46px;
+    text-align: center;
+    padding: 6px 2px;
+    border: 1px solid var(--color-border);
+    border-radius: .4rem;
+    font-size: .85rem;
+    font-family: inherit;
+    min-height: 44px;
+}
+
 .qty{
     display: flex;
     align-items: center;
@@ -276,7 +297,7 @@ a{ text-decoration: none; color: inherit; }
     border-radius: var(--radius-card);
     box-shadow: 0 12px 28px rgba(26,35,126,0.18);
     padding: 12px;
-    z-index: 200;
+    z-index: 1100;   /* por encima de los controles de Leaflet (1000) */
 }
 .perfil--abierto{ display: flex; }
 
@@ -325,6 +346,89 @@ a{ text-decoration: none; color: inherit; }
     transition: transform .2s;
 }
 .perfil__logout:hover{ transform: scale(1.08); }
+
+/*===== MODAL DE CONFIRMACION =====*/
+.modal{
+    position: fixed;
+    inset: 0;
+    background: rgba(20,25,60,0.45);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25rem;
+    z-index: 1200;   /* siempre por encima del panel de perfil */
+}
+.modal--abierto{ display: flex; animation: modalFondo .18s ease-out; }
+
+.modal__caja{
+    background: var(--color-card);
+    border-radius: var(--radius-card);
+    box-shadow: 0 20px 48px rgba(26,35,126,0.28);
+    padding: 1.75rem 1.5rem 1.5rem;
+    width: 100%;
+    max-width: 330px;
+    text-align: center;
+    animation: modalCaja .22s ease-out;
+}
+.modal__icono{
+    width: 56px;
+    height: 56px;
+    margin: 0 auto .9rem;
+    border-radius: 50%;
+    background: var(--color-danger-bg);
+    color: var(--color-danger-text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+}
+.modal__titulo{
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--color-text);
+    margin-bottom: .4rem;
+}
+.modal__texto{
+    font-size: .85rem;
+    color: var(--color-text-muted);
+    margin: 0 0 1.4rem;
+    line-height: 1.4;
+}
+.modal__acciones{ display: flex; gap: 10px; }
+.modal__btn{
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: .75rem;
+    font-family: var(--font-display);
+    font-size: .82rem;
+    font-weight: 600;
+    border: none;
+    border-radius: .7rem;
+    cursor: pointer;
+    transition: transform .2s, filter .2s;
+}
+.modal__btn:hover{ transform: translateY(-2px); }
+.modal__btn--cancelar{
+    background: var(--color-bg);
+    color: var(--color-text-muted);
+    border: 1px solid var(--color-border);
+}
+.modal__btn--confirmar{
+    background: var(--color-danger-text);
+    color: #fff;
+}
+.modal__btn--confirmar:hover{ filter: brightness(1.1); }
+
+@keyframes modalFondo{
+    from{ opacity: 0; }
+    to{ opacity: 1; }
+}
+@keyframes modalCaja{
+    from{ opacity: 0; transform: translateY(14px) scale(.96); }
+    to{ opacity: 1; transform: translateY(0) scale(1); }
+}
 
 /*===== MEDIA QUERIES: ESCRITORIO =====*/
 @media screen and (min-width: 768px){
@@ -390,4 +494,82 @@ a{ text-decoration: none; color: inherit; }
         align-items: start;
     }
     .map-box{ height: 340px; min-height: 340px; }
+}
+
+/*===== MODO ALTO CONTRASTE (RFN-19) =====*/
+html.alto-contraste{
+    --color-primary: #ffe600;
+    --color-primary-light: #000000;
+    --color-bg: #000000;
+    --color-card: #0a0a0a;
+    --color-border: #ffffff;
+    --color-text: #ffffff;
+    --color-text-muted: #f5f5f5;
+    --color-success-bg: #062b0a;
+    --color-success-text: #4dff4d;
+    --color-danger-bg: #2b0606;
+    --color-danger-text: #ff5c5c;
+    --color-info-bg: #05202b;
+    --color-info-text: #4ddbff;
+}
+
+/* Elementos con colores fijos (no variables) que hay que ajustar aparte */
+html.alto-contraste .btn--primary{ color:#000; font-weight:700; }
+html.alto-contraste .modal__btn--confirmar{ color:#000; }
+html.alto-contraste .card,
+html.alto-contraste .form__div,
+html.alto-contraste .modal__caja,
+html.alto-contraste .top-nav,
+html.alto-contraste .bottom-nav,
+html.alto-contraste .perfil{
+    border: 2px solid var(--color-border);
+}
+html.alto-contraste .badge{ border: 1px solid currentColor; }
+html.alto-contraste .dot{ border: 1px solid #fff; }
+html.alto-contraste .btn{ font-weight: 700; letter-spacing: .01em; }
+html.alto-contraste .form__label,
+html.alto-contraste .card__sub,
+html.alto-contraste .perfil__rol{ color: #ffffff; }
+
+/*===== BOTON DE ALTO CONTRASTE =====*/
+.btn-contraste,
+.btn-contraste-fab{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg);
+    color: var(--color-primary);
+    cursor: pointer;
+    transition: transform .2s, background .2s, color .2s;
+}
+.btn-contraste{
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    font-size: 17px;
+}
+.btn-contraste-fab{
+    position: fixed;
+    right: 16px;
+    bottom: 96px;      /* justo arriba del bottom-nav */
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    font-size: 20px;
+    box-shadow: 0 8px 20px rgba(0,0,0,.25);
+    z-index: 150;
+}
+.btn-contraste:hover,
+.btn-contraste-fab:hover{ transform: scale(1.08); }
+.btn-contraste[aria-pressed="true"],
+.btn-contraste-fab[aria-pressed="true"]{
+    background: var(--color-primary, #ffe600);
+    color: #000;
+    border-color: #000;
+}
+
+/* En escritorio el boton flotante ya no hace falta, esta el del top-nav */
+@media screen and (min-width: 768px){
+    .btn-contraste-fab{ display: none; }
 }
