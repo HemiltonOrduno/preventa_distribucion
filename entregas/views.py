@@ -210,6 +210,7 @@ def mi_ruta(request):
                    CONCAT(rep.repNombre, ' ', rep.repApellPat) AS representante,
                    rep.telefono,
                    CASE WHEN ep.nombre = 'Entregado' THEN 1 ELSE 0 END AS entregado,
+                   EXISTS(SELECT 1 FROM pago pg WHERE pg.pedido = p.num) AS pagado,
                    COALESCE(reo.orden, 999) AS orden
             FROM entrega en2
             INNER JOIN pedido p ON p.entrega = en2.numero
@@ -231,6 +232,7 @@ def mi_ruta(request):
         e['lon'] = float(e['lon']) if e['lon'] else None
         e['subtotal'] = float(e['subtotal']) if e['subtotal'] else 0
         e['entregado'] = bool(e['entregado'])
+        e['pagado'] = bool(e['pagado'])
         e['tipo'] = 'establecimiento'
 
     # Agregar almacén al inicio
@@ -366,19 +368,31 @@ def registrar_cobro(request):
     establecimiento_id = body.get('establecimiento_id')
     tipo_pago = body.get('tipo_pago')
     monto = body.get('monto')
-    empleado_id = 44  # Temporal hasta autenticación
 
-    with connection.cursor() as cursor:
-        cursor.execute("SELECT COALESCE(MAX(codigo), 0) + 1 FROM pago")
-        nuevo_codigo = cursor.fetchone()[0]
+    empleado_id = request.session.get('empleado_num')
+    if not empleado_id:
+        return JsonResponse({"error": "Sesión no válida, inicia sesión de nuevo"}, status=401)
 
-        cursor.execute("""
-            INSERT INTO pago (codigo, monto, fecha, tipo_pago, empleado, establecimiento, pedido)
-            VALUES (%s, %s, NOW(), %s, %s, %s, %s)
-        """, [nuevo_codigo, monto, tipo_pago, empleado_id, establecimiento_id, pedido_id])
+    if not pedido_id or not tipo_pago or not monto:
+        return JsonResponse({"error": "Faltan datos del cobro"}, status=400)
+
+    with transaction.atomic():
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT COUNT(*) FROM pago WHERE pedido = %s", [pedido_id])
+            if cursor.fetchone()[0] > 0:
+                return JsonResponse({
+                    "error": "Este pedido ya tiene un cobro registrado"
+                }, status=409)
+
+            cursor.execute("SELECT COALESCE(MAX(codigo), 0) + 1 FROM pago")
+            nuevo_codigo = cursor.fetchone()[0]
+
+            cursor.execute("""
+                INSERT INTO pago (codigo, monto, fecha, tipo_pago, empleado, establecimiento, pedido)
+                VALUES (%s, %s, NOW(), %s, %s, %s, %s)
+            """, [nuevo_codigo, monto, tipo_pago, empleado_id, establecimiento_id, pedido_id])
 
     return JsonResponse({"mensaje": "Cobro registrado correctamente", "pago_id": nuevo_codigo})
-
 
 @csrf_exempt
 def registrar_devolucion(request):

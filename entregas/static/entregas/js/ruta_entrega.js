@@ -299,8 +299,8 @@ function abrirModalParada(parada) {
     }
 
     paradaActual = parada;
-
-    habilitarConfirmacion(false);
+    habilitarConfirmacion(!!parada.pagado);
+    actualizarBotonCobro(!!parada.pagado);
     document.getElementById('cobro-monto').value = parseFloat(parada.subtotal || 0).toFixed(2);
 
     document.getElementById('modal-est-nombre').innerText = parada.nombre;
