@@ -39,9 +39,25 @@
         </a>
     </nav>
     <div id="sidebar-logout">
-        <a href="/api/usuarios/logout/">
+        <a href="/api/usuarios/logout/" onclick="return abrirModalLogout(event);">
             <span class="icon">🚪</span> Cerrar sesión
         </a>
+    </div>
+</div>
+
+<!-- MODAL DE CONFIRMACION DE CIERRE DE SESION -->
+<div class="modal" id="modalLogout">
+    <div class="modal__caja">
+        <div class="modal__icono"><i class='bx bx-log-out'></i></div>
+        <h3 class="modal__titulo">Cerrar sesión</h3>
+        <p class="modal__texto">¿Seguro que quieres salir del sistema?</p>
+        <div class="modal__acciones">
+            <button type="button" class="modal__btn modal__btn--cancelar"
+                    onclick="cerrarModalLogout()">Cancelar</button>
+            <a href="/api/usuarios/logout/" class="modal__btn modal__btn--confirmar">
+                Sí, salir
+            </a>
+        </div>
     </div>
 </div>
 
@@ -80,6 +96,31 @@
     </div>
 </div>
 {% endblock %}
+
+<script>
+/*===== MODAL DE CIERRE DE SESION =====*/
+document.addEventListener("DOMContentLoaded", function(){
+    var modalLogout = document.getElementById("modalLogout");
+
+    window.abrirModalLogout = function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        modalLogout.classList.add("modal--abierto");
+        return false;
+    };
+
+    window.cerrarModalLogout = function(){
+        modalLogout.classList.remove("modal--abierto");
+    };
+
+    modalLogout.addEventListener("click", function(e){
+        if (e.target === modalLogout){ cerrarModalLogout(); }
+    });
+    document.addEventListener("keydown", function(e){
+        if (e.key === "Escape"){ cerrarModalLogout(); }
+    });
+});
+</script>
 
 <script src="{% static 'rutas/js/leaflet.js' %}"></script>
 
