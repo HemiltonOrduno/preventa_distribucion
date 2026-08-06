@@ -123,8 +123,13 @@ a { text-decoration: none; color: inherit; }
     display: flex;
     justify-content: space-around;
     padding: 8px;
-    z-index: 100;
+    z-index: 1500;
+    
 }
+
+.ruta-mapa, #map { z-index: 0; position: relative; }
+
+
 .bottom-nav__item {
     display: flex;
     flex-direction: column;
@@ -291,6 +296,7 @@ a { text-decoration: none; color: inherit; }
     display: flex;
     flex-direction: column;
     gap: 1rem;
+    padding-bottom: 1rem;
 }
 
 .ruta-panel {
@@ -341,46 +347,6 @@ a { text-decoration: none; color: inherit; }
 }
 .btn-iniciar-ruta { background: var(--color-primary); color: #fff; box-shadow: var(--shadow-soft); }
 .btn-finalizar-ruta { background: var(--color-success-bg); color: var(--color-success-text); }
-
-/*===== MEDIA QUERIES: ESCRITORIO =====*/
-@media screen and (min-width: 768px) {
-    body { padding-bottom: 2rem; }
-    .bottom-nav { display: none; }
-
-    .top-nav {
-        display: flex;
-        align-items: center;
-        gap: 28px;
-        max-width: 960px;
-        margin: 20px auto 0;
-        background: var(--color-card);
-        border: 1px solid #eef0f4;
-        border-radius: var(--radius-pill);
-        padding: 10px 20px;
-        box-shadow: var(--shadow-soft);
-    }
-    .top-nav__brand { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--color-primary); }
-    .brand-icon { font-size: 20px; }
-    .top-nav__links { display: flex; gap: 6px; flex: 1; }
-    .top-nav__link { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-text-muted); padding: 8px 14px; border-radius: .8rem; }
-    .top-nav__link.active { background: var(--color-primary-light); color: var(--color-primary); font-weight: 600; }
-    .top-nav__avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--color-primary-light); color: var(--color-primary); display: flex; align-items: center; justify-content: center; }
-
-    .page { max-width: 960px; padding: 2rem 1.5rem; }
-    .page--split { display: grid; grid-template-columns: 360px 1fr; gap: 24px; align-items: start; }
-    .map-box { height: 520px; position: sticky; top: 2rem; }
-
-    .ruta-layout {
-        flex-direction: row;
-        align-items: stretch;
-        height: calc(100vh - 160px);
-        gap: 24px;
-    }
-    .ruta-panel { width: 360px; flex-shrink: 0; }
-    .ruta-panel__header { flex-direction: row; flex-wrap: wrap; align-items: center; }
-    .ruta-panel__header button { width: auto; flex: 1; }
-    .ruta-panel__body { max-height: none; flex: 1; }
-    .ruta-mapa { flex: 1; height: auto; min-height: 400px; }
 
     /*===== RNF-27: CODIFICACIÓN VISUAL EN DEVOLUCIONES =====*/
 .tipo-dev-selector { display: flex; flex-direction: column; gap: 8px; }
@@ -434,4 +400,74 @@ a { text-decoration: none; color: inherit; }
     border-color: var(--color-danger-text);
 }
 
+/*===== RNF-20: TAMAÑO MÍNIMO DE ELEMENTOS INTERACTIVOS =====*/
+.btn-cobro, .btn-devolucion, .btn-cancelar-modal,
+.btn-confirmar-dev, .tipo-pago-btn, .tipo-dev-btn,
+.btn-iniciar-ruta, .btn-finalizar-ruta,
+.form-group input, .form-group select {
+    min-height: 48px;
+}
+.bottom-nav__item { min-height: 48px; justify-content: center; }
+.parada-item { min-height: 56px; }
+
+/* El botón dentro de una tarjeta de entrega no debe ocupar todo el ancho */
+.parada-item .btn-iniciar-ruta {
+    width: auto;
+    flex-shrink: 0;
+}
+
+
+/*===== MEDIA QUERIES: ESCRITORIO =====*/
+@media screen and (min-width: 768px) {
+    body { padding-bottom: 2rem; }
+    .bottom-nav { display: none; }
+
+    .top-nav {
+        display: flex;
+        align-items: center;
+        gap: 28px;
+        max-width: 960px;
+        margin: 20px auto 0;
+        background: var(--color-card);
+        border: 1px solid #eef0f4;
+        border-radius: var(--radius-pill);
+        padding: 10px 20px;
+        box-shadow: var(--shadow-soft);
+    }
+    .top-nav__brand { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--color-primary); }
+    .brand-icon { font-size: 20px; }
+    .top-nav__links { display: flex; gap: 6px; flex: 1; }
+    .top-nav__link { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-text-muted); padding: 8px 14px; border-radius: .8rem; }
+    .top-nav__link.active { background: var(--color-primary-light); color: var(--color-primary); font-weight: 600; }
+    .top-nav__avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--color-primary-light); color: var(--color-primary); display: flex; align-items: center; justify-content: center; }
+
+    .page { max-width: 960px; padding: 2rem 1.5rem; }
+    .page--split { display: grid; grid-template-columns: 360px 1fr; gap: 24px; align-items: start; }
+    .map-box { height: 520px; position: sticky; top: 2rem; }
+
+    .ruta-layout {
+        flex-direction: row;
+        align-items: stretch;
+        height: calc(100vh - 160px);
+        gap: 24px;
+    }
+    .ruta-panel { width: 360px; flex-shrink: 0; }
+    .ruta-panel__header { flex-direction: row; flex-wrap: wrap; align-items: center; }
+    .ruta-panel__header button { width: auto; flex: 1; }
+    .ruta-panel__body { max-height: none; flex: 1; }
+    .ruta-mapa { flex: 1; height: auto; min-height: 400px; }
+
+
+
+}
+
+.btn-confirmar-entrega {
+    padding: 14px; background: var(--color-success-text); color: white; border: none;
+    border-radius: .8rem; font-family: var(--font-display); font-size: 14px; font-weight: 700;
+    cursor: pointer; width: 100%; min-height: 48px;
+    box-shadow: var(--shadow-soft); transition: opacity .2s;
+}
+.btn-confirmar-entrega:disabled {
+    background: var(--color-border); color: var(--color-text-muted);
+    cursor: not-allowed; box-shadow: none;
 }

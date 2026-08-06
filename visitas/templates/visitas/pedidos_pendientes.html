@@ -20,6 +20,14 @@
 
 {% block extra_scripts %}
 <script>
+    /* Las observaciones las escribe el vendedor, asi que se escapan
+       antes de insertarlas en el HTML. */
+    function escapar(texto) {
+        const div = document.createElement('div');
+        div.textContent = texto;
+        return div.innerHTML;
+    }
+
     async function cargarPedidos() {
         const cont = document.getElementById('lista-pedidos');
         try {
@@ -36,6 +44,9 @@
                     <div>
                         <strong>Pedido #${p.pedido_id}</strong> — ${p.establecimiento_nombre}
                         <div style="font-size:12px; color:#666;">Zona: ${p.zona_nombre} · Total: $${p.total.toFixed(2)}</div>
+                        ${p.observaciones
+                            ? `<div style="font-size:12px; color:#8a6d1f; margin-top:4px;">📝 ${escapar(p.observaciones)}</div>`
+                            : ''}
                     </div>
                     <button class="btn btn-primary" onclick="verDetalle(${p.pedido_id})">Validar</button>
                 </div>
@@ -57,6 +68,14 @@
         cont.innerHTML = `
             <h3>Pedido #${p.pedido_id} — ${p.establecimiento_nombre}</h3>
             <p style="font-size:12px; color:#666;">Estado: ${p.estado}</p>
+            ${p.observaciones
+                ? `<div style="margin-top:12px; padding:10px 12px; background:#fff8e1;
+                             border-left:3px solid #f0b429; border-radius:4px; font-size:13px;">
+                       <strong style="font-size:11px; color:#8a6d1f; text-transform:uppercase;
+                                      letter-spacing:.04em;">Observaciones del vendedor</strong>
+                       <div style="margin-top:4px;">${escapar(p.observaciones)}</div>
+                   </div>`
+                : ''}
             <table style="width:100%; margin-top:12px; font-size:13px; border-collapse:collapse;">
                 <tr style="text-align:left; border-bottom:1px solid #ddd;">
                     <th style="width:52px;"></th>

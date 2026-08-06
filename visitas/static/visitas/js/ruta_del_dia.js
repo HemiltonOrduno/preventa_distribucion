@@ -1,9 +1,17 @@
 /*
   RF07: trae el siguiente destino de la ruta del vendedor y lo pinta
-  en pantalla. RF08-10: al iniciar visita, se crea y se marca "en
-  proceso" sin salir de esta página, mostrando aquí mismo las
-  opciones de levantar pedido / establecimiento cerrado.
-  Además, dibuja el mapa de toda la ruta del día (visitadas, actual,
+  en pantalla.
+
+  RF08-RF10: el flujo son TRES pasos separados, no uno solo:
+    1. "Iniciar visita"  -> crea la visita En camino  (EVI002)  RF08
+    2. "Realizar visita" -> la pasa a En proceso      (EVI003)  RF09-10
+    3. Levantar pedido / Establecimiento cerrado                RF11, RF14
+
+  La pantalla se dibuja segun el estado que reporta la API, asi que
+  si el vendedor cierra el navegador a medio camino, al volver retoma
+  el paso donde se quedo en vez de empezar de cero.
+
+  Ademas, dibuja el mapa de toda la ruta del dia (visitadas, actual,
   pendientes) para que el vendedor se ubique.
 */
 let destinoActual = null;
@@ -117,6 +125,28 @@ function renderTarjetaPendiente() {
         </button>`;
 }
 
+/* RF08: la visita ya existe y esta En camino. El vendedor va en
+   trayecto; al llegar presiona "Realizar visita" (RF09). */
+function renderTarjetaEnCamino() {
+    const contenedor = document.getElementById("contenidoRuta");
+    contenedor.innerHTML = `
+        <div class="card">
+            <div class="card__row">
+                <i class='bx bx-store'></i>
+                <span class="card__title">${destinoActual.nombre}</span>
+            </div>
+            <p class="card__sub">${destinoActual.estCalle} ${destinoActual.estNumero}, ${destinoActual.estColonia}</p>
+            <span class="badge badge--info">En camino</span>
+        </div>
+        <p style="font-size:12px;color:var(--color-text-muted);margin:0 0 .7rem">
+            Al llegar al establecimiento, presiona Realizar visita.
+        </p>
+        <button class="btn btn--primary" id="btnRealizarVisita" onclick="realizarVisita()">
+            Realizar visita
+            <i class='bx bx-check-circle'></i>
+        </button>`;
+}
+
 function renderTarjetaEnProceso() {
     const contenedor = document.getElementById("contenidoRuta");
     contenedor.innerHTML = `
@@ -157,14 +187,15 @@ async function cargarRutaDelDia(){
             return;
         }
 
-         destinoActual = data;
-        visitaEnProcesoId = null;
+        destinoActual = data;
+        visitaEnProcesoId = data.visita_id;
 
-        if (data.ruta_iniciada) {
-            // La ruta ya se inició antes (no es la primera parada):
-            // se crea la visita automáticamente, sin esperar clic.
-            contenedor.innerHTML = `<p style="font-size:13px;color:var(--color-text-muted)">Cargando siguiente visita...</p>`;
-            await iniciarVisita();
+        // La pantalla refleja el estado real de la visita en la base.
+        // Nunca se avanza de paso sin que el vendedor lo pida (RF08-RF10).
+        if (data.visita_estado === 'EVI003') {
+            renderTarjetaEnProceso();
+        } else if (data.visita_estado === 'EVI002') {
+            renderTarjetaEnCamino();
         } else {
             renderTarjetaPendiente();
         }
@@ -198,8 +229,30 @@ async function iniciarVisita(){
 
     visitaEnProcesoId = data.visita_id;
 
-    // RF09-10: marca la visita como "en proceso" (antes lo hacía visita.js al llegar a esa pantalla)
-    await fetch(`/api/visitas/api/visitas/${visitaEnProcesoId}/realizar/`, { method: 'PATCH' });
+    // RF08 termina aqui: la visita queda En camino. El paso a
+    // En proceso lo dispara el vendedor con "Realizar visita".
+    renderTarjetaEnCamino();
+}
+
+
+/* RF09-RF10: el vendedor llego al establecimiento y da inicio formal
+   a la visita, que pasa a En proceso. */
+async function realizarVisita(){
+    if (!visitaEnProcesoId) return;
+
+    const boton = document.getElementById('btnRealizarVisita');
+    if (boton) { boton.disabled = true; boton.style.opacity = '0.6'; }
+
+    const res = await fetch(`/api/visitas/api/visitas/${visitaEnProcesoId}/realizar/`, {
+        method: 'PATCH'
+    });
+    const data = await res.json();
+
+    if (!res.ok){
+        alert(data.error || 'No se pudo iniciar la visita');
+        if (boton) { boton.disabled = false; boton.style.opacity = '1'; }
+        return;
+    }
 
     renderTarjetaEnProceso();
 }
