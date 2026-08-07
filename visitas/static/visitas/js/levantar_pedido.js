@@ -85,7 +85,8 @@ async function confirmarPedido(){
         return;
     }
 
-    window.location.href = '/api/visitas/ruta-del-dia/';
+    // El aviso lo muestra la pantalla de ruta del dia al volver
+    window.location.href = '/api/visitas/ruta-del-dia/?completada=pedido';
 }
 
 cargarProductos();
