@@ -1554,3 +1554,13 @@ INSERT INTO edo_ruta_visita (codigo, nombre, descripcion) VALUES
 ('ERV006', 'Asignada', 'La ruta de visita ya fue asignada a un vendedor y está lista para iniciar');
 
 INSERT INTO edo_entrega (codigo, nombre) VALUES ('EEN005', 'En carga');
+
+INSERT INTO modelo (numero, nombre, ano, capacidad, marca)
+VALUES (11, 'Camioneta chica', 2024, 0.50, 'M001');
+
+INSERT INTO vehiculo (numero, serie_vin, placas, tipo_vehiculo, modelo, edo_vehiculo, empleado, entrega)
+VALUES (
+  (SELECT COALESCE(MAX(v.numero), 0) + 1 FROM (SELECT numero FROM vehiculo) v),
+  'VINPRUEBA0000001', 'BCTEST01', 'TV002', 11, 'EV001', 44, NULL
+);
+

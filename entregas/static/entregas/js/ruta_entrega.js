@@ -303,6 +303,22 @@ function abrirModalParada(parada) {
     habilitarConfirmacion(false);
     document.getElementById('cobro-monto').value = parseFloat(parada.subtotal || 0).toFixed(2);
 
+    // El cobro pudo registrarse en una sesión anterior: se consulta el
+    // estado real para no obligar a cobrar dos veces
+    fetch(`/api/entregas/pedido/${parada.pedido_id}/estado-cobro/`)
+        .then(r => r.json())
+        .then(d => {
+            if (d.pagado) {
+                habilitarConfirmacion(true);
+                document.getElementById('aviso-cobro').innerText = '✓ Cobro ya registrado';
+                document.getElementById('aviso-cobro').style.display = 'block';
+                document.getElementById('aviso-cobro').style.color = '#2e7d32';
+            } else if (d.pendiente > 0) {
+                document.getElementById('cobro-monto').value = d.pendiente.toFixed(2);
+            }
+        })
+        .catch(() => {});
+
     document.getElementById('modal-est-nombre').innerText = parada.nombre;
     document.getElementById('modal-est-direccion').innerText = parada.colonia;
     document.getElementById('cobro-est-nombre').innerText = parada.nombre;
@@ -418,7 +434,14 @@ function guardarCobro() {
     .then(data => {
         if (data.error) { alert('Error: ' + data.error); return; }
         document.getElementById('modal-cobro').classList.remove('visible');
-        mostrarToast('✓ Cobro registrado');
+
+        // Si el cliente pagó de más, se avisa el cambio a entregar
+        if (data.cambio > 0) {
+            alert(`Cobro registrado: $${data.cobrado.toFixed(2)}\n\nCambio a entregar: $${data.cambio.toFixed(2)}`);
+        } else {
+            mostrarToast('✓ Cobro registrado');
+        }
+
         // Regresa al detalle de la parada y desbloquea la confirmación
         document.getElementById('modal-parada').classList.add('visible');
         habilitarConfirmacion(true);
@@ -600,3 +623,4 @@ function abrirDevolucion() {
 
     document.getElementById('modal-devolucion').classList.add('visible');
 }
+
