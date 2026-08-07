@@ -77,6 +77,51 @@ def validar_telefono(valor):
     return '({}) {}-{}'.format(digitos[:3], digitos[3:6], digitos[6:])
 
 
+# Edad minima para contratar (LFT Art. 22 Bis / 23: 15 anios con permisos
+# especiales, pero este sistema no maneja ese regimen especial, asi que se
+# exige mayoria de edad laboral plena).
+EDAD_MINIMA_CONTRATACION = 18
+# Tope defensivo contra errores de captura (p. ej. escribir 1930 en vez de
+# 2030 al editar), no una regla de negocio real.
+EDAD_MAXIMA_RAZONABLE = 100
+
+
+def validar_fecha_nacimiento(valor):
+    """Valida que la fecha de nacimiento corresponda a alguien contratable.
+
+    DateField por si solo solo valida el formato, no que la fecha sea
+    plausible para el nacimiento de un empleado: sin esta funcion, el
+    sistema aceptaba fechas de hoy o del futuro (un "recien nacido"
+    contratado) o fechas absurdamente antiguas.
+    """
+    hoy = date.today()
+
+    if valor >= hoy:
+        raise serializers.ValidationError(
+            'La fecha de nacimiento no puede ser hoy ni una fecha futura.'
+        )
+
+    edad = (
+        hoy.year - valor.year
+        - ((hoy.month, hoy.day) < (valor.month, valor.day))
+    )
+
+    if edad < EDAD_MINIMA_CONTRATACION:
+        raise serializers.ValidationError(
+            'El empleado debe tener al menos {} anios cumplidos.'.format(
+                EDAD_MINIMA_CONTRATACION
+            )
+        )
+
+    if edad > EDAD_MAXIMA_RAZONABLE:
+        raise serializers.ValidationError(
+            'Revisa la fecha de nacimiento: indica una edad mayor a {} '
+            'anios.'.format(EDAD_MAXIMA_RAZONABLE)
+        )
+
+    return valor
+
+
 def nombre_completo(empleado):
     partes = [
         empleado.nombre_de_pila,
@@ -199,6 +244,9 @@ class AltaUsuarioSerializer(serializers.Serializer):
                 'El rol indicado no existe en el catalogo.'
             )
         return valor
+
+    def validate_fecha_nacimiento(self, valor):
+        return validar_fecha_nacimiento(valor)
 
     def validate_usuario(self, valor):
         valor = valor.strip()
@@ -412,6 +460,9 @@ class EditarDatosSerializer(serializers.Serializer):
         if not Rol.objects.filter(pk=valor).exists():
             raise serializers.ValidationError('El rol indicado no existe.')
         return valor
+
+    def validate_fecha_nacimiento(self, valor):
+        return validar_fecha_nacimiento(valor)
 
     def validate_email(self, valor):
         valor = valor.strip().lower()

@@ -275,12 +275,87 @@ tbody tr.inactivo td{color:var(--texto-tenue)}
     { id: "email", etiqueta: "Correo electrónico", tipo: "email", req: true, max: 50 }
   ];
 
+  /* Mismo criterio que validar_fecha_nacimiento() en
+     admin_panel/serializers.py: nada de hoy/futuro, minimo 18 años
+     cumplidos, maximo 100 como tope defensivo contra errores de captura.
+     Los atributos min/max solo evitan el error mas obvio en el selector
+     nativo; la validacion real (aqui abajo y en el backend) es la que
+     realmente protege el dato. */
+  var EDAD_MINIMA_CONTRATACION = 18;
+  var EDAD_MAXIMA_RAZONABLE = 100;
+
+  function iso(d) {
+    var m = String(d.getMonth() + 1).padStart(2, "0");
+    var dd = String(d.getDate()).padStart(2, "0");
+    return d.getFullYear() + "-" + m + "-" + dd;
+  }
+
+  function limitesFechaNacimiento() {
+    var hoy = new Date();
+    var maxima = new Date(hoy.getFullYear() - EDAD_MINIMA_CONTRATACION,
+      hoy.getMonth(), hoy.getDate());
+    var minima = new Date(hoy.getFullYear() - EDAD_MAXIMA_RAZONABLE,
+      hoy.getMonth(), hoy.getDate());
+    return { min: iso(minima), max: iso(maxima) };
+  }
+
+  var LIMITES_NACIMIENTO = limitesFechaNacimiento();
+
+  function fechaNacimientoValida(valor) {
+    var partes = (valor || "").split("-");
+    if (partes.length !== 3 || partes.some(function (p) { return !p; })) {
+      return { ok: false, motivo: "Captura la fecha de nacimiento." };
+    }
+
+    var nacimiento = new Date(
+      Number(partes[0]), Number(partes[1]) - 1, Number(partes[2])
+    );
+    var hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+
+    if (isNaN(nacimiento.getTime()) || nacimiento >= hoy) {
+      return {
+        ok: false,
+        motivo: "La fecha de nacimiento no puede ser hoy ni una fecha futura."
+      };
+    }
+
+    var edad = hoy.getFullYear() - nacimiento.getFullYear();
+    var yaCumplioEsteAnio =
+      hoy.getMonth() > nacimiento.getMonth() ||
+      (hoy.getMonth() === nacimiento.getMonth() &&
+        hoy.getDate() >= nacimiento.getDate());
+    if (!yaCumplioEsteAnio) { edad -= 1; }
+
+    if (edad < EDAD_MINIMA_CONTRATACION) {
+      return {
+        ok: false,
+        motivo: "El empleado debe tener al menos " +
+          EDAD_MINIMA_CONTRATACION + " años cumplidos."
+      };
+    }
+
+    if (edad > EDAD_MAXIMA_RAZONABLE) {
+      return {
+        ok: false,
+        motivo: "Revisa la fecha de nacimiento: indica una edad mayor a " +
+          EDAD_MAXIMA_RAZONABLE + " años."
+      };
+    }
+
+    return { ok: true };
+  }
+
   function formulario() {
     var campos = CAMPOS.map(function (c) {
       return '<div class="campo"><label for="f_' + c.id + '"' +
         (c.req ? ' class="requerido"' : "") + ">" + c.etiqueta + "</label>" +
         '<input type="' + c.tipo + '" id="f_' + c.id + '"' +
         (c.max ? ' maxlength="' + c.max + '"' : "") +
+        (c.tipo === "date"
+          ? ' min="' + LIMITES_NACIMIENTO.min + '" max="' +
+            LIMITES_NACIMIENTO.max + '"'
+          : "") +
         (c.pista ? ' placeholder="' + c.pista + '"' : "") + ">" +
         (c.pista ? '<span class="pista">' + c.pista + "</span>" : "") +
         '<span class="error" id="e_' + c.id + '"></span></div>';
@@ -351,6 +426,14 @@ tbody tr.inactivo td{color:var(--texto-tenue)}
 
   function guardar() {
     limpiarErrores();
+
+    var fecha = fechaNacimientoValida($("f_fecha_nacimiento").value);
+    if (!fecha.ok) {
+      marcarErrores({ fecha_nacimiento: fecha.motivo });
+      avisar("Revisa los campos marcados.", "mal");
+      $("f_fecha_nacimiento").focus();
+      return;
+    }
 
     if (!telefonoValido($("f_telefono").value)) {
       marcarErrores({
@@ -446,7 +529,9 @@ tbody tr.inactivo td{color:var(--texto-tenue)}
           P.escapar(u.apellido_materno || "") + '">' +
           '<span class="error" id="e_apellido_materno"></span></div>' +
         campoTexto("fecha_nacimiento", "Fecha de nacimiento", "date",
-          u.fecha_nacimiento) +
+          u.fecha_nacimiento,
+          ' min="' + LIMITES_NACIMIENTO.min + '" max="' +
+            LIMITES_NACIMIENTO.max + '"') +
         campoTexto("telefono", "Teléfono", "tel", u.telefono,
           ' maxlength="15" placeholder="10 dígitos (lada + número)"') +
         campoTexto("email", "Correo electrónico", "email", u.email,
@@ -465,6 +550,14 @@ tbody tr.inactivo td{color:var(--texto-tenue)}
     $("btnCancelar").addEventListener("click", P.cerrarModal);
     $("btnGuardar").addEventListener("click", function () {
       limpiarErrores();
+
+      var fecha = fechaNacimientoValida($("f_fecha_nacimiento").value);
+      if (!fecha.ok) {
+        marcarErrores({ fecha_nacimiento: fecha.motivo });
+        avisar("Revisa los campos marcados.", "mal");
+        $("f_fecha_nacimiento").focus();
+        return;
+      }
 
       if (!telefonoValido($("f_telefono").value)) {
         marcarErrores({

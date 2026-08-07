@@ -4,6 +4,8 @@ from datetime import date
 
 from django.db.models import Count, Q
 from django.http import Http404
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.generic import TemplateView
 from rest_framework import status
 from rest_framework.generics import ListCreateAPIView
@@ -398,14 +400,29 @@ class LicenciasAPIView(APIView):
         })
 
 
+@method_decorator(ensure_csrf_cookie, name='dispatch')
 class LicenciasPantalla(TemplateView):
-    """Pantalla de control de licencias (apoyo al RF58)."""
+    """Pantalla de control de licencias (apoyo al RF58).
+
+    ensure_csrf_cookie garantiza que el navegador reciba la cookie
+    'csrftoken' al cargar esta pagina, sin depender de que el template
+    incluya {% csrf_token %} en algun formulario. base_panel.html la lee
+    para mandar X-CSRFToken en enviarAdmin (ver reportes/permissions.py:
+    EsAdministrador ahora exige ese token en POST/PUT/PATCH).
+    """
 
     template_name = 'reportes/licencias.html'
     extra_context = {'seccion': 'licencias'}
 
+
+@method_decorator(ensure_csrf_cookie, name='dispatch')
 class GestionUsuariosPantalla(TemplateView):
-    """Sirve la interfaz del Modulo 9."""
+    """Sirve la interfaz del Modulo 9.
+
+    Mismo motivo que LicenciasPantalla: garantiza la cookie CSRF para que
+    las llamadas de enviarAdmin (alta, edicion, cambio de estado) no
+    fallen con 403 por falta de token.
+    """
 
     template_name = 'reportes/gestion_usuarios.html'
     extra_context = {'seccion': 'usuarios'}

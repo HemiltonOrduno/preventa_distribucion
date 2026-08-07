@@ -294,8 +294,8 @@ tbody tr:focus-visible{outline:2px solid var(--primario);outline-offset:-2px}
     <div class="identidad">
       <div class="avatar">AD</div>
       <div>
-        <strong class="identidad-nombre">Administrador</strong>
-        <small>Sucursal Tijuana</small>
+        <strong class="identidad-nombre">{{ request.session.nombre_usuario|default:"Administrador" }}</strong>
+        <small>Administrador &middot; Sucursal Tijuana</small>
       </div>
       <span class="identidad-separador" aria-hidden="true"></span>
       <button type="button" class="boton-salir" id="btnCerrarSesion" title="Cerrar sesión"
@@ -337,12 +337,6 @@ var Panel = (function () {
   var API = "/api/reportes";
   var API_ADMIN = "/api/admin";
 
-  // TEMPORAL: identidad del administrador mientras el modulo de login
-  // (RF01-RF03) no expone un token. Sustituir por el token de sesion.
-  // Debe ser un empleado con rol Administrador (R001); de lo contrario el
-  // backend respondera 403 en cuanto se apague RBAC_MODO_DESARROLLO.
-  var ID_ADMIN = 1;
-
   var dinero = new Intl.NumberFormat("es-MX", {
     style: "currency", currency: "MXN"
   });
@@ -373,27 +367,55 @@ var Panel = (function () {
     });
   }
 
+  /* Lee el valor de una cookie por nombre. Django deja la cookie
+     "csrftoken" en el navegador en cuanto el template que sirve el panel
+     usa {% csrf_token %} en algun formulario, o la vista tiene
+     @ensure_csrf_cookie. Si el panel se sirve desde una vista que no
+     renderiza ningun token, esta cookie no existira y enviarAdmin fallara
+     con 403 "Token CSRF invalido o ausente": revisar la vista del panel
+     en ese caso. */
+  function leerCookie(nombre) {
+    var prefijo = nombre + "=";
+    var partes = document.cookie.split(";");
+    for (var i = 0; i < partes.length; i++) {
+      var parte = partes[i].trim();
+      if (parte.indexOf(prefijo) === 0) {
+        return decodeURIComponent(parte.slice(prefijo.length));
+      }
+    }
+    return null;
+  }
+
+  /* La identidad del empleado viaja en la cookie de sesion (fijada por
+     LoginView al autenticar), no en un header manipulable por el
+     cliente. credentials: "same-origin" asegura que fetch la incluya. */
   function pedir(ruta) {
     return fetch(API + ruta, {
-      headers: { "X-Empleado-Id": String(ID_ADMIN), "Accept": "application/json" }
+      credentials: "same-origin",
+      headers: { "Accept": "application/json" }
     }).then(leerRespuesta);
   }
 
   function pedirAdmin(ruta) {
     return fetch(API_ADMIN + ruta, {
-      headers: { "X-Empleado-Id": String(ID_ADMIN), "Accept": "application/json" }
+      credentials: "same-origin",
+      headers: { "Accept": "application/json" }
     }).then(leerRespuesta);
   }
 
-  /* POST con JSON. Los endpoints de DRF quedan exentos de CSRF, la
-     identidad viaja en la cabecera igual que en las lecturas. */
+  /* POST/PATCH/PUT con JSON. La identidad viaja en la cookie de sesion,
+     igual que en las lecturas; el backend la resuelve via
+     obtener_empleado_actual. Ademas de la sesion, el backend ahora exige
+     el token CSRF en estos metodos (ver reportes/permissions.py), asi
+     que se manda en la cabecera X-CSRFToken tal como Django lo espera. */
   function enviarAdmin(ruta, cuerpo, metodo) {
     return fetch(API_ADMIN + ruta, {
       method: metodo || "POST",
+      credentials: "same-origin",
       headers: {
-        "X-Empleado-Id": String(ID_ADMIN),
         "Accept": "application/json",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "X-CSRFToken": leerCookie("csrftoken")
       },
       body: JSON.stringify(cuerpo)
     }).then(leerRespuesta);
@@ -483,15 +505,13 @@ var Panel = (function () {
 
   function cerrarModal() { $("telon").classList.remove("visible"); }
 
-  /* Cierra la sesión del administrador y regresa a la pantalla de login.
-     TEMPORAL: mientras RF01-RF03 no emita un token real, aquí solo se
-     limpia cualquier rastro guardado en el cliente y se redirige.
-     Cuando exista sesión/token del backend, aquí debe ir además la
-     llamada a un endpoint tipo POST /api/auth/logout antes de redirigir. */
+  /* Cierra la sesión y regresa a la pantalla de login. La identidad vive
+     en la cookie de sesión de Django, así que basta con navegar a la
+     URL de logout (usuarios.views.logout_view) para que el backend haga
+     request.session.flush() y la invalide del lado servidor. */
   function cerrarSesion(urlLogin) {
     try {
       sessionStorage.clear();
-      localStorage.removeItem("empleadoId");
     } catch (e) { /* almacenamiento no disponible, se ignora */ }
     window.location.href = urlLogin;
   }
