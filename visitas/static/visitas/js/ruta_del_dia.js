@@ -2,10 +2,18 @@
   RF07: trae el siguiente destino de la ruta del vendedor y lo pinta
   en pantalla.
 
-  RF08-RF10: el flujo son TRES pasos separados, no uno solo:
-    1. "Iniciar visita"  -> crea la visita En camino  (EVI002)  RF08
-    2. "Realizar visita" -> la pasa a En proceso      (EVI003)  RF09-10
-    3. Levantar pedido / Establecimiento cerrado                RF11, RF14
+  Flujo de la jornada:
+    "Iniciar ruta"  -> una sola vez al empezar el dia. Pasa la ruta de
+                       Asignada a Iniciada y deja la primera visita
+                       En camino (EVI002).                        RF08
+    "Realizar visita" -> en cada establecimiento, al llegar. Pasa la
+                       visita a En proceso (EVI003).           RF09-RF10
+    Levantar pedido / Establecimiento cerrado                RF11, RF14
+
+  Al completar una parada el vendedor ya va rumbo a la siguiente, asi
+  que la visita del proximo establecimiento se abre En camino sola, sin
+  pedir otro clic. El estado En camino se conserva hasta que presione
+  "Realizar visita", que es lo que exige el RF08.
 
   La pantalla se dibuja segun el estado que reporta la API, asi que
   si el vendedor cierra el navegador a medio camino, al volver retoma
@@ -108,7 +116,9 @@ async function cargarMapaRuta() {
     }
 }
 
-function renderTarjetaPendiente() {
+/* Inicio de jornada: la ruta esta Asignada y todavia no arranca.
+   Este boton sale UNA sola vez, en la primera parada del dia. */
+function renderTarjetaInicioRuta() {
     const contenedor = document.getElementById("contenidoRuta");
     contenedor.innerHTML = `
         <div class="card">
@@ -119,8 +129,11 @@ function renderTarjetaPendiente() {
             <p class="card__sub">${destinoActual.estCalle} ${destinoActual.estNumero}, ${destinoActual.estColonia}</p>
             <span class="badge badge--info">${destinoActual.zona_nombre}</span>
         </div>
-        <button class="btn btn--primary" id="btnIniciarVisita" onclick="iniciarVisita()">
-            Iniciar visita
+        <p style="font-size:12px;color:var(--color-text-muted);margin:0 0 .7rem">
+            Este es tu primer destino. Inicia la ruta para salir a campo.
+        </p>
+        <button class="btn btn--primary" id="btnIniciarRuta" onclick="iniciarVisita()">
+            Iniciar ruta
             <i class='bx bx-right-arrow-alt'></i>
         </button>`;
 }
@@ -168,6 +181,27 @@ function renderTarjetaEnProceso() {
         </button>`;
 }
 
+/* Aviso breve al regresar de completar una parada. El resultado llega
+   como ?completada= en la URL y se limpia enseguida para que no
+   reaparezca si el vendedor recarga la pagina. */
+function mostrarAvisoVisitaCompletada(){
+    const resultado = new URLSearchParams(window.location.search).get('completada');
+    if (!resultado) return;
+
+    const textos = {
+        pedido:  '\u2714 Visita completada, pedido registrado',
+        cerrado: '\u2714 Visita completada, establecimiento cerrado'
+    };
+    const aviso = document.createElement('div');
+    aviso.className = 'aviso-visita';
+    aviso.textContent = textos[resultado] || '\u2714 Visita completada';
+    document.getElementById('contenidoRuta').before(aviso);
+
+    history.replaceState(null, '', window.location.pathname);
+    setTimeout(() => aviso.remove(), 4000);
+}
+
+
 async function cargarRutaDelDia(){
     const contenedor = document.getElementById("contenidoRuta");
     try {
@@ -190,14 +224,23 @@ async function cargarRutaDelDia(){
         destinoActual = data;
         visitaEnProcesoId = data.visita_id;
 
-        // La pantalla refleja el estado real de la visita en la base.
-        // Nunca se avanza de paso sin que el vendedor lo pida (RF08-RF10).
         if (data.visita_estado === 'EVI003') {
+            // Ya esta En proceso: el vendedor llego y abrio la visita.
             renderTarjetaEnProceso();
         } else if (data.visita_estado === 'EVI002') {
+            // En camino hacia este establecimiento.
             renderTarjetaEnCamino();
+        } else if (!data.ruta_iniciada) {
+            // Todavia no arranca la jornada: unico momento en que
+            // aparece el boton "Iniciar ruta".
+            renderTarjetaInicioRuta();
         } else {
-            renderTarjetaPendiente();
+            // La ruta ya va en marcha y esta parada aun no tiene visita:
+            // el vendedor viene de completar la anterior, asi que ya va
+            // en camino. Se abre la visita En camino sin pedir otro clic
+            // y se le muestra directo "Realizar visita".
+            contenedor.innerHTML = `<p style="font-size:13px;color:var(--color-text-muted)">Cargando siguiente parada...</p>`;
+            await iniciarVisita();
         }
 
     } catch (err) {
@@ -208,7 +251,7 @@ async function cargarRutaDelDia(){
 async function iniciarVisita(){
     if (!destinoActual) return;
 
-    const boton = document.getElementById('btnIniciarVisita');
+    const boton = document.getElementById('btnIniciarRuta');
     if (boton) { boton.disabled = true; boton.style.opacity = '0.6'; }
 
     const res = await fetch('/api/visitas/api/visitas/', {
@@ -222,7 +265,7 @@ async function iniciarVisita(){
     const data = await res.json();
 
     if (!res.ok){
-        alert(data.error || 'No se pudo iniciar la visita');
+        alert(data.error || 'No se pudo iniciar la ruta');
         if (boton) { boton.disabled = false; boton.style.opacity = '1'; }
         return;
     }
@@ -249,7 +292,7 @@ async function realizarVisita(){
     const data = await res.json();
 
     if (!res.ok){
-        alert(data.error || 'No se pudo iniciar la visita');
+        alert(data.error || 'No se pudo iniciar la ruta');
         if (boton) { boton.disabled = false; boton.style.opacity = '1'; }
         return;
     }
@@ -269,3 +312,5 @@ function irAVisitaSinPedido(){
 
 cargarRutaDelDia();
 cargarMapaRuta();
+
+mostrarAvisoVisitaCompletada();
