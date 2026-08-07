@@ -159,6 +159,13 @@ def crear_entrega(request):
     except Exception as e:
         return JsonResponse({"error": f"No se pudo crear la entrega: {str(e)}"}, status=400)
 
+    # Si ningún pedido pudo entrar (zona distinta o capacidad excedida),
+    # no se deja la entrega abierta ni el vehículo ocupado
+    if not pedidos_incluidos:
+        with connection.cursor() as cursor:
+            cursor.execute("UPDATE vehiculo SET entrega = NULL WHERE entrega = %s", [nueva_entrega])
+            cursor.execute("DELETE FROM ruta_entrega WHERE entrega = %s", [nueva_entrega])
+            cursor.execute("DELETE FROM entrega WHERE numero = %s", [nueva_entrega])
 
     status = 201 if pedidos_incluidos else 400
     return JsonResponse({
@@ -354,6 +361,11 @@ def finalizar_ruta(request):
 
 @csrf_exempt
 def registrar_cobro(request):
+    """
+    RF39: registra el cobro del pedido entregado. El monto no puede ser
+    menor a lo que falta por cobrar; si el cliente paga de más, se
+    registra solo lo adeudado y el excedente se reporta como cambio.
+    """
     if request.method != 'POST':
         return JsonResponse({"error": "Método no permitido"}, status=405)
 
@@ -366,18 +378,58 @@ def registrar_cobro(request):
     establecimiento_id = body.get('establecimiento_id')
     tipo_pago = body.get('tipo_pago')
     monto = body.get('monto')
-    empleado_id = 44  # Temporal hasta autenticación
+
+    empleado_id = request.session.get('empleado_num')
+    if not empleado_id:
+        return JsonResponse({"error": "Sesión no válida, inicia sesión de nuevo"}, status=401)
+
+    try:
+        monto = float(monto)
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "El monto no es válido"}, status=400)
 
     with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT p.total, COALESCE(SUM(pg.monto), 0)
+            FROM pedido p
+            LEFT JOIN pago pg ON pg.pedido = p.num
+            WHERE p.num = %s
+            GROUP BY p.num, p.total
+        """, [pedido_id])
+        row = cursor.fetchone()
+        if not row:
+            return JsonResponse({"error": "Pedido no encontrado"}, status=404)
+
+        total_pedido, ya_cobrado = float(row[0] or 0), float(row[1] or 0)
+        pendiente = round(total_pedido - ya_cobrado, 2)
+
+        if pendiente <= 0:
+            return JsonResponse({
+                "mensaje": "Este pedido ya está cobrado",
+                "pago_id": None,
+                "cobrado": 0,
+                "cambio": 0
+            })
+
+        if monto < pendiente:
+            return JsonResponse({
+                "error": f"El monto es insuficiente. Falta cobrar ${pendiente:.2f}"
+            }, status=400)
+
         cursor.execute("SELECT COALESCE(MAX(codigo), 0) + 1 FROM pago")
         nuevo_codigo = cursor.fetchone()[0]
 
         cursor.execute("""
             INSERT INTO pago (codigo, monto, fecha, tipo_pago, empleado, establecimiento, pedido)
             VALUES (%s, %s, NOW(), %s, %s, %s, %s)
-        """, [nuevo_codigo, monto, tipo_pago, empleado_id, establecimiento_id, pedido_id])
+        """, [nuevo_codigo, pendiente, tipo_pago, empleado_id, establecimiento_id, pedido_id])
 
-    return JsonResponse({"mensaje": "Cobro registrado correctamente", "pago_id": nuevo_codigo})
+    return JsonResponse({
+        "mensaje": "Cobro registrado correctamente",
+        "pago_id": nuevo_codigo,
+        "cobrado": pendiente,
+        "cambio": round(monto - pendiente, 2)
+    })
 
 
 @csrf_exempt
@@ -811,3 +863,29 @@ def confirmar_carga_camion(request, entrega_id):
         "mensaje": "Entrega registrada, lista para que el coordinador genere su ruta",
         "entrega_id": entrega_id
     }, json_dumps_params={'ensure_ascii': False})
+    
+def estado_cobro_pedido(request, pedido_id):
+    """
+    Indica si el pedido ya tiene cobro registrado, para habilitar la
+    confirmación de entrega aunque el repartidor haya cerrado la app.
+    """
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT p.total, COALESCE(SUM(pg.monto), 0)
+            FROM pedido p
+            LEFT JOIN pago pg ON pg.pedido = p.num
+            WHERE p.num = %s
+            GROUP BY p.num, p.total
+        """, [pedido_id])
+        row = cursor.fetchone()
+
+    if not row:
+        return JsonResponse({"error": "Pedido no encontrado"}, status=404)
+
+    total, cobrado = float(row[0] or 0), float(row[1] or 0)
+    return JsonResponse({
+        "total": total,
+        "cobrado": cobrado,
+        "pendiente": round(total - cobrado, 2),
+        "pagado": cobrado >= total > 0
+    })

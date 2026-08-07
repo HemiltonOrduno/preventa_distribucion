@@ -23,5 +23,6 @@ urlpatterns = [
     path('entregas-en-carga/', views.entregas_en_carga, name='entregas_en_carga'),
     path('entrega/<int:entrega_id>/agregar-pedidos/', views.agregar_pedidos_entrega, name='agregar_pedidos_entrega'),
     path('entrega/<int:entrega_id>/confirmar-carga/', views.confirmar_carga_camion, name='confirmar_carga_camion'),
+    path('pedido/<int:pedido_id>/estado-cobro/', views.estado_cobro_pedido, name='estado_cobro_pedido'),
 
 ]
