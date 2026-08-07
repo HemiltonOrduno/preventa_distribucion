@@ -179,10 +179,12 @@ def calcular_ruta_entrega_coordinador(request, entrega_id):
     """
     with connection.cursor() as cursor:
         cursor.execute("""
-            SELECT DISTINCT
+            SELECT
                 e.numero AS id, e.nombre, e.latitud AS lat, e.longitud AS lon,
-                p.num AS pedido_id, p.subtotal, e.estColonia AS colonia,
-                reo.orden
+                e.estColonia AS colonia,
+                GROUP_CONCAT(p.num ORDER BY p.num) AS pedidos,
+                SUM(p.total) AS subtotal,
+                MIN(reo.orden) AS orden
             FROM entrega en2
             INNER JOIN pedido p ON p.entrega = en2.numero
             INNER JOIN visita v ON v.numero = p.visita
@@ -191,7 +193,8 @@ def calcular_ruta_entrega_coordinador(request, entrega_id):
             LEFT JOIN ruta_entrega_orden reo ON reo.ruta_entrega = re.numero
                                             AND reo.establecimiento = e.numero
             WHERE en2.numero = %s
-            ORDER BY reo.orden IS NULL, reo.orden
+            GROUP BY e.numero, e.nombre, e.latitud, e.longitud, e.estColonia
+            ORDER BY MIN(reo.orden) IS NULL, MIN(reo.orden)
         """, [entrega_id])
         columns = [col[0] for col in cursor.description]
         establecimientos = [dict(zip(columns, row)) for row in cursor.fetchall()]
@@ -252,7 +255,7 @@ def calcular_ruta_entrega_coordinador(request, entrega_id):
                 "tipo": "establecimiento",
                 "orden": orden_final[i],
                 "establecimiento_id": est["id"],
-                "pedido_id": est["pedido_id"],
+                "pedido_id": est["pedidos"],
                 "subtotal": float(est["subtotal"]),
                 "colonia": est["colonia"]
             })
@@ -995,7 +998,7 @@ def paradas_ruta_entrega(request, ruta_id):
             SELECT COALESCE(reo.orden, 999) AS orden,
                    e.numero AS establecimiento_id, e.nombre,
                    e.estColonia AS colonia,
-                   p.num AS pedido_id, p.subtotal,
+                   p.num AS pedido_id, p.total AS subtotal,
                    ep.nombre AS estado_pedido,
                    ee.fecha_entrega, ee.hora_entrega
             FROM ruta_entrega re

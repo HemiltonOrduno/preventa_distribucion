@@ -1552,3 +1552,5 @@ INSERT INTO establecimiento (numero, nombre, estCalle, estNumero, estColonia, te
 
 INSERT INTO edo_ruta_visita (codigo, nombre, descripcion) VALUES
 ('ERV006', 'Asignada', 'La ruta de visita ya fue asignada a un vendedor y está lista para iniciar');
+
+INSERT INTO edo_entrega (codigo, nombre) VALUES ('EEN005', 'En carga');

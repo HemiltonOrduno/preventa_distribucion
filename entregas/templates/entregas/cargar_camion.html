@@ -5,31 +5,110 @@
 {% block page_icon %}🚚{% endblock %}
 {% block page_title %}Cargar Camión y Crear Entrega{% endblock %}
 
+{% block extra_styles %}
+    .carga-layout { display:flex; gap:16px; align-items:flex-start; }
+    .carga-izq { flex:1; min-width:0; }
+    .carga-der { width:340px; flex-shrink:0; }
+
+    .camion-card {
+        background:white; border:2px solid #1b5e20; border-radius:10px;
+        padding:14px; margin-bottom:12px;
+    }
+    .camion-card.inactivo { border-color:#dee2e6; }
+    .camion-head {
+        display:flex; justify-content:space-between; align-items:flex-start;
+        margin-bottom:10px;
+    }
+    .camion-placas { font-size:14px; font-weight:700; color:#1b5e20; }
+    .camion-modelo { font-size:11px; color:#888; }
+    .camion-folio {
+        background:#e8f5e9; color:#1b5e20; padding:3px 9px;
+        border-radius:10px; font-size:11px; font-weight:700;
+    }
+    .capacidad-barra {
+        height:8px; background:#eee; border-radius:4px;
+        overflow:hidden; margin:6px 0 4px;
+    }
+    .capacidad-barra div { height:100%; transition:width .3s; }
+    .capacidad-texto {
+        display:flex; justify-content:space-between;
+        font-size:11px; color:#666; margin-bottom:10px;
+    }
+    .capacidad-texto b { color:#1b5e20; }
+    .camion-pedidos {
+        border-top:1px solid #eee; padding-top:8px;
+        max-height:220px; overflow-y:auto;
+    }
+    .camion-pedido {
+        display:flex; justify-content:space-between; gap:8px;
+        font-size:12px; padding:5px 0; border-bottom:1px dashed #f0f0f0;
+    }
+    .camion-pedido:last-child { border-bottom:none; }
+    .camion-pedido small { color:#888; display:block; font-size:10px; }
+    .btn-confirmar-carga {
+        width:100%; padding:10px; margin-top:10px; background:#1b5e20;
+        color:white; border:none; border-radius:6px;
+        font-size:13px; font-weight:700; cursor:pointer;
+    }
+    .btn-confirmar-carga:hover { background:#154a19; }
+    .btn-agregar-aqui {
+        width:100%; padding:7px; margin-top:6px; background:#e8f5e9;
+        color:#1b5e20; border:1px solid #1b5e20; border-radius:6px;
+        font-size:12px; cursor:pointer;
+    }
+    .sin-camiones {
+        text-align:center; color:#888; font-size:12px;
+        padding:24px 12px; background:white;
+        border:1px dashed #dee2e6; border-radius:10px;
+    }
+{% endblock %}
+
 {% block content %}
-<div class="card" style="max-width:700px;">
-    <p style="font-size:13px; color:#666; margin-bottom:10px;">
-        Folio de la entrega: <strong id="folio-entrega">—</strong>
-    </p>
+<div class="carga-layout">
 
-    <label style="font-size:13px; font-weight:600;">Vehículo</label>
-    <select id="vehiculo" style="width:100%; padding:8px; margin:6px 0 14px; border-radius:6px; border:1px solid #ccc;">
-        <option value="">Cargando vehículos...</option>
-    </select>
-</div>
+    <!-- IZQUIERDA: crear entrega nueva y pedidos disponibles -->
+    <div class="carga-izq">
+        <div class="card">
+            <p style="font-size:13px; color:#666; margin-bottom:10px;">
+                Folio de la siguiente entrega: <strong id="folio-entrega">—</strong>
+            </p>
 
-<div class="card" style="max-width:700px;">
-    <strong>Pedidos validados</strong>
-    <p style="font-size:12px; color:#666; margin:4px 0 12px;">Selecciona solo pedidos de la MISMA zona — el sistema rechaza mezclas.</p>
-    <div id="lista-pedidos-validados">Cargando...</div>
-</div>
+            <label style="font-size:13px; font-weight:600;">Vehículo</label>
+            <select id="vehiculo" style="width:100%; padding:8px; margin:6px 0 14px; border-radius:6px; border:1px solid #ccc;">
+                <option value="">Cargando vehículos...</option>
+            </select>
+        </div>
 
-<div style="max-width:700px; text-align:right; margin-top:12px;">
-    <button class="btn btn-primary" onclick="crearEntrega()">Crear entrega</button>
+        <div class="card">
+            <strong>Pedidos validados</strong>
+            <p style="font-size:12px; color:#666; margin:4px 0 12px;">
+                Selecciona solo pedidos de la MISMA zona — el sistema rechaza mezclas.
+            </p>
+            <div id="lista-pedidos-validados">Cargando...</div>
+        </div>
+
+        <div style="text-align:right; margin-top:12px;">
+            <button class="btn btn-primary" onclick="crearEntrega()">🚚 Cargar camión</button>
+        </div>
+    </div>
+
+    <!-- DERECHA: camiones que se están llenando -->
+    <div class="carga-der">
+        <div style="font-size:13px; font-weight:bold; color:#1b5e20; margin-bottom:10px;">
+            📦 Camiones en carga
+        </div>
+        <div id="camiones-en-carga">
+            <p style="font-size:12px;color:#888;">Cargando...</p>
+        </div>
+    </div>
+
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
+    let entregasEnCarga = [];
+
     async function cargarVehiculos() {
         const select = document.getElementById('vehiculo');
         const res = await fetch('/api/entregas/vehiculos-disponibles/');
@@ -71,6 +150,69 @@
         document.getElementById('folio-entrega').textContent = `#${data.proximo_numero}`;
     }
 
+    /* RF22 + RF25: camiones que siguen abiertos, con la capacidad que les
+       queda, para que el almacenista siga agregando pedidos antes de mandarlos */
+    async function cargarCamionesEnCarga() {
+        const cont = document.getElementById('camiones-en-carga');
+        const res = await fetch('/api/entregas/entregas-en-carga/');
+        const data = await res.json();
+        entregasEnCarga = data.entregas || [];
+
+        if (entregasEnCarga.length === 0) {
+            cont.innerHTML = '<div class="sin-camiones">No hay camiones en carga.<br>Crea una entrega nueva para empezar.</div>';
+            return;
+        }
+
+        cont.innerHTML = entregasEnCarga.map(e => {
+            const pct = e.capacidad > 0
+                ? Math.min(100, Math.round(e.peso_cargado / e.capacidad * 100)) : 0;
+            const color = pct >= 90 ? '#c62828' : pct >= 70 ? '#e65100' : '#1b5e20';
+
+            const pedidos = e.pedidos.map(p => `
+                <div class="camion-pedido">
+                    <span>
+                        <strong>#${p.pedido_id}</strong> ${p.establecimiento}
+                        <small>${p.zona} · ${p.peso.toFixed(1)} kg</small>
+                    </span>
+                    <span style="color:#1b5e20;font-weight:600;white-space:nowrap;">
+                        $${p.total.toFixed(2)}
+                    </span>
+                </div>
+            `).join('');
+
+            return `
+                <div class="camion-card">
+                    <div class="camion-head">
+                        <div>
+                            <div class="camion-placas">${e.placas || 'Sin vehículo'}</div>
+                            <div class="camion-modelo">${e.modelo || ''}</div>
+                        </div>
+                        <span class="camion-folio">Entrega #${e.entrega_id}</span>
+                    </div>
+
+                    <div class="capacidad-barra">
+                        <div style="width:${pct}%;background:${color};"></div>
+                    </div>
+                    <div class="capacidad-texto">
+                        <span>${e.peso_cargado.toFixed(1)} / ${e.capacidad.toFixed(0)} kg</span>
+                        <span>Restante: <b>${e.capacidad_restante.toFixed(1)} kg</b></span>
+                    </div>
+
+                    <div class="camion-pedidos">
+                        ${pedidos || '<p style="font-size:12px;color:#888;">Sin pedidos aún</p>'}
+                    </div>
+
+                    <button class="btn-agregar-aqui" onclick="agregarAEntrega(${e.entrega_id})">
+                        ➕ Cargar pedidos seleccionados
+                    </button>
+                    <button class="btn-confirmar-carga" onclick="confirmarCarga(${e.entrega_id}, ${e.total_pedidos})">
+                        ✓ Registrar entrega
+                    </button>
+                </div>
+            `;
+        }).join('');
+    }
+
     async function crearEntrega() {
         const vehiculo = document.getElementById('vehiculo').value;
         const pedidos = Array.from(document.querySelectorAll('.pedido-check:checked')).map(c => parseInt(c.value));
@@ -89,23 +231,64 @@
 
         if (data.pedidos_incluidos !== undefined) {
             let msg = data.pedidos_incluidos.length > 0
-                ? `Entrega #${data.entrega_id} creada con ${data.pedidos_incluidos.length} pedido(s)`
-                : `No se pudo crear la entrega`;
+                ? `Camión cargado con ${data.pedidos_incluidos.length} pedido(s) — entrega #${data.entrega_id}`
+                : `No se pudo cargar el camión`;
             if (data.pedidos_rechazados.length > 0) {
                 const detalles = data.pedidos_rechazados.map(r => `#${r.pedido_id}: ${r.motivo}`).join(' | ');
                 msg += `. Rechazados: ${detalles}`;
             }
             mostrarToast(msg, data.pedidos_incluidos.length > 0 ? 'success' : 'error');
-            cargarPedidosValidados();
-            cargarVehiculos();
-            cargarFolio();
+            refrescarTodo();
         } else {
             mostrarToast(data.error, 'error');
         }
     }
 
-    cargarVehiculos();
-    cargarPedidosValidados();
-    cargarFolio();
+    /* RF24: sigue llenando un camión que ya estaba abierto */
+    async function agregarAEntrega(entregaId) {
+        const pedidos = Array.from(document.querySelectorAll('.pedido-check:checked')).map(c => parseInt(c.value));
+
+        if (pedidos.length === 0) {
+            mostrarToast('Selecciona al menos un pedido de la lista', 'error');
+            return;
+        }
+
+        const res = await fetch(`/api/entregas/entrega/${entregaId}/agregar-pedidos/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pedidos })
+        });
+        const data = await res.json();
+
+        if (!res.ok) { mostrarToast(data.error, 'error'); return; }
+
+        let msg = data.mensaje;
+        if (data.pedidos_rechazados.length > 0) {
+            msg += `. Rechazados: ${data.pedidos_rechazados.map(r => '#' + r.pedido_id).join(', ')}`;
+        }
+        mostrarToast(msg, data.pedidos_incluidos.length > 0 ? 'success' : 'error');
+        refrescarTodo();
+    }
+
+    /* RF26: se da por terminada la carga y la entrega pasa al coordinador */
+    async function confirmarCarga(entregaId, totalPedidos) {
+        if (!confirm(`¿Registrar la entrega #${entregaId} con ${totalPedidos} pedido(s)?\n\nUna vez registrada ya no se le pueden agregar más pedidos y pasará al coordinador para generar su ruta.`)) return;
+
+        const res = await fetch(`/api/entregas/entrega/${entregaId}/confirmar-carga/`, { method: 'POST' });
+        const data = await res.json();
+
+        if (!res.ok) { mostrarToast(data.error, 'error'); return; }
+        mostrarToast(data.mensaje, 'success');
+        refrescarTodo();
+    }
+
+    function refrescarTodo() {
+        cargarPedidosValidados();
+        cargarVehiculos();
+        cargarFolio();
+        cargarCamionesEnCarga();
+    }
+
+    refrescarTodo();
 </script>
 {% endblock %}

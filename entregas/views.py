@@ -1,4 +1,5 @@
 import requests
+from datetime import datetime
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.db import connection, transaction
@@ -121,7 +122,7 @@ def crear_entrega(request):
 
                 cursor.execute("""
                     INSERT INTO entrega (numero, fecha_creacion, fecha_entrega, empleado, edo_entrega)
-                    VALUES (%s, CURDATE(), NULL, %s, 'EEN001')
+                    VALUES (%s, CURDATE(), NULL, %s, 'EEN005')
                 """, [nueva_entrega, empleado])
 
                 cursor.execute("""
@@ -158,13 +159,6 @@ def crear_entrega(request):
     except Exception as e:
         return JsonResponse({"error": f"No se pudo crear la entrega: {str(e)}"}, status=400)
 
-    # Orden de visita propuesto por el sistema. Va fuera del try principal
-    # para que un fallo aquí no invalide una entrega ya creada.
-    if pedidos_incluidos:
-        try:
-            _calcular_orden_entrega(nueva_ruta_entrega, nueva_entrega)
-        except Exception:
-            pass
 
     status = 201 if pedidos_incluidos else 400
     return JsonResponse({
@@ -423,6 +417,13 @@ def confirmar_entrega_establecimiento(request):
     establecimiento_id = body.get('establecimiento_id')
     entrega_id = body.get('entrega_id')
 
+    # RF36: la confirmación de entrega debe indicar fecha y hora.
+    # El repartidor las ve y las envía desde el modal; si por algún motivo
+    # no llegan, se usa el momento actual del servidor como respaldo.
+    ahora = datetime.now()
+    fecha_entrega = body.get('fecha_entrega') or ahora.strftime('%Y-%m-%d')
+    hora_entrega = body.get('hora_entrega') or ahora.strftime('%H:%M:%S')
+
     with transaction.atomic():
         with connection.cursor() as cursor:
             # RF36: no se puede confirmar la entrega sin pago registrado
@@ -444,15 +445,18 @@ def confirmar_entrega_establecimiento(request):
 
             cursor.execute("""
                 INSERT INTO entrega_estable (entrega, establecimiento, fecha_entrega, hora_entrega)
-                VALUES (%s, %s, CURDATE(), TIME(NOW()))
-                ON DUPLICATE KEY UPDATE fecha_entrega = CURDATE(), hora_entrega = TIME(NOW())
-            """, [entrega_id, establecimiento_id])
+                VALUES (%s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE fecha_entrega = %s, hora_entrega = %s
+            """, [entrega_id, establecimiento_id, fecha_entrega, hora_entrega,
+                  fecha_entrega, hora_entrega])
 
             entrega_cerrada = _cerrar_entrega_si_completa(cursor, entrega_id)
 
     return JsonResponse({
         "mensaje": "Entrega confirmada correctamente",
-        "entrega_completada": entrega_cerrada
+        "entrega_completada": entrega_cerrada,
+        "fecha_entrega": fecha_entrega,
+        "hora_entrega": hora_entrega
     })
 
 
@@ -671,3 +675,139 @@ def _cerrar_entrega_si_completa(cursor, entrega_id):
         UPDATE vehiculo SET edo_vehiculo = 'EV001', entrega = NULL WHERE entrega = %s
     """, [entrega_id])
     return True
+
+@rol_requerido('Almacenista', 'Administrador')
+def entregas_en_carga(request):
+    """
+    RF22/RF24: camiones que el almacenista está llenando, con su
+    capacidad restante y los pedidos que ya llevan cargados.
+    """
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT en.numero AS entrega_id, en.fecha_creacion,
+                   veh.numero AS vehiculo_id, veh.placas,
+                   mdl.nombre AS modelo, mdl.capacidad,
+                   COALESCE(SUM(dp.cantidad * pr.peso) / 1000, 0) AS peso_cargado,
+                   COUNT(DISTINCT p.num) AS total_pedidos
+            FROM entrega en
+            LEFT JOIN vehiculo veh ON veh.entrega = en.numero
+            LEFT JOIN modelo mdl ON mdl.numero = veh.modelo
+            LEFT JOIN pedido p ON p.entrega = en.numero
+            LEFT JOIN detalle_pedido dp ON dp.num_pedido = p.num
+            LEFT JOIN producto pr ON pr.codigo = dp.cod_producto
+            WHERE en.edo_entrega = 'EEN005'
+            GROUP BY en.numero, en.fecha_creacion, veh.numero, veh.placas, mdl.nombre, mdl.capacidad
+            ORDER BY en.numero DESC
+        """)
+        columns = [c[0] for c in cursor.description]
+        entregas = [dict(zip(columns, r)) for r in cursor.fetchall()]
+
+        for e in entregas:
+            e['capacidad'] = float(e['capacidad'] or 0)
+            e['peso_cargado'] = float(e['peso_cargado'])
+            e['capacidad_restante'] = round(e['capacidad'] - e['peso_cargado'], 2)
+            e['fecha_creacion'] = e['fecha_creacion'].isoformat() if e['fecha_creacion'] else None
+
+            cursor.execute("""
+                SELECT p.num AS pedido_id, p.total,
+                       est.nombre AS establecimiento, z.nombre AS zona,
+                       COALESCE(SUM(dp.cantidad * pr.peso) / 1000, 0) AS peso
+                FROM pedido p
+                INNER JOIN visita v ON v.numero = p.visita
+                INNER JOIN establecimiento est ON est.numero = v.establecimiento
+                INNER JOIN zona z ON z.num = est.zona
+                LEFT JOIN detalle_pedido dp ON dp.num_pedido = p.num
+                LEFT JOIN producto pr ON pr.codigo = dp.cod_producto
+                WHERE p.entrega = %s
+                GROUP BY p.num, p.total, est.nombre, z.nombre
+                ORDER BY p.num
+            """, [e['entrega_id']])
+            cols = [c[0] for c in cursor.description]
+            e['pedidos'] = [dict(zip(cols, r)) for r in cursor.fetchall()]
+            for ped in e['pedidos']:
+                ped['total'] = float(ped['total'] or 0)
+                ped['peso'] = float(ped['peso'])
+
+    return JsonResponse({"entregas": entregas}, json_dumps_params={'ensure_ascii': False})
+
+
+@rol_requerido('Almacenista', 'Administrador')
+@csrf_exempt
+def agregar_pedidos_entrega(request, entrega_id):
+    """RF24: agrega más pedidos a un camión que sigue en carga."""
+    if request.method != 'POST':
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+
+    try:
+        pedidos_ids = json.loads(request.body).get("pedidos", [])
+    except Exception:
+        return JsonResponse({"error": "JSON inválido"}, status=400)
+
+    if not pedidos_ids:
+        return JsonResponse({"error": "No se enviaron pedidos"}, status=400)
+
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT edo_entrega FROM entrega WHERE numero = %s", [entrega_id])
+        row = cursor.fetchone()
+        if not row:
+            return JsonResponse({"error": "Entrega no encontrada"}, status=404)
+        if row[0] != 'EEN005':
+            return JsonResponse({"error": "Este camión ya fue cargado"}, status=409)
+
+    incluidos, rechazados = [], []
+    for pedido_id in pedidos_ids:
+        try:
+            with transaction.atomic():
+                with connection.cursor() as cursor:
+                    cursor.execute("""
+                        UPDATE pedido SET entrega = %s, edo_pedido = 'EPD004'
+                        WHERE num = %s AND edo_pedido = 'EPD003'
+                    """, [entrega_id, pedido_id])
+                    if cursor.rowcount == 0:
+                        raise ValueError("no está disponible")
+            incluidos.append(pedido_id)
+        except Exception as e:
+            rechazados.append({"pedido_id": pedido_id, "motivo": str(e)})
+
+    return JsonResponse({
+        "mensaje": f"{len(incluidos)} pedido(s) agregados",
+        "pedidos_incluidos": incluidos,
+        "pedidos_rechazados": rechazados
+    }, json_dumps_params={'ensure_ascii': False})
+
+
+@rol_requerido('Almacenista', 'Administrador')
+@csrf_exempt
+def confirmar_carga_camion(request, entrega_id):
+    """
+    RF26: el almacenista da por terminada la carga. Se calcula el orden
+    de paradas y la entrega pasa a estar disponible para el coordinador.
+    """
+    if request.method != 'POST':
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT COUNT(*) FROM pedido WHERE entrega = %s", [entrega_id])
+        if cursor.fetchone()[0] == 0:
+            return JsonResponse({"error": "El camión no tiene pedidos cargados"}, status=400)
+
+        cursor.execute("""
+            UPDATE entrega SET edo_entrega = 'EEN001'
+            WHERE numero = %s AND edo_entrega = 'EEN005'
+        """, [entrega_id])
+        if cursor.rowcount == 0:
+            return JsonResponse({"error": "Este camión ya fue cargado"}, status=409)
+
+        cursor.execute("SELECT numero FROM ruta_entrega WHERE entrega = %s", [entrega_id])
+        row = cursor.fetchone()
+
+    if row:
+        try:
+            _calcular_orden_entrega(row[0], entrega_id)
+        except Exception:
+            pass
+
+    return JsonResponse({
+        "mensaje": "Entrega registrada, lista para que el coordinador genere su ruta",
+        "entrega_id": entrega_id
+    }, json_dumps_params={'ensure_ascii': False})
