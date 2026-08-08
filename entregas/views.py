@@ -275,7 +275,7 @@ def mi_ruta(request):
 def detalle_pedido(request, pedido_id):
     with connection.cursor() as cursor:
         cursor.execute("""
-            SELECT pr.nombre, dp.cantidad, dp.precioUnitario, dp.importe
+            SELECT dp.cod_producto, pr.nombre, dp.cantidad, dp.precioUnitario, dp.importe
             FROM detalle_pedido dp
             INNER JOIN producto pr ON pr.codigo = dp.cod_producto
             WHERE dp.num_pedido = %s
@@ -442,17 +442,68 @@ def registrar_devolucion(request):
     except Exception:
         return JsonResponse({"error": "JSON inválido"}, status=400)
 
-    with connection.cursor() as cursor:
-        cursor.execute("SELECT COALESCE(MAX(codigo), 0) + 1 FROM devolucion")
-        nuevo_codigo = cursor.fetchone()[0]
+    pedido_id = body.get('pedido_id')
+    cod_producto = body.get('cod_producto')
+    cantidad = body.get('cantidad')
+    motivo = body.get('motivo')
+    descripcion = body.get('descripcion')
+    entrega_id = body.get('entrega_id')
 
-        cursor.execute("""
-            INSERT INTO devolucion (codigo, fecha, cantidad, motivo, descripcion, entrega)
-            VALUES (%s, CURDATE(), %s, %s, %s, %s)
-        """, [nuevo_codigo, body.get('cantidad'), body.get('motivo'),
-              body.get('descripcion'), body.get('entrega_id')])
+    if not pedido_id or not cod_producto or not cantidad or not motivo or not entrega_id:
+        return JsonResponse({"error": "Faltan datos obligatorios"}, status=400)
 
-    return JsonResponse({"mensaje": "Devolución registrada correctamente"})
+    if not isinstance(cantidad, int) or cantidad <= 0:
+        return JsonResponse({"error": "La cantidad debe ser un entero mayor a 0"}, status=400)
+
+    empleado_num = request.session.get('empleado_num')
+    if not empleado_num:
+        return JsonResponse({"error": "Sesión no válida, inicia sesión de nuevo"}, status=401)
+
+    with transaction.atomic():
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT cantidad, precioUnitario FROM detalle_pedido
+                WHERE num_pedido = %s AND cod_producto = %s
+            """, [pedido_id, cod_producto])
+            row = cursor.fetchone()
+
+            if not row:
+                return JsonResponse({"error": "Ese producto no pertenece a este pedido"}, status=400)
+
+            cantidad_pedida, precio_unitario = row
+            if cantidad > cantidad_pedida:
+                return JsonResponse({
+                    "error": f"No puedes devolver más de lo entregado ({cantidad_pedida})"
+                }, status=400)
+
+            cursor.execute("SELECT COALESCE(MAX(codigo), 0) + 1 FROM devolucion")
+            nuevo_codigo = cursor.fetchone()[0]
+
+            importe_devuelto = cantidad * precio_unitario
+
+            cursor.execute("""
+                INSERT INTO devolucion (codigo, fecha, cantidad, motivo, descripcion, entrega, cod_producto, pedido, importe)
+                VALUES (%s, CURDATE(), %s, %s, %s, %s, %s, %s, %s)
+            """, [nuevo_codigo, cantidad, motivo, descripcion, entrega_id, cod_producto, pedido_id, importe_devuelto])
+
+            # Solo la devolución completa (sin reemplazo) regresa el producto
+            # al stock del almacén. Con sustitución, el producto dañado se
+            # repone en el momento y no hay pieza "extra" que devolver.
+            if motivo == 'Devolución completa sin reemplazo':
+                cursor.execute("SELECT COALESCE(MAX(codigo), 0) + 1 FROM movimientos")
+                nuevo_mov = cursor.fetchone()[0]
+
+                cursor.execute("""
+                    INSERT INTO movimientos (codigo, observaciones, fecha, tipo_movimiento, devolucion, empleado)
+                    VALUES (%s, %s, NOW(), 'TM004', %s, %s)
+                """, [nuevo_mov, f"Devolución del pedido #{pedido_id}", nuevo_codigo, empleado_num])
+
+                cursor.execute("""
+                    INSERT INTO detalle_movimiento (cod_movimientos, cod_producto, cantidad, precioUnitario, subtotal)
+                    VALUES (%s, %s, %s, %s, %s)
+                """, [nuevo_mov, cod_producto, cantidad, precio_unitario, cantidad * precio_unitario])
+
+    return JsonResponse({"mensaje": "Devolución registrada correctamente", "devolucion_id": nuevo_codigo})
 
 
 @csrf_exempt
@@ -478,12 +529,30 @@ def confirmar_entrega_establecimiento(request):
 
     with transaction.atomic():
         with connection.cursor() as cursor:
-            # RF36: no se puede confirmar la entrega sin pago registrado
-            cursor.execute("SELECT COALESCE(SUM(monto), 0) FROM pago WHERE pedido = %s",
-                           [pedido_id])
-            cobrado = cursor.fetchone()[0]
+            # RF36: no se puede confirmar la entrega sin pago registrado,
+            # pero si el pedido quedó en $0 por una devolución completa,
+            # no hay nada que cobrar y se deja pasar.
+            cursor.execute("""
+                SELECT
+                    p.total,
+                    COALESCE(SUM(pg.monto), 0),
+                    COALESCE((
+                        SELECT SUM(d.importe) FROM devolucion d
+                        WHERE d.pedido = p.num AND d.motivo = 'Devolución completa sin reemplazo'
+                    ), 0)
+                FROM pedido p
+                LEFT JOIN pago pg ON pg.pedido = p.num
+                WHERE p.num = %s
+                GROUP BY p.num, p.total
+            """, [pedido_id])
+            row = cursor.fetchone()
+            if not row:
+                return JsonResponse({"error": "Pedido no encontrado"}, status=404)
 
-            if cobrado <= 0:
+            total, cobrado, devuelto = float(row[0] or 0), float(row[1] or 0), float(row[2] or 0)
+            total_neto = round(total - devuelto, 2)
+
+            if total_neto > 0 and cobrado < total_neto:
                 return JsonResponse({
                     "error": "Debes registrar el cobro antes de confirmar la entrega"
                 }, status=400)
@@ -868,10 +937,18 @@ def estado_cobro_pedido(request, pedido_id):
     """
     Indica si el pedido ya tiene cobro registrado, para habilitar la
     confirmación de entrega aunque el repartidor haya cerrado la app.
+    Resta del total lo que ya se devolvió sin reemplazo, porque ese
+    monto ya no debe cobrarse al establecimiento.
     """
     with connection.cursor() as cursor:
         cursor.execute("""
-            SELECT p.total, COALESCE(SUM(pg.monto), 0)
+            SELECT
+                p.total,
+                COALESCE(SUM(DISTINCT pg.monto), 0),
+                COALESCE((
+                    SELECT SUM(d.importe) FROM devolucion d
+                    WHERE d.pedido = p.num AND d.motivo = 'Devolución completa sin reemplazo'
+                ), 0)
             FROM pedido p
             LEFT JOIN pago pg ON pg.pedido = p.num
             WHERE p.num = %s
@@ -882,10 +959,15 @@ def estado_cobro_pedido(request, pedido_id):
     if not row:
         return JsonResponse({"error": "Pedido no encontrado"}, status=404)
 
-    total, cobrado = float(row[0] or 0), float(row[1] or 0)
+    total, cobrado, devuelto = float(row[0] or 0), float(row[1] or 0), float(row[2] or 0)
+    total_neto = round(total - devuelto, 2)
+    pendiente = round(total_neto - cobrado, 2)
+
     return JsonResponse({
         "total": total,
+        "devuelto": devuelto,
+        "total_neto": total_neto,
         "cobrado": cobrado,
-        "pendiente": round(total - cobrado, 2),
-        "pagado": cobrado >= total > 0
+        "pendiente": pendiente,
+        "pagado": pendiente <= 0
     })

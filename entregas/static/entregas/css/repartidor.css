@@ -471,3 +471,27 @@ a { text-decoration: none; color: inherit; }
     background: var(--color-border); color: var(--color-text-muted);
     cursor: not-allowed; box-shadow: none;
 }
+
+/*===== DATOS DE TARJETA (dentro del modal de cobro) =====*/
+.tarjeta-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.tarjeta-col {
+    flex: 1;
+}
+
+.input-error {
+    font-size: 11px;
+    color: var(--color-danger-text);
+    margin-top: 4px;
+    min-height: 14px;
+}
+
+#tarjeta-numero.input-invalido,
+#tarjeta-vencimiento.input-invalido,
+#tarjeta-cvv.input-invalido {
+    border-color: var(--color-danger-text);
+}

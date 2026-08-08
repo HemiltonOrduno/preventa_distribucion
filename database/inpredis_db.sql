@@ -1,4 +1,4 @@
--- Active: 1785279407257@@127.0.0.1@3306@inpredis_db
+-- Active: 1772565691688@@127.0.0.1@3306@inpredis_db
 CREATE DATABASE inpredis_db;
 
 USE inpredis_db;
@@ -436,3 +436,10 @@ WHERE numero IN (1,2,3,4,5,6,7,8,9,10,11);
 ALTER TABLE ruta_visita MODIFY empleado INT(11) NULL;
 
 ALTER TABLE ruta_entrega MODIFY empleado INT(11) NULL;
+
+ALTER TABLE devolucion ADD COLUMN cod_producto VARCHAR(10) NULL;
+ALTER TABLE devolucion ADD FOREIGN KEY (cod_producto) REFERENCES producto(codigo);
+
+ALTER TABLE devolucion ADD COLUMN pedido INT NULL;
+ALTER TABLE devolucion ADD COLUMN importe DECIMAL(10,2) NULL;
+ALTER TABLE devolucion ADD FOREIGN KEY (pedido) REFERENCES pedido(num);

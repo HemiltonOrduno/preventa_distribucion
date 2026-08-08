@@ -301,23 +301,12 @@ function abrirModalParada(parada) {
     paradaActual = parada;
 
     habilitarConfirmacion(false);
+    document.getElementById('btn-abrir-cobro').style.display = 'block';
     document.getElementById('cobro-monto').value = parseFloat(parada.subtotal || 0).toFixed(2);
 
-    // El cobro pudo registrarse en una sesión anterior: se consulta el
+   // El cobro pudo registrarse en una sesión anterior: se consulta el
     // estado real para no obligar a cobrar dos veces
-    fetch(`/api/entregas/pedido/${parada.pedido_id}/estado-cobro/`)
-        .then(r => r.json())
-        .then(d => {
-            if (d.pagado) {
-                habilitarConfirmacion(true);
-                document.getElementById('aviso-cobro').innerText = '✓ Cobro ya registrado';
-                document.getElementById('aviso-cobro').style.display = 'block';
-                document.getElementById('aviso-cobro').style.color = '#2e7d32';
-            } else if (d.pendiente > 0) {
-                document.getElementById('cobro-monto').value = d.pendiente.toFixed(2);
-            }
-        })
-        .catch(() => {});
+    actualizarEstadoCobroModal(parada.pedido_id);
 
     document.getElementById('modal-est-nombre').innerText = parada.nombre;
     document.getElementById('modal-est-direccion').innerText = parada.colonia;
@@ -336,7 +325,7 @@ function abrirModalParada(parada) {
         </div>
         <div class="pedido-row">
             <span class="label">Total a cobrar</span>
-            <span class="monto">$${parseFloat(parada.subtotal || 0).toFixed(2)}</span>
+            <span class="monto" id="modal-total-cobrar">$${parseFloat(parada.subtotal || 0).toFixed(2)}</span>
         </div>
         <div class="pedido-row">
             <span class="label">Representante</span>
@@ -387,6 +376,37 @@ function abrirModalParada(parada) {
     document.getElementById('modal-parada').classList.add('visible');
 }
 
+
+function actualizarEstadoCobroModal(pedidoId) {
+    fetch(`/api/entregas/pedido/${pedidoId}/estado-cobro/`)
+        .then(r => r.json())
+        .then(d => {
+            const btnCobro = document.getElementById('btn-abrir-cobro');
+            const aviso = document.getElementById('aviso-cobro');
+
+            const totalSpan = document.getElementById('modal-total-cobrar');
+            if (totalSpan && d.total_neto !== undefined) {
+                totalSpan.innerText = `$${d.total_neto.toFixed(2)}`;
+            }
+
+            if (d.pagado) {
+                habilitarConfirmacion(true);
+                btnCobro.style.display = 'none';
+                aviso.innerText = d.devuelto > 0
+                    ? '✓ Sin saldo pendiente (con devolución aplicada)'
+                    : '✓ Cobro ya registrado';
+                aviso.style.display = 'block';
+                aviso.style.color = '#2e7d32';
+            } else {
+                btnCobro.style.display = 'block';
+                document.getElementById('cobro-monto').value = d.pendiente.toFixed(2);
+                habilitarConfirmacion(false);
+            }
+        })
+        .catch(() => {});
+}
+
+
 function cerrarModalParada(e) {
     if (!e || e.target === document.getElementById('modal-parada')) {
         document.getElementById('modal-parada').classList.remove('visible');
@@ -400,6 +420,11 @@ function abrirCobro() {
     tipoPagoSeleccionado = 'TP001';
     document.querySelectorAll('.tipo-pago-btn').forEach(b => b.classList.remove('active'));
     document.getElementById('btn-efectivo').classList.add('active');
+    document.getElementById('datos-tarjeta').style.display = 'none';
+    document.getElementById('tarjeta-numero').value = '';
+    document.getElementById('tarjeta-vencimiento').value = '';
+    document.getElementById('tarjeta-cvv').value = '';
+    limpiarErroresTarjeta();
     document.getElementById('modal-cobro').classList.add('visible');
 }
 
@@ -414,11 +439,106 @@ function seleccionarPago(tipo, btn) {
     tipoPagoSeleccionado = tipo;
     document.querySelectorAll('.tipo-pago-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
+
+    const datosTarjeta = document.getElementById('datos-tarjeta');
+    datosTarjeta.style.display = tipo === 'TP002' ? 'block' : 'none';
+    if (tipo !== 'TP002') limpiarErroresTarjeta();
 }
+
+// ===== VALIDACION DE TARJETA (simulada, no se envia al backend) =====
+document.addEventListener('DOMContentLoaded', () => {
+    const inputNumero = document.getElementById('tarjeta-numero');
+    const inputVencimiento = document.getElementById('tarjeta-vencimiento');
+    const inputCvv = document.getElementById('tarjeta-cvv');
+
+    if (inputNumero) {
+        inputNumero.addEventListener('input', () => {
+            let soloNumeros = inputNumero.value.replace(/\D/g, '').slice(0, 16);
+            inputNumero.value = soloNumeros.replace(/(.{4})/g, '$1 ').trim();
+        });
+    }
+
+    if (inputVencimiento) {
+        inputVencimiento.addEventListener('input', () => {
+            let soloNumeros = inputVencimiento.value.replace(/\D/g, '').slice(0, 4);
+            if (soloNumeros.length >= 3) {
+                inputVencimiento.value = soloNumeros.slice(0, 2) + '/' + soloNumeros.slice(2);
+            } else {
+                inputVencimiento.value = soloNumeros;
+            }
+        });
+    }
+
+    if (inputCvv) {
+        inputCvv.addEventListener('input', () => {
+            inputCvv.value = inputCvv.value.replace(/\D/g, '').slice(0, 4);
+        });
+    }
+});
+
+function limpiarErroresTarjeta() {
+    ['tarjeta-numero', 'tarjeta-vencimiento', 'tarjeta-cvv'].forEach(id => {
+        document.getElementById(id)?.classList.remove('input-invalido');
+        const err = document.getElementById(`error-${id}`);
+        if (err) err.innerText = '';
+    });
+}
+
+function validarDatosTarjeta() {
+    limpiarErroresTarjeta();
+    let valido = true;
+
+    const numero = document.getElementById('tarjeta-numero').value.replace(/\s/g, '');
+    if (!/^\d{16}$/.test(numero)) {
+        marcarError('tarjeta-numero', 'El número debe tener 16 dígitos');
+        valido = false;
+    }
+
+    const vencimiento = document.getElementById('tarjeta-vencimiento').value;
+    const match = vencimiento.match(/^(\d{2})\/(\d{2})$/);
+    if (!match) {
+        marcarError('tarjeta-vencimiento', 'Formato MM/AA');
+        valido = false;
+    } else {
+        const mes = parseInt(match[1], 10);
+        const anio = parseInt('20' + match[2], 10);
+
+        if (mes < 1 || mes > 12) {
+            marcarError('tarjeta-vencimiento', 'Mes inválido');
+            valido = false;
+        } else {
+            const ahora = new Date();
+            const finDeMes = new Date(anio, mes, 0);
+            if (finDeMes < new Date(ahora.getFullYear(), ahora.getMonth(), 1)) {
+                marcarError('tarjeta-vencimiento', 'Tarjeta vencida');
+                valido = false;
+            }
+        }
+    }
+
+    const cvv = document.getElementById('tarjeta-cvv').value;
+    if (!/^\d{3,4}$/.test(cvv)) {
+        marcarError('tarjeta-cvv', '3 o 4 dígitos');
+        valido = false;
+    }
+
+    return valido;
+}
+
+function marcarError(inputId, mensaje) {
+    document.getElementById(inputId).classList.add('input-invalido');
+    const err = document.getElementById(`error-${inputId}`);
+    if (err) err.innerText = mensaje;
+}
+
 
 function guardarCobro() {
     const monto = parseFloat(document.getElementById('cobro-monto').value);
     if (!monto || monto <= 0) { alert('Ingresa un monto válido'); return; }
+
+    if (tipoPagoSeleccionado === 'TP002' && !validarDatosTarjeta()) {
+        return;
+    }
 
     fetch('/api/entregas/registrar-cobro/', {
         method: 'POST',
@@ -462,7 +582,47 @@ function abrirDevolucion() {
     document.getElementById('modal-parada').classList.remove('visible');
     document.getElementById('dev-cantidad').value = '';
     document.getElementById('dev-motivo').value = '';
+    document.getElementById('dev-cantidad-maxima').innerText = '';
+
+    seleccionarTipoDevolucion('sustitucion', document.getElementById('btn-dev-sustitucion'));
+    cargarProductosDevolucion();
+
     document.getElementById('modal-devolucion').classList.add('visible');
+}
+
+function cargarProductosDevolucion() {
+    const select = document.getElementById('dev-producto');
+    select.innerHTML = '<option value="">Cargando...</option>';
+
+    fetch(`/api/entregas/pedido/${paradaActual.pedido_id}/detalle/`)
+        .then(res => res.json())
+        .then(data => {
+            const productos = data.productos || [];
+            select.innerHTML = '<option value="">Selecciona un producto...</option>' +
+                productos.map(p =>
+                    `<option value="${p.cod_producto}" data-cantidad="${p.cantidad}">${p.nombre} (${p.cantidad} pzas)</option>`
+                ).join('');
+        })
+        .catch(() => {
+            select.innerHTML = '<option value="">No se pudieron cargar los productos</option>';
+        });
+}
+
+function actualizarMaximoDevolucion() {
+    const select = document.getElementById('dev-producto');
+    const opcion = select.options[select.selectedIndex];
+    const maximo = opcion ? opcion.dataset.cantidad : null;
+
+    const inputCantidad = document.getElementById('dev-cantidad');
+    const etiquetaMax = document.getElementById('dev-cantidad-maxima');
+
+    if (maximo) {
+        inputCantidad.max = maximo;
+        etiquetaMax.innerText = `(máx. ${maximo})`;
+    } else {
+        inputCantidad.removeAttribute('max');
+        etiquetaMax.innerText = '';
+    }
 }
 
 function cerrarModalDevolucion(e) {
@@ -473,11 +633,18 @@ function cerrarModalDevolucion(e) {
 }
 
 function guardarDevolucion() {
+    const selectProducto = document.getElementById('dev-producto');
+    const codProducto = selectProducto.value;
+    const opcionSeleccionada = selectProducto.options[selectProducto.selectedIndex];
+    const maximo = opcionSeleccionada ? parseInt(opcionSeleccionada.dataset.cantidad) : null;
+
     const cantidad = parseInt(document.getElementById('dev-cantidad').value);
     const motivo = document.getElementById('dev-motivo').value.trim();
     const tipo = TIPOS_DEVOLUCION[tipoDevolucionActual].valor;
 
+    if (!codProducto) { alert('Selecciona el producto a devolver'); return; }
     if (!cantidad || cantidad <= 0) { alert('Ingresa una cantidad válida'); return; }
+    if (maximo && cantidad > maximo) { alert(`No puedes devolver más de ${maximo} piezas`); return; }
     if (!motivo) { alert('Ingresa el motivo de la devolución'); return; }
 
     // Doble confirmación para la acción irreversible
@@ -490,6 +657,8 @@ function guardarDevolucion() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             entrega_id: entregaId,
+            pedido_id: paradaActual.pedido_id,
+            cod_producto: codProducto,
             cantidad: cantidad,
             motivo: tipo,
             descripcion: motivo
@@ -500,6 +669,9 @@ function guardarDevolucion() {
         if (data.error) { alert('Error: ' + data.error); return; }
         document.getElementById('modal-devolucion').classList.remove('visible');
         mostrarToast('✓ Devolución registrada');
+
+        document.getElementById('modal-parada').classList.add('visible');
+        actualizarEstadoCobroModal(paradaActual.pedido_id);
     });
 }
 
@@ -585,6 +757,7 @@ window.addEventListener('load', () => {
 });
 
 // ===== MODAL DEVOLUCION =====
+// ===== MODAL DEVOLUCION =====
 const TIPOS_DEVOLUCION = {
     sustitucion: {
         valor: 'Producto dañado con sustitución',
@@ -606,21 +779,9 @@ function seleccionarTipoDevolucion(tipo, btn) {
     document.querySelectorAll('.tipo-dev-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
 
-    // El botón de confirmar hereda el color del tipo seleccionado
     const confirmar = document.getElementById('btn-guardar-dev');
     confirmar.classList.remove('btn-confirmar-dev--sustitucion', 'btn-confirmar-dev--completa');
     confirmar.classList.add(TIPOS_DEVOLUCION[tipo].clase);
     confirmar.innerText = TIPOS_DEVOLUCION[tipo].etiqueta;
-}
-
-function abrirDevolucion() {
-    document.getElementById('modal-parada').classList.remove('visible');
-    document.getElementById('dev-cantidad').value = '';
-    document.getElementById('dev-motivo').value = '';
-
-    // Siempre arranca en la opción de menor impacto
-    seleccionarTipoDevolucion('sustitucion', document.getElementById('btn-dev-sustitucion'));
-
-    document.getElementById('modal-devolucion').classList.add('visible');
 }
 

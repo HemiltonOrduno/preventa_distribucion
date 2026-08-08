@@ -93,10 +93,33 @@
             <input type="number" id="cobro-monto" placeholder="0.00" step="0.01">
         </div>
 
+        <div class="form-group" id="datos-tarjeta" style="display:none;">
+            <label>Número de tarjeta</label>
+            <input type="text" id="tarjeta-numero" placeholder="0000 0000 0000 0000"
+                   inputmode="numeric" maxlength="19">
+            <div class="input-error" id="error-tarjeta-numero"></div>
+
+            <div class="tarjeta-row">
+                <div class="tarjeta-col">
+                    <label>Vencimiento</label>
+                    <input type="text" id="tarjeta-vencimiento" placeholder="MM/AA"
+                           inputmode="numeric" maxlength="5">
+                    <div class="input-error" id="error-tarjeta-vencimiento"></div>
+                </div>
+                <div class="tarjeta-col">
+                    <label>CVV</label>
+                    <input type="text" id="tarjeta-cvv" placeholder="123"
+                           inputmode="numeric" maxlength="4">
+                    <div class="input-error" id="error-tarjeta-cvv"></div>
+                </div>
+            </div>
+        </div>
+
         <div class="modal-acciones">
             <button class="btn-cobro" onclick="guardarCobro()">✓ Guardar cobro</button>
             <button class="btn-cancelar-modal" onclick="cerrarModalCobro()">Cancelar</button>
         </div>
+
     </div>
 </div>
 
@@ -128,7 +151,14 @@
         </div>
 
         <div class="form-group">
-            <label>Cantidad</label>
+            <label>Producto</label>
+            <select id="dev-producto" onchange="actualizarMaximoDevolucion()">
+                <option value="">Selecciona un producto...</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Cantidad <span id="dev-cantidad-maxima" style="font-weight:normal;color:#888;"></span></label>
             <input type="number" id="dev-cantidad" placeholder="0" min="1">
         </div>
 
