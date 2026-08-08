@@ -42,16 +42,12 @@ def crear_cliente(request):
 
     with transaction.atomic():
         with connection.cursor() as cursor:
-            cursor.execute("SELECT COALESCE(MAX(numero), 0) + 1 FROM rep_establecimiento")
-            nuevo_numero = cursor.fetchone()[0]
-
             cursor.execute("""
                 INSERT INTO rep_establecimiento
-                    (numero, rfc, repNombre, repApellPat, repApellMa, telefono,
+                    (rfc, repNombre, repApellPat, repApellMa, telefono,
                      email, fecha_registro, empleado, edo_rep_establecimiento)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, CURDATE(), %s, 'ERE001')
+                VALUES (%s, %s, %s, %s, %s, %s, CURDATE(), %s, 'ERE001')
             """, [
-                nuevo_numero,
                 body['rfc'],
                 body['nombre_de_pila'],
                 body['apellido_paterno'],
@@ -60,6 +56,7 @@ def crear_cliente(request):
                 body['email'],
                 empleado_num,
             ])
+            nuevo_numero = cursor.lastrowid
 
     return JsonResponse({
         "mensaje": "Cliente registrado correctamente",
@@ -106,17 +103,13 @@ def crear_establecimiento(request):
                 return JsonResponse({"error": "No se encontró una zona para esta ubicación"}, status=400)
             zona_id = zona_row[0]
 
-            cursor.execute("SELECT COALESCE(MAX(numero), 0) + 1 FROM establecimiento")
-            nuevo_numero = cursor.fetchone()[0]
-
             cursor.execute("""
                 INSERT INTO establecimiento
-                    (numero, nombre, estCalle, estNumero, estColonia, telefono,
+                    (nombre, estCalle, estNumero, estColonia, telefono,
                      latitud, longitud, fecha_registro, zona, empleado,
                      entrega, rep_establecimiento, edo_establecimiento)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, CURDATE(), %s, %s, NULL, %s, 'EST001')
+                VALUES (%s, %s, %s, %s, %s, %s, %s, CURDATE(), %s, %s, NULL, %s, 'EST001')
             """, [
-                nuevo_numero,
                 body['nombre'],
                 body['calle'],
                 body['numero'],
@@ -128,6 +121,7 @@ def crear_establecimiento(request):
                 empleado_num,
                 body['rep_establecimiento_id'],
             ])
+            nuevo_numero = cursor.lastrowid
 
     return JsonResponse({
         "mensaje": "Establecimiento registrado correctamente",

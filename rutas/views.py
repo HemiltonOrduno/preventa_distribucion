@@ -739,9 +739,6 @@ def crear_ruta_visita(request):
         return JsonResponse({"error": "Faltan datos requeridos"}, status=400)
 
     with connection.cursor() as cursor:
-        cursor.execute("SELECT COALESCE(MAX(numero), 0) + 1 FROM ruta_visita")
-        nuevo_num = cursor.fetchone()[0]
-
         cursor.execute("""
             SELECT em.num FROM empleado em
             INNER JOIN rol r ON r.codigo = em.rol
@@ -753,9 +750,10 @@ def crear_ruta_visita(request):
         vendedor_id = vendedor[0] if vendedor else None
 
         cursor.execute("""
-            INSERT INTO ruta_visita (numero, nombre, descripcion, dia, zona, empleado, edo_ruta_visita)
-            VALUES (%s, %s, %s, %s, %s, %s, 'ERV001')
-        """, [nuevo_num, nombre, descripcion, dia, zona_id, vendedor_id])
+            INSERT INTO ruta_visita (nombre, descripcion, dia, zona, empleado, edo_ruta_visita)
+            VALUES (%s, %s, %s, %s, %s, 'ERV001')
+        """, [nombre, descripcion, dia, zona_id, vendedor_id])
+        nuevo_num = cursor.lastrowid
 
         # Guardar orden en ruta_visita_orden
         for i, est_id in enumerate(establecimientos):

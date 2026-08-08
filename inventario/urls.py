@@ -1,9 +1,12 @@
 from django.urls import path
-from .views import registrar_movimiento, consultar_stock
-from .views import almacenista_movimientos_view  # agrégalo al import existente
-from .views import catalogo_stock  # agrégalo al import existente
-from .views import perfil_actual 
-from .views import devoluciones_pendientes  # RF40: origen = Devolución
+from .views import (
+    registrar_movimiento,
+    consultar_stock,
+    almacenista_movimientos_view,
+    catalogo_stock,
+    perfil_actual,
+    devoluciones_pendientes,
+)
 
 urlpatterns = [
     path('movimientos/', registrar_movimiento, name='registrar_movimiento'),

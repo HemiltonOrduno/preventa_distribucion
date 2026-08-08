@@ -1,9 +1,16 @@
 -- Active: 1772565691688@@127.0.0.1@3306@inpredis_db
-CREATE DATABASE inpredis_db;
+-- =============================================================
+-- INPREDIS — Estructura de base de datos
+-- Sistema de Preventa y Distribución — Sabritas Tijuana
+-- Incluye los cambios aplicados durante el desarrollo
+-- =============================================================
 
+CREATE DATABASE inpredis_db;
 USE inpredis_db;
 
---- TABLAS ---
+-- -------------------------------------------------------------
+-- CATÁLOGOS DE USUARIOS Y EMPLEADOS
+-- -------------------------------------------------------------
 
 CREATE TABLE EDO_USUARIO(
     codigo VARCHAR(10) PRIMARY KEY,
@@ -38,7 +45,7 @@ CREATE TABLE LICENCIA(
 );
 
 CREATE TABLE EMPLEADO(
-    num INT PRIMARY KEY,
+    num INT PRIMARY KEY AUTO_INCREMENT,
     empNombre VARCHAR(25) NOT NULL,
     empApellPat VARCHAR(25) NOT NULL,
     empApellMa VARCHAR(25),
@@ -54,7 +61,7 @@ CREATE TABLE EMPLEADO(
 );
 
 CREATE TABLE USUARIO(
-    num INT PRIMARY KEY,
+    num INT PRIMARY KEY AUTO_INCREMENT,
     usuario VARCHAR(20) UNIQUE NOT NULL,
     contraseña VARCHAR(255) NOT NULL,
     edo_usuario VARCHAR(10) NOT NULL,
@@ -62,6 +69,10 @@ CREATE TABLE USUARIO(
     FOREIGN KEY (edo_usuario) REFERENCES EDO_USUARIO(codigo),
     FOREIGN KEY (empleado) REFERENCES EMPLEADO(num)
 );
+
+-- -------------------------------------------------------------
+-- VEHÍCULOS Y ENTREGAS
+-- -------------------------------------------------------------
 
 CREATE TABLE EDO_VEHICULO(
     codigo VARCHAR(10) PRIMARY KEY,
@@ -81,7 +92,7 @@ CREATE TABLE TIPO_VEHICULO(
 );
 
 CREATE TABLE MODELO(
-    numero INT PRIMARY KEY,
+    numero INT PRIMARY KEY AUTO_INCREMENT,
     nombre VARCHAR(20) UNIQUE NOT NULL,
     ano INT NOT NULL,
     capacidad DECIMAL(10,2) NOT NULL,
@@ -96,17 +107,17 @@ CREATE TABLE EDO_ENTREGA(
 );
 
 CREATE TABLE ENTREGA(
-    numero INT PRIMARY KEY,
+    numero INT PRIMARY KEY AUTO_INCREMENT,
     fecha_creacion DATE NOT NULL,
     fecha_entrega DATETIME NULL,
-    empleado int NOT NULL,
+    empleado INT NOT NULL,
     edo_entrega VARCHAR(10) NOT NULL,
     FOREIGN KEY (empleado) REFERENCES EMPLEADO(num),
     FOREIGN KEY (edo_entrega) REFERENCES EDO_ENTREGA(codigo)
 );
 
 CREATE TABLE VEHICULO(
-    numero INT PRIMARY KEY,
+    numero INT PRIMARY KEY AUTO_INCREMENT,
     serie_vin VARCHAR(20) UNIQUE NOT NULL,
     placas VARCHAR(10) UNIQUE NOT NULL,
     tipo_vehiculo VARCHAR(10) NOT NULL,
@@ -130,11 +141,21 @@ CREATE TABLE EMP_VEHICULO(
     FOREIGN KEY (vehiculo) REFERENCES VEHICULO(numero)
 );
 
+-- -------------------------------------------------------------
+-- ZONAS Y ESTABLECIMIENTOS
+-- -------------------------------------------------------------
+
+-- Los límites de latitud y longitud permiten asignar automáticamente
+-- la zona de un establecimiento a partir de su ubicación (RF03)
 CREATE TABLE ZONA(
-    num INT PRIMARY KEY,
+    num INT PRIMARY KEY AUTO_INCREMENT,
     nombre VARCHAR(20) UNIQUE NOT NULL,
     descripcion VARCHAR(100),
     empleado INT NOT NULL,
+    lat_min DECIMAL(10,6),
+    lat_max DECIMAL(10,6),
+    lon_min DECIMAL(10,6),
+    lon_max DECIMAL(10,6),
     FOREIGN KEY (empleado) REFERENCES EMPLEADO(num)
 );
 
@@ -151,7 +172,7 @@ CREATE TABLE EDO_REP_ESTABLECIMIENTO(
 );
 
 CREATE TABLE REP_ESTABLECIMIENTO(
-    numero INT PRIMARY KEY,
+    numero INT PRIMARY KEY AUTO_INCREMENT,
     rfc VARCHAR(13) UNIQUE NOT NULL,
     repNombre VARCHAR(20) NOT NULL,
     repApellPat VARCHAR(20) NOT NULL,
@@ -166,7 +187,7 @@ CREATE TABLE REP_ESTABLECIMIENTO(
 );
 
 CREATE TABLE ESTABLECIMIENTO(
-    numero INT PRIMARY KEY,
+    numero INT PRIMARY KEY AUTO_INCREMENT,
     nombre VARCHAR(20) UNIQUE NOT NULL,
     estCalle VARCHAR(40) NOT NULL,
     estNumero VARCHAR(10) NOT NULL,
@@ -187,22 +208,39 @@ CREATE TABLE ESTABLECIMIENTO(
     FOREIGN KEY (edo_establecimiento) REFERENCES EDO_ESTABLECIMIENTO(codigo)
 );
 
+-- -------------------------------------------------------------
+-- RUTAS DE VISITA
+-- -------------------------------------------------------------
+
 CREATE TABLE EDO_RUTA_VISITA(
     codigo VARCHAR(10) PRIMARY KEY,
     nombre VARCHAR(20) UNIQUE NOT NULL,
     descripcion VARCHAR(100)
 );
 
+-- 'dia' fija el día de la semana en que se recorre la ruta.
+-- 'empleado' es NULL mientras el coordinador no asigne vendedor (RF31)
 CREATE TABLE RUTA_VISITA(
-    numero INT PRIMARY KEY,
+    numero INT PRIMARY KEY AUTO_INCREMENT,
     nombre VARCHAR(20) NOT NULL,
     descripcion VARCHAR(150),
+    dia VARCHAR(10) NOT NULL DEFAULT 'Lunes',
     zona INT NOT NULL,
-    empleado INT NOT NULL,
+    empleado INT NULL,
     edo_ruta_visita VARCHAR(10) NOT NULL,
     FOREIGN KEY (zona) REFERENCES ZONA(num),
     FOREIGN KEY (empleado) REFERENCES EMPLEADO(num),
     FOREIGN KEY (edo_ruta_visita) REFERENCES EDO_RUTA_VISITA(codigo)
+);
+
+-- Orden en que el vendedor debe recorrer los establecimientos
+CREATE TABLE RUTA_VISITA_ORDEN(
+    ruta_visita INT NOT NULL,
+    establecimiento INT NOT NULL,
+    orden INT NOT NULL,
+    PRIMARY KEY (ruta_visita, establecimiento),
+    FOREIGN KEY (ruta_visita) REFERENCES RUTA_VISITA(numero),
+    FOREIGN KEY (establecimiento) REFERENCES ESTABLECIMIENTO(numero)
 );
 
 CREATE TABLE EDO_VISITA(
@@ -212,7 +250,7 @@ CREATE TABLE EDO_VISITA(
 );
 
 CREATE TABLE VISITA(
-    numero INT PRIMARY KEY,
+    numero INT PRIMARY KEY AUTO_INCREMENT,
     observaciones VARCHAR(200),
     fecha DATETIME NOT NULL,
     ruta_visita INT NOT NULL,
@@ -224,6 +262,10 @@ CREATE TABLE VISITA(
     FOREIGN KEY (edo_visita) REFERENCES EDO_VISITA(codigo),
     FOREIGN KEY (empleado) REFERENCES EMPLEADO(num)
 );
+
+-- -------------------------------------------------------------
+-- PRODUCTOS Y PEDIDOS
+-- -------------------------------------------------------------
 
 CREATE TABLE EDO_PEDIDO(
     codigo VARCHAR(10) PRIMARY KEY,
@@ -243,9 +285,9 @@ CREATE TABLE PRODUCTO(
 );
 
 CREATE TABLE PEDIDO(
-    num INT PRIMARY KEY,
+    num INT PRIMARY KEY AUTO_INCREMENT,
     observaciones VARCHAR(200),
-    iva DECIMAL (10,2) NOT NULL DEFAULT 0,
+    iva DECIMAL(10,2) NOT NULL DEFAULT 0,
     total DECIMAL(10,2) NOT NULL DEFAULT 0,
     fecha DATETIME NOT NULL,
     subtotal DECIMAL(10,2) NOT NULL,
@@ -268,22 +310,53 @@ CREATE TABLE DETALLE_PEDIDO(
     FOREIGN KEY (cod_producto) REFERENCES PRODUCTO(codigo)
 );
 
+-- Histórico de los productos que el almacenista canceló por falta de
+-- stock, con la fecha estimada en que volverán a estar disponibles (RF20-21)
+CREATE TABLE PRODUCTO_CANCELADO_PEDIDO(
+    num_pedido INT NOT NULL,
+    cod_producto VARCHAR(10) NOT NULL,
+    cantidad_solicitada INT NOT NULL,
+    fecha_cancelacion DATETIME NOT NULL,
+    fecha_disponible_estimada DATE,
+    motivo VARCHAR(200),
+    PRIMARY KEY (num_pedido, cod_producto, fecha_cancelacion),
+    FOREIGN KEY (num_pedido) REFERENCES PEDIDO(num),
+    FOREIGN KEY (cod_producto) REFERENCES PRODUCTO(codigo)
+);
+
+-- -------------------------------------------------------------
+-- RUTAS DE ENTREGA
+-- -------------------------------------------------------------
+
 CREATE TABLE EDO_RUTA_ENTREGA(
     codigo VARCHAR(10) PRIMARY KEY,
     nombre VARCHAR(20) UNIQUE NOT NULL,
     descripcion VARCHAR(100)
 );
 
+-- 'empleado' es NULL mientras el coordinador no asigne repartidor, o
+-- cuando la ruta se deja disponible para que cualquiera la tome (RF33)
 CREATE TABLE RUTA_ENTREGA(
-    numero INT PRIMARY KEY,
+    numero INT PRIMARY KEY AUTO_INCREMENT,
     nombre VARCHAR(40) NOT NULL,
     descripcion VARCHAR(150),
-    empleado INT NOT NULL,
+    empleado INT NULL,
     entrega INT NULL,
     edo_ruta_entrega VARCHAR(10) NOT NULL,
     FOREIGN KEY (empleado) REFERENCES EMPLEADO(num),
     FOREIGN KEY (entrega) REFERENCES ENTREGA(numero),
     FOREIGN KEY (edo_ruta_entrega) REFERENCES EDO_RUTA_ENTREGA(codigo)
+);
+
+-- Orden de las paradas: lo propone OSRM al crear la entrega y el
+-- coordinador puede reordenarlo antes de liberar la ruta
+CREATE TABLE RUTA_ENTREGA_ORDEN(
+    ruta_entrega INT NOT NULL,
+    establecimiento INT NOT NULL,
+    orden INT NOT NULL,
+    PRIMARY KEY (ruta_entrega, establecimiento),
+    FOREIGN KEY (ruta_entrega) REFERENCES RUTA_ENTREGA(numero),
+    FOREIGN KEY (establecimiento) REFERENCES ESTABLECIMIENTO(numero)
 );
 
 CREATE TABLE ENTREGA_ESTABLE(
@@ -296,6 +369,10 @@ CREATE TABLE ENTREGA_ESTABLE(
     FOREIGN KEY (establecimiento) REFERENCES ESTABLECIMIENTO(numero)
 );
 
+-- -------------------------------------------------------------
+-- COBROS Y DEVOLUCIONES
+-- -------------------------------------------------------------
+
 CREATE TABLE TIPO_PAGO(
     codigo VARCHAR(10) PRIMARY KEY,
     nombre VARCHAR(20) UNIQUE NOT NULL,
@@ -303,7 +380,7 @@ CREATE TABLE TIPO_PAGO(
 );
 
 CREATE TABLE PAGO(
-    codigo INT PRIMARY KEY,
+    codigo INT PRIMARY KEY AUTO_INCREMENT,
     monto DECIMAL(10,2) NOT NULL,
     fecha DATETIME NOT NULL,
     tipo_pago VARCHAR(10) NOT NULL,
@@ -316,15 +393,26 @@ CREATE TABLE PAGO(
     FOREIGN KEY (pedido) REFERENCES PEDIDO(num)
 );
 
+-- 'cod_producto', 'pedido' e 'importe' identifican qué se devolvió y
+-- cuánto representa, para poder descontarlo de la venta (RF38)
 CREATE TABLE DEVOLUCION(
-    codigo INT PRIMARY KEY,
+    codigo INT PRIMARY KEY AUTO_INCREMENT,
     fecha DATE NOT NULL,
     cantidad INT NOT NULL,
     motivo VARCHAR(40) NOT NULL,
     descripcion VARCHAR(150),
     entrega INT NOT NULL,
-    FOREIGN KEY (entrega) REFERENCES ENTREGA(numero)
+    cod_producto VARCHAR(10) NULL,
+    pedido INT NULL,
+    importe DECIMAL(10,2) NULL,
+    FOREIGN KEY (entrega) REFERENCES ENTREGA(numero),
+    FOREIGN KEY (cod_producto) REFERENCES PRODUCTO(codigo),
+    FOREIGN KEY (pedido) REFERENCES PEDIDO(num)
 );
+
+-- -------------------------------------------------------------
+-- MOVIMIENTOS DE INVENTARIO
+-- -------------------------------------------------------------
 
 CREATE TABLE TIPO_MOVIMIENTO(
     codigo VARCHAR(10) PRIMARY KEY,
@@ -333,7 +421,7 @@ CREATE TABLE TIPO_MOVIMIENTO(
 );
 
 CREATE TABLE MOVIMIENTOS(
-    codigo INT PRIMARY KEY,
+    codigo INT PRIMARY KEY AUTO_INCREMENT,
     observaciones VARCHAR(150),
     fecha DATETIME NOT NULL,
     tipo_movimiento VARCHAR(10) NOT NULL,
@@ -353,105 +441,4 @@ CREATE TABLE DETALLE_MOVIMIENTO(
     PRIMARY KEY (cod_movimientos, cod_producto),
     FOREIGN KEY (cod_movimientos) REFERENCES MOVIMIENTOS(codigo),
     FOREIGN KEY (cod_producto) REFERENCES PRODUCTO(codigo)
-);
-
-ALTER TABLE ruta_visita ADD COLUMN dia VARCHAR(10) NOT NULL DEFAULT 'Lunes';
-
-UPDATE ruta_visita SET dia = 'Lunes' WHERE numero IN (1, 2);
-UPDATE ruta_visita SET dia = 'Martes' WHERE numero IN (3, 4);
-UPDATE ruta_visita SET dia = 'Miércoles' WHERE numero IN (5, 6);
-UPDATE ruta_visita SET dia = 'Jueves' WHERE numero IN (7, 8);
-UPDATE ruta_visita SET dia = 'Viernes' WHERE numero IN (9, 10);
-
-CREATE TABLE ruta_entrega_orden (
-    ruta_entrega INT NOT NULL,
-    establecimiento INT NOT NULL,
-    orden INT NOT NULL,
-    PRIMARY KEY (ruta_entrega, establecimiento),
-    FOREIGN KEY (ruta_entrega) REFERENCES ruta_entrega(numero),
-    FOREIGN KEY (establecimiento) REFERENCES establecimiento(numero)
-);
-
-ALTER TABLE zona ADD COLUMN lat_min DECIMAL(10,6);
-ALTER TABLE zona ADD COLUMN lat_max DECIMAL(10,6);
-ALTER TABLE zona ADD COLUMN lon_min DECIMAL(10,6);
-ALTER TABLE zona ADD COLUMN lon_max DECIMAL(10,6);
-
-UPDATE zona SET lat_min=32.50, lat_max=32.62, lon_min=-117.15, lon_max=-117.05 WHERE num=1; -- Noroeste
-UPDATE zona SET lat_min=32.50, lat_max=32.62, lon_min=-117.05, lon_max=-116.98 WHERE num=2; -- Norte 1
-UPDATE zona SET lat_min=32.50, lat_max=32.62, lon_min=-116.98, lon_max=-116.88 WHERE num=3; -- Norte 2
-UPDATE zona SET lat_min=32.45, lat_max=32.50, lon_min=-117.15, lon_max=-117.05 WHERE num=4; -- Poniente
-UPDATE zona SET lat_min=32.45, lat_max=32.50, lon_min=-117.05, lon_max=-116.98 WHERE num=5; -- Centro
-UPDATE zona SET lat_min=32.45, lat_max=32.50, lon_min=-116.98, lon_max=-116.88 WHERE num=6; -- Oriente 1
-UPDATE zona SET lat_min=32.40, lat_max=32.45, lon_min=-116.98, lon_max=-116.88 WHERE num=7; -- Oriente 2
-UPDATE zona SET lat_min=32.40, lat_max=32.45, lon_min=-117.15, lon_max=-117.05 WHERE num=8; -- Sureste 1
-UPDATE zona SET lat_min=32.40, lat_max=32.45, lon_min=-117.05, lon_max=-116.98 WHERE num=9; -- Sureste 2
-UPDATE zona SET lat_min=32.38, lat_max=32.40, lon_min=-117.15, lon_max=-116.88 WHERE num=10; -- Sur
-
-INSERT INTO zona (num, nombre, descripcion, empleado, lat_min, lat_max, lon_min, lon_max) VALUES
-(11, 'Norte 2B', 'Zona que cubre el área norte oriente de Tijuana', 2, 32.508, 32.560, -116.870, -116.820),
-(12, 'Oriente 1B', 'Zona que cubre el área oriente de Tijuana lado sur', 2, 32.470, 32.508, -116.870, -116.820),
-(13, 'Oriente 2B', 'Zona que cubre el área oriente de Tijuana parte baja', 2, 32.430, 32.470, -116.870, -116.820);
-
-
-SELECT num, nombre, lat_min, lat_max, lon_min, lon_max FROM zona WHERE num IN (7, 10, 12, 13);
-SELECT num, nombre, lon_min, lon_max FROM zona WHERE num IN (3,6,7,11,12,13);
-
-CREATE TABLE ruta_visita_orden (
-    ruta_visita INT NOT NULL,
-    establecimiento INT NOT NULL,
-    orden INT NOT NULL,
-    PRIMARY KEY (ruta_visita, establecimiento),
-    FOREIGN KEY (ruta_visita) REFERENCES ruta_visita(numero),
-    FOREIGN KEY (establecimiento) REFERENCES establecimiento(numero)
-);
-
-SELECT re.numero, re.nombre, er.nombre AS estado, re.empleado,
-       CONCAT(em.empNombre, ' ', em.empApellPat) AS repartidor
-FROM ruta_entrega re
-INNER JOIN edo_ruta_entrega er ON er.codigo = re.edo_ruta_entrega
-INNER JOIN empleado em ON em.num = re.empleado
-WHERE er.nombre NOT IN ('Entregada')
-ORDER BY re.numero;
-
-CREATE TABLE producto_cancelado_pedido (
-    num_pedido INT NOT NULL,
-    cod_producto VARCHAR(10) NOT NULL,
-    cantidad_solicitada INT NOT NULL,
-    fecha_cancelacion DATETIME NOT NULL,
-    fecha_disponible_estimada DATE,
-    motivo VARCHAR(200),
-    PRIMARY KEY (num_pedido, cod_producto, fecha_cancelacion),
-    FOREIGN KEY (num_pedido) REFERENCES pedido(num),
-    FOREIGN KEY (cod_producto) REFERENCES producto(codigo)
-);
-
-DELETE FROM ruta_visita_orden WHERE ruta_visita IN (12,13,14);
-DELETE FROM ruta_visita WHERE numero IN (12,13,14);
-
-UPDATE ruta_visita
-SET edo_ruta_visita = 'ERV002'
-WHERE numero IN (1,2,3,4,5,6,7,8,9,10,11);
-
-ALTER TABLE ruta_visita MODIFY empleado INT(11) NULL;
-
-ALTER TABLE ruta_entrega MODIFY empleado INT(11) NULL;
-
-ALTER TABLE devolucion ADD COLUMN cod_producto VARCHAR(10) NULL;
-ALTER TABLE devolucion ADD FOREIGN KEY (cod_producto) REFERENCES producto(codigo);
-
-ALTER TABLE devolucion ADD COLUMN pedido INT NULL;
-ALTER TABLE devolucion ADD COLUMN importe DECIMAL(10,2) NULL;
-ALTER TABLE devolucion ADD FOREIGN KEY (pedido) REFERENCES pedido(num);
-
-CREATE TABLE producto_cancelado_pedido (
-    num_pedido INT NOT NULL,
-    cod_producto VARCHAR(10) NOT NULL,
-    cantidad_solicitada INT NOT NULL,
-    fecha_cancelacion DATETIME NOT NULL,
-    fecha_disponible_estimada DATE,
-    motivo VARCHAR(200),
-    PRIMARY KEY (num_pedido, cod_producto, fecha_cancelacion),
-    FOREIGN KEY (num_pedido) REFERENCES pedido(num),
-    FOREIGN KEY (cod_producto) REFERENCES producto(codigo)
 );

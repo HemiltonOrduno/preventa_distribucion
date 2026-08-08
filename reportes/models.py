@@ -300,7 +300,7 @@ class RutaEntrega(models.Model):
 # ---------------------------------------------------------------------------
 
 class Pago(models.Model):
-    codigo = models.IntegerField(primary_key=True)
+    codigo = models.AutoField(primary_key=True)
     monto = models.DecimalField(max_digits=10, decimal_places=2)
     fecha = models.DateTimeField()
     tipo_pago = models.ForeignKey(
@@ -327,7 +327,7 @@ class Pago(models.Model):
 
 
 class Devolucion(models.Model):
-    codigo = models.IntegerField(primary_key=True)
+    codigo = models.AutoField(primary_key=True)
     fecha = models.DateField()
     cantidad = models.IntegerField()
     motivo = models.CharField(max_length=100, blank=True, null=True)
@@ -350,7 +350,7 @@ class Devolucion(models.Model):
 # ---------------------------------------------------------------------------
 
 class Movimiento(models.Model):
-    codigo = models.IntegerField(primary_key=True)
+    codigo = models.AutoField(primary_key=True)
     observaciones = models.CharField(max_length=150, blank=True, null=True)
     fecha = models.DateTimeField()
     tipo_movimiento = models.ForeignKey(

@@ -72,16 +72,12 @@ def registrar_movimiento(request):
                 if cursor.fetchone():
                     return JsonResponse({"error": f"La devolución {devolucion} ya fue registrada como entrada de inventario"}, status=400)
 
-            # codigo no es autoincremental en el esquema real (igual que
-            # pasó con usuario.num) -> lo calculamos nosotros.
-            cursor.execute("SELECT COALESCE(MAX(codigo), 0) + 1 FROM movimientos")
-            nuevo_codigo = cursor.fetchone()[0]
-
-            cursor.execute("""
-                INSERT INTO movimientos (codigo, observaciones, fecha, tipo_movimiento, devolucion, empleado)
-                VALUES (%s, %s, NOW(), %s, %s, %s)
-            """, [nuevo_codigo, observaciones, tipo_movimiento,
-                  devolucion if tipo_movimiento == TIPO_ENTRADA_DEVOLUCION else None, empleado])
+                cursor.execute("""
+                    INSERT INTO movimientos (observaciones, fecha, tipo_movimiento, devolucion, empleado)
+                    VALUES (%s, NOW(), %s, %s, %s)
+                """, [observaciones, tipo_movimiento,
+                    devolucion if tipo_movimiento == TIPO_ENTRADA_DEVOLUCION else None, empleado])
+                nuevo_codigo = cursor.lastrowid
 
             for linea in detalle:
                 subtotal = linea["cantidad"] * linea["precio_unitario"]

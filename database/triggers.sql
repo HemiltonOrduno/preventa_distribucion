@@ -173,3 +173,22 @@ BEGIN
     WHERE num = NEW.num_pedido;
 END$$
 DELIMITER ;
+
+DELIMITER $$
+CREATE OR REPLACE TRIGGER tg_campos_calculados_pedido_delete
+AFTER DELETE ON detalle_pedido
+FOR EACH ROW
+BEGIN
+    DECLARE suma_importes DECIMAL(10,2);
+
+    SELECT COALESCE(SUM(importe), 0) INTO suma_importes
+    FROM detalle_pedido
+    WHERE num_pedido = OLD.num_pedido;
+
+    UPDATE pedido
+    SET subtotal = suma_importes,
+        iva = ROUND(suma_importes * 0.16, 2),
+        total = ROUND(suma_importes * 1.16, 2)
+    WHERE num = OLD.num_pedido;
+END$$
+DELIMITER ;

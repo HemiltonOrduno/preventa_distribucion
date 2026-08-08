@@ -301,7 +301,12 @@ function abrirModalParada(parada) {
     paradaActual = parada;
 
     habilitarConfirmacion(false);
-    document.getElementById('btn-abrir-cobro').style.display = 'block';
+
+    const btnCobro = document.getElementById('btn-abrir-cobro');
+    btnCobro.disabled = false;
+    btnCobro.style.opacity = '';
+    btnCobro.style.cursor = '';
+
     document.getElementById('cobro-monto').value = parseFloat(parada.subtotal || 0).toFixed(2);
 
    // El cobro pudo registrarse en una sesión anterior: se consulta el
@@ -406,20 +411,29 @@ function actualizarEstadoCobroModal(pedidoId) {
             const btnCobro = document.getElementById('btn-abrir-cobro');
             const aviso = document.getElementById('aviso-cobro');
 
+            // El total refleja lo realmente cobrable: si hubo devolución
+            // completa, ese importe ya no se le cobra al establecimiento
             const totalSpan = document.getElementById('modal-total-cobrar');
             if (totalSpan && d.total_neto !== undefined) {
-                totalSpan.innerText = `$${d.total_neto.toFixed(2)}`;
+                totalSpan.innerHTML = `$${d.total_neto.toFixed(2)}`;
+                if (d.devuelto > 0) {
+                    totalSpan.innerHTML += `<br><small style="color:#e65100;font-weight:normal;">−$${d.devuelto.toFixed(2)} devuelto</small>`;
+                }
             }
 
             if (d.pagado) {
                 habilitarConfirmacion(true);
-                btnCobro.style.display = 'none';
-                aviso.innerText = d.devuelto > 0
-                    ? '✓ Sin saldo pendiente (con devolución aplicada)'
-                    : '✓ Cobro ya registrado';
+                aviso.innerText = '✓ Cobro ya registrado';
                 aviso.style.display = 'block';
                 aviso.style.color = '#2e7d32';
+
+                btnCobro.disabled = true;
+                btnCobro.style.opacity = '0.5';
+                btnCobro.style.cursor = 'not-allowed';
             } else {
+                btnCobro.disabled = false;
+                btnCobro.style.opacity = '';
+                btnCobro.style.cursor = '';
                 btnCobro.style.display = 'block';
                 document.getElementById('cobro-monto').value = d.pendiente.toFixed(2);
                 habilitarConfirmacion(false);
@@ -690,7 +704,14 @@ function guardarDevolucion() {
     .then(data => {
         if (data.error) { alert('Error: ' + data.error); return; }
         document.getElementById('modal-devolucion').classList.remove('visible');
-        mostrarToast('✓ Devolución registrada');
+
+        if (data.reembolso > 0) {
+            alert(`Devolución registrada por $${data.importe_devuelto.toFixed(2)}\n\n` +
+                  `Debes entregar al cliente $${data.reembolso.toFixed(2)} ` +
+                  `por el producto devuelto.`);
+        } else {
+            mostrarToast('✓ Devolución registrada');
+        }
 
         document.getElementById('modal-parada').classList.add('visible');
         actualizarEstadoCobroModal(paradaActual.pedido_id);

@@ -121,9 +121,10 @@ def crear_entrega(request):
                 nueva_entrega = cursor.fetchone()[0]
 
                 cursor.execute("""
-                    INSERT INTO entrega (numero, fecha_creacion, fecha_entrega, empleado, edo_entrega)
-                    VALUES (%s, CURDATE(), NULL, %s, 'EEN005')
-                """, [nueva_entrega, empleado])
+                    INSERT INTO entrega (fecha_creacion, fecha_entrega, empleado, edo_entrega)
+                    VALUES (CURDATE(), NULL, %s, 'EEN005')
+                """, [empleado])
+                nueva_entrega = cursor.lastrowid
 
                 cursor.execute("""
                     UPDATE vehiculo SET entrega = %s WHERE numero = %s
@@ -135,9 +136,10 @@ def crear_entrega(request):
                 nueva_ruta_entrega = cursor.fetchone()[0]
 
                 cursor.execute("""
-                    INSERT INTO ruta_entrega (numero, nombre, descripcion, empleado, entrega, edo_ruta_entrega)
-                    VALUES (%s, %s, %s, NULL, %s, 'ERET001')
-                """, [nueva_ruta_entrega, f"Ruta de entrega #{nueva_entrega}", None, nueva_entrega])
+                    INSERT INTO ruta_entrega (nombre, descripcion, empleado, entrega, edo_ruta_entrega)
+                    VALUES (%s, %s, NULL, %s, 'ERET001')
+                """, [f"Ruta de entrega #{nueva_entrega}", None, nueva_entrega])
+                nueva_ruta_entrega = cursor.lastrowid
 
             for pedido_id in pedidos_ids:
                 try:
@@ -440,9 +442,10 @@ def registrar_cobro(request):
         nuevo_codigo = cursor.fetchone()[0]
 
         cursor.execute("""
-            INSERT INTO pago (codigo, monto, fecha, tipo_pago, empleado, establecimiento, pedido)
-            VALUES (%s, %s, NOW(), %s, %s, %s, %s)
-        """, [nuevo_codigo, pendiente, tipo_pago, empleado_id, establecimiento_id, pedido_id])
+            INSERT INTO pago (monto, fecha, tipo_pago, empleado, establecimiento, pedido)
+            VALUES (%s, NOW(), %s, %s, %s, %s)
+        """, [pendiente, tipo_pago, empleado_id, establecimiento_id, pedido_id])
+        nuevo_codigo = cursor.lastrowid
 
     return JsonResponse({
         "mensaje": "Cobro registrado correctamente",
@@ -454,77 +457,122 @@ def registrar_cobro(request):
 
 @csrf_exempt
 def registrar_devolucion(request):
+    """
+    RF38: registra la devolución de producto en la entrega.
+    Con sustitución -> el repartidor repone la pieza del inventario del
+    camión, no entra al almacén.
+    Completa sin reemplazo -> el producto regresa al almacén y se
+    registra el movimiento de entrada por devolución (TM004).
+    Si el pedido ya estaba cobrado, se genera el reembolso al cliente.
+    """
     if request.method != 'POST':
         return JsonResponse({"error": "Método no permitido"}, status=405)
+
+    empleado_num = request.session.get('empleado_num')
+    if not empleado_num:
+        return JsonResponse({"error": "Sesión no válida, inicia sesión de nuevo"}, status=401)
 
     try:
         body = json.loads(request.body)
     except Exception:
         return JsonResponse({"error": "JSON inválido"}, status=400)
 
+    entrega_id = body.get('entrega_id')
     pedido_id = body.get('pedido_id')
     cod_producto = body.get('cod_producto')
     cantidad = body.get('cantidad')
     motivo = body.get('motivo')
-    descripcion = body.get('descripcion')
-    entrega_id = body.get('entrega_id')
+    descripcion = body.get('descripcion', '')
 
-    if not pedido_id or not cod_producto or not cantidad or not motivo or not entrega_id:
-        return JsonResponse({"error": "Faltan datos obligatorios"}, status=400)
+    if not entrega_id or not pedido_id or not cod_producto or not cantidad:
+        return JsonResponse({"error": "Faltan datos requeridos"}, status=400)
 
-    if not isinstance(cantidad, int) or cantidad <= 0:
-        return JsonResponse({"error": "La cantidad debe ser un entero mayor a 0"}, status=400)
+    try:
+        cantidad = int(cantidad)
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "La cantidad no es válida"}, status=400)
 
-    empleado_num = request.session.get('empleado_num')
-    if not empleado_num:
-        return JsonResponse({"error": "Sesión no válida, inicia sesión de nuevo"}, status=401)
+    if cantidad <= 0:
+        return JsonResponse({"error": "La cantidad debe ser mayor a cero"}, status=400)
 
     with transaction.atomic():
         with connection.cursor() as cursor:
+            # No se puede devolver más de lo que se entregó
             cursor.execute("""
-                SELECT cantidad, precioUnitario FROM detalle_pedido
-                WHERE num_pedido = %s AND cod_producto = %s
+                SELECT dp.cantidad, dp.precioUnitario
+                FROM detalle_pedido dp
+                WHERE dp.num_pedido = %s AND dp.cod_producto = %s
             """, [pedido_id, cod_producto])
             row = cursor.fetchone()
-
             if not row:
-                return JsonResponse({"error": "Ese producto no pertenece a este pedido"}, status=400)
+                return JsonResponse({"error": "Ese producto no pertenece al pedido"}, status=400)
 
-            cantidad_pedida, precio_unitario = row
-            if cantidad > cantidad_pedida:
-                return JsonResponse({
-                    "error": f"No puedes devolver más de lo entregado ({cantidad_pedida})"
-                }, status=400)
-
-            cursor.execute("SELECT COALESCE(MAX(codigo), 0) + 1 FROM devolucion")
-            nuevo_codigo = cursor.fetchone()[0]
-
-            importe_devuelto = cantidad * precio_unitario
+            cantidad_pedida, precio_unitario = row[0], float(row[1])
 
             cursor.execute("""
-                INSERT INTO devolucion (codigo, fecha, cantidad, motivo, descripcion, entrega, cod_producto, pedido, importe)
-                VALUES (%s, CURDATE(), %s, %s, %s, %s, %s, %s, %s)
-            """, [nuevo_codigo, cantidad, motivo, descripcion, entrega_id, cod_producto, pedido_id, importe_devuelto])
+                SELECT COALESCE(SUM(cantidad), 0) FROM devolucion
+                WHERE pedido = %s AND cod_producto = %s
+            """, [pedido_id, cod_producto])
+            ya_devuelto = cursor.fetchone()[0]
 
-            # Solo la devolución completa (sin reemplazo) regresa el producto
-            # al stock del almacén. Con sustitución, el producto dañado se
-            # repone en el momento y no hay pieza "extra" que devolver.
+            if cantidad + ya_devuelto > cantidad_pedida:
+                disponible = cantidad_pedida - ya_devuelto
+                return JsonResponse({
+                    "error": f"Solo puedes devolver {disponible} pieza(s) de este producto"
+                }, status=400)
+
+            importe_devuelto = round(cantidad * precio_unitario, 2)
+
+            cursor.execute("""
+                INSERT INTO devolucion (fecha, cantidad, motivo, descripcion, entrega, cod_producto, pedido, importe)
+                VALUES (CURDATE(), %s, %s, %s, %s, %s, %s, %s)
+            """, [cantidad, motivo, descripcion, entrega_id, cod_producto, pedido_id, importe_devuelto])
+            nuevo_codigo = cursor.lastrowid
+
+            # Solo la devolución completa regresa producto al almacén: si es
+            # con sustitución, el repartidor repone la pieza en el momento
             if motivo == 'Devolución completa sin reemplazo':
-                cursor.execute("SELECT COALESCE(MAX(codigo), 0) + 1 FROM movimientos")
-                nuevo_mov = cursor.fetchone()[0]
-
                 cursor.execute("""
-                    INSERT INTO movimientos (codigo, observaciones, fecha, tipo_movimiento, devolucion, empleado)
-                    VALUES (%s, %s, NOW(), 'TM004', %s, %s)
-                """, [nuevo_mov, f"Devolución del pedido #{pedido_id}", nuevo_codigo, empleado_num])
+                    INSERT INTO movimientos (observaciones, fecha, tipo_movimiento, devolucion, empleado)
+                    VALUES (%s, NOW(), 'TM004', %s, %s)
+                """, [f"Devolución del pedido #{pedido_id}", nuevo_codigo, empleado_num])
+                nuevo_mov = cursor.lastrowid
 
                 cursor.execute("""
                     INSERT INTO detalle_movimiento (cod_movimientos, cod_producto, cantidad, precioUnitario, subtotal)
                     VALUES (%s, %s, %s, %s, %s)
-                """, [nuevo_mov, cod_producto, cantidad, precio_unitario, cantidad * precio_unitario])
+                """, [nuevo_mov, cod_producto, cantidad, precio_unitario, importe_devuelto])
 
-    return JsonResponse({"mensaje": "Devolución registrada correctamente", "devolucion_id": nuevo_codigo})
+            # El establecimiento se deriva del pedido, no viene en el body
+            cursor.execute("""
+                SELECT v.establecimiento FROM pedido p
+                INNER JOIN visita v ON v.numero = p.visita
+                WHERE p.num = %s
+            """, [pedido_id])
+            establecimiento_id = cursor.fetchone()[0]
 
+            # Si el pedido ya estaba cobrado, la devolución genera un
+            # reembolso: se registra como un pago negativo para que la
+            # cobranza cuadre con lo realmente recibido
+            cursor.execute("""
+                SELECT COALESCE(SUM(monto), 0) FROM pago WHERE pedido = %s
+            """, [pedido_id])
+            ya_cobrado = float(cursor.fetchone()[0] or 0)
+
+            reembolso = 0
+            if ya_cobrado > 0:
+                reembolso = importe_devuelto
+                cursor.execute("""
+                    INSERT INTO pago (monto, fecha, tipo_pago, empleado, establecimiento, pedido)
+                    VALUES (%s, NOW(), %s, %s, %s, %s)
+                """, [-reembolso, 'TP001', empleado_num, establecimiento_id, pedido_id])
+
+    return JsonResponse({
+        "mensaje": "Devolución registrada correctamente",
+        "devolucion_id": nuevo_codigo,
+        "importe_devuelto": importe_devuelto,
+        "reembolso": reembolso
+    }, json_dumps_params={'ensure_ascii': False})
 
 @csrf_exempt
 def confirmar_entrega_establecimiento(request):
@@ -600,29 +648,6 @@ def confirmar_entrega_establecimiento(request):
         "hora_entrega": hora_entrega
     })
 
-
-def ruta_entrega_view(request):
-    from django.shortcuts import render
-    return render(request, 'entregas/ruta_entrega.html')
-
-
-def pedidos_view(request):
-    from django.shortcuts import render
-    return render(request, 'entregas/pedidos.html')
-
-@rol_requerido('Almacenista', 'Administrador')
-def proximo_numero_entrega(request):
-    """
-    Muestra el folio que le tocaría a la siguiente entrega, solo
-    informativo — el número real se confirma hasta crear_entrega
-    (si alguien más crea una entrega entre medio, este número corre).
-    """
-    with connection.cursor() as cursor:
-        cursor.execute("SELECT COALESCE(MAX(numero), 0) + 1 FROM entrega")
-        siguiente = cursor.fetchone()[0]
-
-    return JsonResponse({"proximo_numero": siguiente})
-
 def entregas_disponibles(request):
     """
     Lista las entregas que ya arma el almacenista pero que todavía
@@ -660,6 +685,16 @@ def entregas_disponibles(request):
         e['fecha_creacion'] = e['fecha_creacion'].isoformat() if e['fecha_creacion'] else None
 
     return JsonResponse({"entregas": entregas}, json_dumps_params={'ensure_ascii': False})
+
+def ruta_entrega_view(request):
+    from django.shortcuts import render
+    return render(request, 'entregas/ruta_entrega.html')
+
+def pedidos_view(request):
+    from django.shortcuts import render
+    return render(request, 'entregas/pedidos.html')
+
+
 
 @csrf_exempt
 def tomar_entrega(request):
@@ -964,15 +999,13 @@ def estado_cobro_pedido(request, pedido_id):
         cursor.execute("""
             SELECT
                 p.total,
-                COALESCE(SUM(DISTINCT pg.monto), 0),
+                COALESCE((SELECT SUM(pg.monto) FROM pago pg WHERE pg.pedido = p.num), 0),
                 COALESCE((
                     SELECT SUM(d.importe) FROM devolucion d
                     WHERE d.pedido = p.num AND d.motivo = 'Devolución completa sin reemplazo'
                 ), 0)
             FROM pedido p
-            LEFT JOIN pago pg ON pg.pedido = p.num
             WHERE p.num = %s
-            GROUP BY p.num, p.total
         """, [pedido_id])
         row = cursor.fetchone()
 
@@ -991,3 +1024,14 @@ def estado_cobro_pedido(request, pedido_id):
         "pendiente": pendiente,
         "pagado": pendiente <= 0
     })
+    
+def proximo_numero_entrega(request):
+    """
+    Devuelve el número que tendría la siguiente entrega. Es solo
+    informativo — el número real lo asigna la base al insertar.
+    """
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT COALESCE(MAX(numero), 0) + 1 FROM entrega")
+        proximo = cursor.fetchone()[0]
+
+    return JsonResponse({"proximo_numero": proximo})

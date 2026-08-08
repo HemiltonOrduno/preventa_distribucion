@@ -222,9 +222,10 @@ def iniciar_visita(request):
 
             cursor.execute("""
                 INSERT INTO visita
-                    (numero, observaciones, fecha, ruta_visita, establecimiento, empleado, edo_visita)
-                VALUES (%s, NULL, NOW(), %s, %s, %s, 'EVI002')
-            """, [nueva_visita, ruta_visita_id, establecimiento_id, empleado_num])
+                    (observaciones, fecha, ruta_visita, establecimiento, empleado, edo_visita)
+                VALUES (NULL, NOW(), %s, %s, %s, 'EVI002')
+            """, [ruta_visita_id, establecimiento_id, empleado_num])
+            nueva_visita = cursor.lastrowid
 
     return JsonResponse({
         "mensaje": "Visita iniciada, en camino",
@@ -288,13 +289,11 @@ def levantar_pedido(request, visita_id):
                     {"error": "La visita debe estar en proceso para levantar el pedido"},
                     status=409)
 
-            cursor.execute("SELECT COALESCE(MAX(num), 0) + 1 FROM pedido")
-            nuevo_pedido = cursor.fetchone()[0]
-
             cursor.execute("""
-                INSERT INTO pedido (num, observaciones, iva, total, fecha, subtotal, visita, entrega, edo_pedido)
-                VALUES (%s, %s, 0, 0, NOW(), 0, %s, NULL, 'EPD001')
-            """, [nuevo_pedido, observaciones, visita_id])
+                INSERT INTO pedido (observaciones, iva, total, fecha, subtotal, visita, entrega, edo_pedido)
+                VALUES (%s, 0, 0, NOW(), 0, %s, NULL, 'EPD001')
+            """, [observaciones, visita_id])
+            nuevo_pedido = cursor.lastrowid
 
             for p in productos:
                 cod_producto = p['cod_producto']
@@ -690,13 +689,11 @@ def confirmar_pedido(request, pedido_id):
                 return JsonResponse({"error": "El pedido ya no está pendiente de validación"}, status=400)
 
             # Salida por pedido: el INSERT en detalle_movimiento dispara el trigger
-            cursor.execute("SELECT COALESCE(MAX(codigo), 0) + 1 FROM movimientos")
-            nuevo_mov = cursor.fetchone()[0]
-
             cursor.execute("""
-                INSERT INTO movimientos (codigo, observaciones, fecha, tipo_movimiento, empleado)
-                VALUES (%s, %s, NOW(), 'TM002', %s)
-            """, [nuevo_mov, f"Salida por validación del pedido #{pedido_id}", empleado_num])
+                INSERT INTO movimientos (observaciones, fecha, tipo_movimiento, empleado)
+                VALUES (%s, NOW(), 'TM002', %s)
+            """, [f"Salida por validación del pedido #{pedido_id}", empleado_num])
+            nuevo_mov = cursor.lastrowid
 
             for cod, _nombre, cantidad, _stock, precio in lineas:
                 cursor.execute("""
