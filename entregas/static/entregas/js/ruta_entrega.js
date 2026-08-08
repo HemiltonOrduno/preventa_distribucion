@@ -807,3 +807,28 @@ function seleccionarTipoDevolucion(tipo, btn) {
     confirmar.innerText = TIPOS_DEVOLUCION[tipo].etiqueta;
 }
 
+/* Dibuja un camion con la caja rellenandose segun el porcentaje de
+       carga (pct), usando clip-path para que el relleno no se salga
+       de los bordes redondeados de la caja. */
+    function svgCamion(pct, color, id) {
+        const alturaCaja = 45;
+        const relleno = Math.max(0, Math.min(100, pct)) / 100 * alturaCaja;
+        const yRelleno = 30 + (alturaCaja - relleno);
+
+        return `
+            <svg viewBox="0 0 200 100" role="img" aria-label="Camion cargado al ${pct} por ciento">
+                <defs>
+                    <clipPath id="cajaClip${id}">
+                        <rect x="18" y="30" width="110" height="${alturaCaja}" rx="4"/>
+                    </clipPath>
+                </defs>
+                <rect x="18" y="30" width="110" height="${alturaCaja}" rx="4"
+                      fill="none" stroke="#999" stroke-width="2"/>
+                <rect x="18" y="${yRelleno}" width="110" height="${relleno}"
+                      fill="${color}" clip-path="url(#cajaClip${id})"/>
+                <path d="M128 45 h34 l16 20 v10 h-50 z" fill="none" stroke="#999" stroke-width="2"/>
+                <circle cx="50" cy="80" r="10" fill="white" stroke="#999" stroke-width="2"/>
+                <circle cx="150" cy="80" r="10" fill="white" stroke="#999" stroke-width="2"/>
+            </svg>
+        `;
+    }
