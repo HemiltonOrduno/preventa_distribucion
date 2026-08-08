@@ -568,14 +568,14 @@ def rutas_visita_todas(request):
                 rv.dia,
                 erv.nombre AS estado,
                 z.nombre AS zona,
-                CONCAT(em.empNombre, ' ', em.empApellPat) AS vendedor_asignado,
+                COALESCE(CONCAT(em.empNombre, ' ', em.empApellPat), 'Sin asignar') AS vendedor,
                 em.num AS vendedor_id,
                 COUNT(v.numero) AS total_establecimientos,
                 SUM(CASE WHEN ev.nombre IN ('Completada', 'Completada sin pedido') THEN 1 ELSE 0 END) AS completadas
             FROM ruta_visita rv
             INNER JOIN edo_ruta_visita erv ON erv.codigo = rv.edo_ruta_visita
             INNER JOIN zona z ON z.num = rv.zona
-            INNER JOIN empleado em ON em.num = rv.empleado
+            LEFT JOIN empleado em ON em.num = rv.empleado
             LEFT JOIN visita v ON v.ruta_visita = rv.numero
             LEFT JOIN edo_visita ev ON ev.codigo = v.edo_visita
             WHERE erv.nombre != 'Inactiva'

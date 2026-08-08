@@ -4,7 +4,6 @@
 -- Sistema de Preventa y Distribución — Sabritas Tijuana
 -- Incluye los cambios aplicados durante el desarrollo
 -- =============================================================
-
 CREATE DATABASE inpredis_db;
 USE inpredis_db;
 
@@ -442,3 +441,6 @@ CREATE TABLE DETALLE_MOVIMIENTO(
     FOREIGN KEY (cod_movimientos) REFERENCES MOVIMIENTOS(codigo),
     FOREIGN KEY (cod_producto) REFERENCES PRODUCTO(codigo)
 );
+
+SHOW TABLES LIKE 'django_%';
+SELECT app, name FROM django_migrations WHERE app IN ('contenttypes','auth','admin','sessions');
