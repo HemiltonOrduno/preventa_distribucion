@@ -495,3 +495,38 @@ a { text-decoration: none; color: inherit; }
 #tarjeta-cvv.input-invalido {
     border-color: var(--color-danger-text);
 }
+
+/*===== PRODUCTOS CANCELADOS (dentro del modal de parada) =====*/
+.cancelados-titulo {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--color-warning-text);
+    margin-bottom: 8px;
+}
+
+.producto-cancelado-item {
+    background: var(--color-warning-bg);
+    border: 1px solid #ffe0b2;
+    border-radius: .6rem;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+}
+
+.producto-cancelado-item .producto-nombre {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.producto-cancelado-detalle {
+    font-size: 11px;
+    color: var(--color-text-muted);
+    margin-top: 2px;
+}
+
+.producto-cancelado-fecha {
+    font-size: 11px;
+    color: var(--color-warning-text);
+    font-weight: 600;
+    margin-top: 4px;
+}

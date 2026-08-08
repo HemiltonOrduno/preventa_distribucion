@@ -212,7 +212,8 @@ def mi_ruta(request):
         # Obtener paradas con orden
         cursor.execute("""
             SELECT e.numero AS establecimiento_id, e.nombre, e.latitud AS lat,
-                    e.longitud AS lon, e.estColonia AS colonia,
+                   e.longitud AS lon, e.estCalle AS calle, e.estNumero AS num_ext,
+                   e.estColonia AS colonia,
                     p.num AS pedido_id, p.total AS subtotal,
                    CONCAT(rep.repNombre, ' ', rep.repApellPat) AS representante,
                    rep.telefono,
@@ -283,11 +284,30 @@ def detalle_pedido(request, pedido_id):
         columns = [col[0] for col in cursor.description]
         productos = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
+        cursor.execute("""
+            SELECT pcp.cod_producto, pr.nombre, pcp.cantidad_solicitada,
+                   pcp.fecha_disponible_estimada, pcp.motivo
+            FROM producto_cancelado_pedido pcp
+            INNER JOIN producto pr ON pr.codigo = pcp.cod_producto
+            WHERE pcp.num_pedido = %s
+            ORDER BY pcp.fecha_cancelacion DESC
+        """, [pedido_id])
+        columns = [col[0] for col in cursor.description]
+        cancelados = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
     for p in productos:
         p['precioUnitario'] = float(p['precioUnitario'])
         p['importe'] = float(p['importe'])
 
-    return JsonResponse({"productos": productos}, json_dumps_params={'ensure_ascii': False})
+    for c in cancelados:
+        c['fecha_disponible_estimada'] = (
+            c['fecha_disponible_estimada'].isoformat() if c['fecha_disponible_estimada'] else None
+        )
+
+    return JsonResponse({
+        "productos": productos,
+        "cancelados": cancelados
+    }, json_dumps_params={'ensure_ascii': False})
 
 
 @csrf_exempt

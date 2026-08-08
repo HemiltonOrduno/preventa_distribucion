@@ -309,7 +309,8 @@ function abrirModalParada(parada) {
     actualizarEstadoCobroModal(parada.pedido_id);
 
     document.getElementById('modal-est-nombre').innerText = parada.nombre;
-    document.getElementById('modal-est-direccion').innerText = parada.colonia;
+    document.getElementById('modal-est-direccion').innerText =
+        `${parada.calle} ${parada.num_ext}, ${parada.colonia}`;
     document.getElementById('cobro-est-nombre').innerText = parada.nombre;
     document.getElementById('dev-est-nombre').innerText = parada.nombre;
 
@@ -346,7 +347,9 @@ function abrirModalParada(parada) {
     `;
 
     // Cargar detalle del pedido
+    // Cargar detalle del pedido
     document.getElementById('modal-productos').innerHTML = '';
+    document.getElementById('modal-productos-cancelados').innerHTML = '';
     fetch(`/api/entregas/pedido/${parada.pedido_id}/detalle/`)
         .then(res => res.json())
         .then(data => {
@@ -364,6 +367,25 @@ function abrirModalParada(parada) {
                     `;
                 });
                 document.getElementById('modal-productos').innerHTML = html;
+            }
+
+            if (data.cancelados && data.cancelados.length > 0) {
+                let htmlCancel = '<div class="modal-divider"></div><div class="cancelados-titulo">⚠️ Productos no disponibles</div>';
+                data.cancelados.forEach(c => {
+                    const fechaTexto = c.fecha_disponible_estimada
+                        ? new Date(c.fecha_disponible_estimada + 'T00:00:00').toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                        : 'Sin fecha estimada';
+                    htmlCancel += `
+                        <div class="producto-cancelado-item">
+                            <div class="producto-nombre">${c.nombre}</div>
+                            <div class="producto-cancelado-detalle">
+                                Solicitado: ${c.cantidad_solicitada} piezas · ${c.motivo || 'Sin stock disponible'}
+                            </div>
+                            <div class="producto-cancelado-fecha">📅 Disponible aprox.: ${fechaTexto}</div>
+                        </div>
+                    `;
+                });
+                document.getElementById('modal-productos-cancelados').innerHTML = htmlCancel;
             }
         });
 

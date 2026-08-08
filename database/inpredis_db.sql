@@ -443,3 +443,15 @@ ALTER TABLE devolucion ADD FOREIGN KEY (cod_producto) REFERENCES producto(codigo
 ALTER TABLE devolucion ADD COLUMN pedido INT NULL;
 ALTER TABLE devolucion ADD COLUMN importe DECIMAL(10,2) NULL;
 ALTER TABLE devolucion ADD FOREIGN KEY (pedido) REFERENCES pedido(num);
+
+CREATE TABLE producto_cancelado_pedido (
+    num_pedido INT NOT NULL,
+    cod_producto VARCHAR(10) NOT NULL,
+    cantidad_solicitada INT NOT NULL,
+    fecha_cancelacion DATETIME NOT NULL,
+    fecha_disponible_estimada DATE,
+    motivo VARCHAR(200),
+    PRIMARY KEY (num_pedido, cod_producto, fecha_cancelacion),
+    FOREIGN KEY (num_pedido) REFERENCES pedido(num),
+    FOREIGN KEY (cod_producto) REFERENCES producto(codigo)
+);
