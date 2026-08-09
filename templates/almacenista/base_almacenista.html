@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
     <title>{% block title %}Panel Almacenista{% endblock %} - Sabritas Tijuana</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -165,38 +166,187 @@
 
         {% block extra_styles %}{% endblock %}
     </style>
+    <style>
+    .badge-pendientes {
+        display: none;
+        background: #c62828;
+        color: white;
+        border-radius: 50%;
+        min-width: 18px;
+        height: 18px;
+        font-size: 11px;
+        font-weight: bold;
+        line-height: 18px;
+        text-align: center;
+        margin-left: 6px;
+        padding: 0 4px;
+    }
+</style>
+
+<script>
+    // Avisa al almacenista que hay mercancía devuelta esperando entrada
+    function revisarDevolucionesPendientes() {
+        fetch('/api/inventario/devoluciones-pendientes/')
+            .then(r => r.json())
+            .then(d => {
+                const n = (d.devoluciones || []).length;
+                const badge = document.getElementById('badge-devoluciones');
+                if (!badge) return;
+                if (n > 0) {
+                    badge.innerText = n;
+                    badge.style.display = 'inline-block';
+                } else {
+                    badge.style.display = 'none';
+                }
+            })
+            .catch(() => {});
+    }
+
+    revisarDevolucionesPendientes();
+    setInterval(revisarDevolucionesPendientes, 60000);
+</script>
+
+<style>
+    /* La navegacion pasa de barra lateral a barra superior flotante,
+       igual que en coordinador y vendedor. Se unifica el azul del sistema. */
+    body {
+        display: block;
+        background: #f4f6fb;
+        font-family: 'Roboto', sans-serif;
+        padding: 14px;
+        height: auto;
+    }
+    #sidebar-left { display: none; }
+
+    .top-nav {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        background: #fff;
+        padding: 10px 18px;
+        border-radius: 18px;
+        box-shadow: 0 4px 18px rgba(26,35,126,.08);
+        margin-bottom: 14px;
+    }
+    .top-nav__brand {
+        font-family: 'Sora', sans-serif;
+        font-weight: 700;
+        font-size: 15px;
+        color: #1a237e;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        white-space: nowrap;
+    }
+    .top-nav__links { display: flex; gap: 6px; flex: 1; overflow-x: auto; }
+    .top-nav__link {
+        color: #8a8fa3;
+        text-decoration: none;
+        font-size: 13px;
+        padding: 8px 14px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+        transition: background .15s, color .15s;
+    }
+    .top-nav__link:hover { background: #f0f2f8; color: #1a237e; }
+    .top-nav__link.active { background: #e8eaf6; color: #1a237e; font-weight: 600; }
+
+    .top-nav__avatar {
+        width: 38px; height: 38px;
+        border-radius: 50%;
+        background: #e8eaf6; color: #1a237e;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; font-size: 13px; font-weight: 700; flex-shrink: 0;
+    }
+    .top-nav__avatar:hover { background: #d7dcf5; }
+
+    .perfil {
+        position: fixed; display: none;
+        background: #fff; border-radius: 14px;
+        box-shadow: 0 8px 28px rgba(0,0,0,.16);
+        padding: 14px; gap: 12px; align-items: center;
+        z-index: 3000; min-width: 250px;
+    }
+    .perfil--abierto { display: flex; }
+    .perfil__avatar {
+        width: 42px; height: 42px; border-radius: 50%;
+        background: #e8eaf6; color: #1a237e;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 15px; font-weight: 700; flex-shrink: 0;
+    }
+    .perfil__datos { flex: 1; min-width: 0; }
+    .perfil__nombre { font-size: 14px; font-weight: 600; color: #333; }
+    .perfil__rol { font-size: 12px; color: #888; }
+    .perfil__email { font-size: 11px; color: #aaa; }
+    .perfil__logout {
+        background: none; border: none;
+        color: #c62828; font-size: 20px;
+        padding: 8px; border-radius: 8px; cursor: pointer;
+    }
+    .perfil__logout:hover { background: #fbeaea; }
+
+    /* El contenido ya no comparte fila con la barra lateral */
+    #contenido {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        height: calc(100vh - 100px);
+        background: transparent;
+    }
+    #page-header {
+        background: #fff;
+        border-radius: 14px;
+        margin-bottom: 12px;
+        color: #1a237e;
+        justify-content: center;
+    }
+    #page-body { background: transparent; }
+
+    .badge-pendientes {
+        display: none;
+        background: #c62828; color: #fff;
+        border-radius: 50%;
+        min-width: 18px; height: 18px;
+        font-size: 11px; font-weight: bold;
+        line-height: 18px; text-align: center;
+        margin-left: 4px; padding: 0 4px;
+    }
+</style>
+
 </head>
 <body>
 
-<div id="sidebar-left">
-    <a href="/api/visitas/almacenista/pedidos/" class="logo">
-        📦 Sabritas Tijuana
-        <span>Panel del Almacenista</span>
-    </a>
-    <nav>
-        <a href="/api/visitas/almacenista/pedidos/" class="{% block nav_pedidos %}{% endblock %}">
-            <span class="icon">📋</span> Pedidos pendientes
+<nav class="top-nav">
+    <div class="top-nav__brand">📦 INPREDISROUTE</div>
+    <div class="top-nav__links">
+        <a href="/api/visitas/almacenista/pedidos/" class="top-nav__link {% block nav_pedidos %}{% endblock %}">
+            📋 Pedidos pendientes
         </a>
-        <a href="/api/inventario/almacenista/movimientos/" class="{% block nav_inventario %}{% endblock %}">
-            <span class="icon">📦</span> Inventario
+        <a href="/api/inventario/almacenista/movimientos/" class="top-nav__link {% block nav_movimientos %}{% endblock %}">
+            📦 Inventario
+            <span class="badge-pendientes" id="badge-devoluciones"></span>
         </a>
-        <a href="/api/entregas/almacenista/cargar-camion/" class="{% block nav_entregas %}{% endblock %}">
-            <span class="icon">🚚</span> Cargar camión
+        <a href="/api/entregas/almacenista/cargar-camion/" class="top-nav__link {% block nav_entregas %}{% endblock %}">
+            🚚 Cargar camión
         </a>
-        <a href="/api/productos/almacenista/nuevo/" class="{% block nav_productos %}{% endblock %}">
-            <span class="icon">🏷️</span> Nuevo producto
+        <a href="/api/productos/almacenista/nuevo/" class="top-nav__link {% block nav_productos %}{% endblock %}">
+            🏷️ Nuevo producto
         </a>
-    </nav>
-
-    <div id="perfil-widget">
-        <div id="perfil-avatar">--</div>
-        <div id="perfil-info">
-            <div id="perfil-nombre">Cargando...</div>
-            <div id="perfil-rol"></div>
-            <div id="perfil-email"></div>
-        </div>
-        <button id="btn-logout" title="Cerrar sesión" onclick="cerrarSesion()">⏻</button>
     </div>
+    <div class="top-nav__avatar" id="perfil-avatar" onclick="togglePerfil(event)">--</div>
+</nav>
+
+<div class="perfil" id="menuPerfil">
+    <div class="perfil__avatar" id="perfil-avatar-panel">--</div>
+    <div class="perfil__datos">
+        <div class="perfil__nombre" id="perfil-nombre">Cargando...</div>
+        <div class="perfil__rol" id="perfil-rol"></div>
+        <div class="perfil__email" id="perfil-email"></div>
+    </div>
+    <button class="perfil__logout" title="Cerrar sesión" onclick="cerrarSesion()">⏻</button>
 </div>
 
 <div id="contenido">
@@ -238,12 +388,50 @@
 
             const iniciales = data.nombre.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
             document.getElementById('perfil-avatar').textContent = iniciales;
+            document.getElementById('perfil-avatar-panel').textContent = iniciales;
         } catch (e) {
             document.getElementById('perfil-nombre').textContent = 'Sesión activa';
         }
     }
 
+    var menuPerfil = document.getElementById("menuPerfil");
+
+    function togglePerfil(e){
+        e.preventDefault();
+        e.stopPropagation();
+        if (menuPerfil.classList.toggle("perfil--abierto")){
+            var r = e.currentTarget.getBoundingClientRect();
+            var izq = r.right - menuPerfil.offsetWidth;
+            menuPerfil.style.left = (izq < 12 ? 12 : izq) + "px";
+            menuPerfil.style.top = (r.bottom + 10) + "px";
+        }
+    }
+
+    document.addEventListener("click", function(){
+        menuPerfil.classList.remove("perfil--abierto");
+    });
+    menuPerfil.addEventListener("click", function(e){ e.stopPropagation(); });
+
+    var menuPerfil = document.getElementById("menuPerfil");
+
+    function togglePerfil(e){
+        e.preventDefault();
+        e.stopPropagation();
+        if (menuPerfil.classList.toggle("perfil--abierto")){
+            var r = e.currentTarget.getBoundingClientRect();
+            var izq = r.right - menuPerfil.offsetWidth;
+            menuPerfil.style.left = (izq < 12 ? 12 : izq) + "px";
+            menuPerfil.style.top = (r.bottom + 10) + "px";
+        }
+    }
+
+    document.addEventListener("click", function(){
+        menuPerfil.classList.remove("perfil--abierto");
+    });
+    menuPerfil.addEventListener("click", function(e){ e.stopPropagation(); });
+
     cargarPerfil();
+
 </script>
 {% block extra_scripts %}{% endblock %}
 </body>

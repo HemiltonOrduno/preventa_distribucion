@@ -156,7 +156,7 @@
 
             select.innerHTML = '<option value="">Selecciona una devolución...</option>' +
                 devolucionesPendientes.map(d =>
-                    `<option value="${d.codigo}">Devolución #${d.codigo} — Entrega #${d.entrega} — ${d.cantidad} pza(s) — ${d.motivo} (${d.fecha})</option>`
+                    `<option value="${d.codigo}">Devolución #${d.codigo} — ${d.producto || 'Producto'} — ${d.cantidad} pza(s) — ${d.establecimiento || 'Sin establecimiento'} (${d.fecha})</option>`
                 ).join('');
         } catch (e) {
             select.innerHTML = '<option value="">Error al cargar devoluciones</option>';

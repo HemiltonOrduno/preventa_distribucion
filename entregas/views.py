@@ -529,19 +529,6 @@ def registrar_devolucion(request):
             """, [cantidad, motivo, descripcion, entrega_id, cod_producto, pedido_id, importe_devuelto])
             nuevo_codigo = cursor.lastrowid
 
-            # Solo la devolución completa regresa producto al almacén: si es
-            # con sustitución, el repartidor repone la pieza en el momento
-            if motivo == 'Devolución completa sin reemplazo':
-                cursor.execute("""
-                    INSERT INTO movimientos (observaciones, fecha, tipo_movimiento, devolucion, empleado)
-                    VALUES (%s, NOW(), 'TM004', %s, %s)
-                """, [f"Devolución del pedido #{pedido_id}", nuevo_codigo, empleado_num])
-                nuevo_mov = cursor.lastrowid
-
-                cursor.execute("""
-                    INSERT INTO detalle_movimiento (cod_movimientos, cod_producto, cantidad, precioUnitario, subtotal)
-                    VALUES (%s, %s, %s, %s, %s)
-                """, [nuevo_mov, cod_producto, cantidad, precio_unitario, importe_devuelto])
 
             # El establecimiento se deriva del pedido, no viene en el body
             cursor.execute("""

@@ -4,74 +4,79 @@
 {% block nav_rutas_entrega %}active{% endblock %}
 
 {% block main_content %}
-<div id="contenido">
-    <div id="page-header">
-        🚚 Gestionar Rutas de Entrega
-    </div>
-    <div id="page-body">
-        <div class="filtro-estado">
-            <button class="active" onclick="filtrar('por-crear', this)">📦 Por crear ruta</button>
-            <button onclick="filtrar('todas', this)">Todas</button>
-            <button onclick="filtrar('En camino', this)">En camino</button>
-            <button onclick="filtrar('Pausada', this)">Pausadas</button>
+<div id="page-header">
+    🚚 Gestionar Rutas de Entrega
+</div>
+<div id="page-body" style="padding:0;overflow:hidden;">
+    <div id="layout">
+
+        <!-- PANEL NORMAL: lista de rutas -->
+        <div id="panel-rutas">
+            <div id="panel-rutas-header">
+                <div style="font-size:13px;font-weight:bold;color:#333;">Rutas de entrega</div>
+            </div>
+            <div class="filtro-estado" style="padding:8px 12px;">
+                <button class="active" onclick="filtrar('por-crear', this)">📦 Por crear</button>
+                <button onclick="filtrar('todas', this)">Todas</button>
+                <button onclick="filtrar('En camino', this)">En camino</button>
+                <button onclick="filtrar('Pausada', this)">Pausadas</button>
+            </div>
+            <div id="loading" style="padding:20px;text-align:center;color:#888;font-size:13px;">
+                Cargando rutas de entrega...
+            </div>
+            <div id="lista-rutas" style="flex:1;overflow-y:auto;padding:8px;"></div>
         </div>
 
-        <div id="loading">Cargando rutas de entrega...</div>
-        <div id="lista-rutas"></div>
+        <!-- PANEL EDICION: reemplaza al de la lista al abrir una ruta -->
+        <div id="panel-edicion" style="display:none;flex-direction:column;">
+            <div id="panel-edicion-header">
+                <div id="edicion-titulo" style="font-size:13px;font-weight:bold;color:#1a237e;">Ruta</div>
+                <button onclick="cerrarEdicion()"
+                        style="padding:5px 10px;background:#f0f2f5;border:none;border-radius:5px;font-size:11px;cursor:pointer;">✕</button>
+            </div>
 
-        <!-- MODAL MAPA -->
-        <div id="modal-overlay" onclick="cerrarModalClick(event)">
-            <div id="modal">
-                <div id="modal-header">
-                    <h3 id="modal-titulo">Ruta de entrega</h3>
-                    <button onclick="cerrarModal()">×</button>
-                </div>
-                <div id="modal-body">
-                    <div id="modal-map"></div>
-                    <div id="modal-paradas">
-                        <div id="modal-paradas-header">
-                            Orden de paradas
-                            <span>Arrastra para reordenar</span>
-                        </div>
-                        <div id="sortable-paradas"></div>
-                        <div id="panel-aprobar" style="display:none;padding:12px;border-top:1px solid #dee2e6;background:#f8f9fa;">
-                            <div class="form-group" style="margin-bottom:10px;">
-                                <label>Nombre de la ruta</label>
-                                <input type="text" id="apr-nombre" readonly
-                                       style="background:#f0f2f5;color:#555;cursor:not-allowed;">
-                            </div>
-                            <div class="form-group" style="margin-bottom:10px;">
-                                <label>Descripción</label>
-                                <textarea id="apr-descripcion" placeholder="Opcional..."></textarea>
-                            </div>
-                            <div class="form-group" style="margin-bottom:10px;">
-                                <label>Repartidor</label>
-                                <select id="apr-repartidor">
-                                    <option value="">Dejar disponible para cualquiera</option>
-                                </select>
-                            </div>
-                            <button class="btn-guardar" style="width:100%;padding:10px;"
-                                    onclick="aprobarRuta()">✓ Liberar ruta</button>
-                        </div>
+            <div id="modal-paradas-header" style="padding:8px 12px;">
+                Orden de paradas
+                <span>Arrastra para reordenar</span>
+            </div>
+            <div id="sortable-paradas" style="flex:1;overflow-y:auto;padding:8px;"></div>
 
-                        <div id="modal-footer">
-                            <button class="btn-resetear" onclick="resetearOrden()">↺ Resetear</button>
-                            <button class="btn-guardar" onclick="guardarOrden()">✓ Guardar orden</button>
-                        </div>
-                    </div>
+            <div id="panel-aprobar" style="display:none;padding:12px;border-top:1px solid #dee2e6;background:#f8f9fa;">
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label>Nombre de la ruta</label>
+                    <input type="text" id="apr-nombre" readonly
+                           style="background:#f0f2f5;color:#555;cursor:not-allowed;">
                 </div>
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label>Descripción</label>
+                    <textarea id="apr-descripcion" placeholder="Opcional..."></textarea>
+                </div>
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label>Repartidor</label>
+                    <select id="apr-repartidor">
+                        <option value="">Dejar disponible para cualquiera</option>
+                    </select>
+                </div>
+                <button class="btn-guardar" style="width:100%;padding:10px;"
+                        onclick="aprobarRuta()">✓ Liberar ruta</button>
+            </div>
+
+            <div id="modal-footer">
+                <button class="btn-resetear" onclick="resetearOrden()">↺ Resetear</button>
+                <button class="btn-guardar" onclick="guardarOrden()">✓ Guardar orden</button>
             </div>
         </div>
 
-        <div class="toast" id="toast"></div>
+        <!-- MAPA PRINCIPAL: siempre visible -->
+        <div id="mapa-rutas"><div id="modal-map" style="width:100%;height:100%;"></div></div>
     </div>
+
+    <div class="toast" id="toast"></div>
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
 {% load static %}
-<script src="{% static 'rutas/js/leaflet.js' %}"></script>
-<script src="{% static 'rutas/js/sortable.min.js' %}"></script>
 <script>
 let todasLasRutas = [];
 let mapaModal = null;
@@ -83,9 +88,17 @@ let entregaActualId = null;
 let sortable = null;
 let repartidores = [];
 let estadoRutaActual = null;
+let mapaPrincipal = null;
+let rutaLayerPrincipal = null;
+let marcadoresPrincipal = [];
 
 window.addEventListener('load', () => {
     cargarRutas();
+    mapaModal = L.map('modal-map', { center: [32.5149, -117.0382], zoom: 12 });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(mapaModal);
+
     fetch('/api/rutas/repartidores-disponibles/')
         .then(r => r.json())
         .then(d => { repartidores = d.repartidores || []; });
@@ -147,6 +160,10 @@ function renderizar(rutas, porCrear) {
 
         const div = document.createElement('div');
         div.className = 'card';
+        div.onclick = (e) => {
+            if (!e.target.closest('button')) verRutaEnMapaPrincipal(r.entrega_id);
+        };
+        div.style.cursor = 'pointer';
         div.innerHTML = `
             <div class="card-header">
                 <div class="card-title">${porCrear ? 'Entrega #' + r.entrega_id : r.nombre}</div>
@@ -174,10 +191,11 @@ function abrirMapa(rutaId, entregaId, nombre, estado) {
     rutaActualId = rutaId;
     entregaActualId = entregaId;
     estadoRutaActual = estado;
-    document.getElementById('modal-titulo').innerText = nombre;
-    document.getElementById('modal-overlay').classList.add('visible');
+    document.getElementById('edicion-titulo').innerText = nombre;
 
-    // Solo las rutas recién creadas por el almacenista se pueden liberar
+    document.getElementById('panel-rutas').style.display = 'none';
+    document.getElementById('panel-edicion').style.display = 'flex';
+
     const panel = document.getElementById('panel-aprobar');
     const footer = document.getElementById('modal-footer');
     if (estado === 'Creada') {
@@ -202,14 +220,7 @@ function abrirMapa(rutaId, entregaId, nombre, estado) {
         footer.style.display = 'flex';
     }
 
-    if (mapaModal) {
-        mapaModal.remove();
-        mapaModal = null;
-        rutaLayer = null;
-        marcadoresModal = [];
-    }
-
-    setTimeout(() => {
+    if (!mapaModal) {
         mapaModal = L.map('modal-map', {
             center: [32.5149, -117.0382],
             zoom: 12, minZoom: 11, maxZoom: 18
@@ -217,7 +228,10 @@ function abrirMapa(rutaId, entregaId, nombre, estado) {
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(mapaModal);
+    }
 
+    setTimeout(() => {
+        mapaModal.invalidateSize();
         cargarRutaEnMapa(entregaId);
     }, 100);
 }
@@ -387,24 +401,20 @@ function guardarOrden() {
     .then(data => {
         if (data.error) { alert('Error: ' + data.error); return; }
         mostrarToast('✓ Orden de ruta guardado correctamente');
-        cerrarModal();
+        cerrarEdicion();
     })
     .catch(() => alert('Error de conexión'));
 }
 
-function cerrarModal() {
-    document.getElementById('modal-overlay').classList.remove('visible');
-    if (mapaModal) {
-        mapaModal.remove();
-        mapaModal = null;
-        rutaLayer = null;
-        marcadoresModal = [];
-    }
+function cerrarEdicion() {
+    document.getElementById('panel-edicion').style.display = 'none';
+    document.getElementById('panel-rutas').style.display = 'flex';
+    rutaActualId = null;
+    entregaActualId = null;
+    estadoRutaActual = null;
+    setTimeout(() => mapaModal && mapaModal.invalidateSize(), 100);
 }
 
-function cerrarModalClick(e) {
-    if (e.target === document.getElementById('modal-overlay')) cerrarModal();
-}
 
 function aprobarRuta() {
     const nombre = document.getElementById('apr-nombre').value.trim();
@@ -440,10 +450,54 @@ function aprobarRuta() {
         mostrarToast(data.asignada
             ? '✓ Ruta creada y asignada al repartidor'
             : '✓ Ruta creada, disponible para cualquier repartidor');
-        cerrarModal();
+        cerrarEdicion();
         setTimeout(() => location.reload(), 1200);
     })
     .catch(() => alert('Error de conexión'));
+}
+
+function inicializarMapaPrincipal() {
+    mapaPrincipal = L.map('mapa-rutas', {
+        center: [32.5149, -117.0382],
+        zoom: 12
+    });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(mapaPrincipal);
+}
+
+/* Dibuja en el mapa grande la ruta de la tarjeta que se seleccionó */
+function verRutaEnMapaPrincipal(entregaId) {
+    if (rutaLayerPrincipal) { mapaPrincipal.removeLayer(rutaLayerPrincipal); rutaLayerPrincipal = null; }
+    marcadoresPrincipal.forEach(m => mapaPrincipal.removeLayer(m));
+    marcadoresPrincipal = [];
+
+    fetch(`/api/rutas/entrega/${entregaId}/ruta/`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) return;
+
+            const coords = data.geometria.coordinates.map(c => [c[1], c[0]]);
+            rutaLayerPrincipal = L.polyline(coords, {
+                color: '#1565c0', weight: 4, opacity: .8
+            }).addTo(mapaPrincipal);
+
+            data.paradas.forEach((p, i) => {
+                const color = p.tipo === 'almacen' ? '#7b1fa2' : '#1565c0';
+                const icono = L.divIcon({
+                    className: '',
+                    html: `<div style="background:${color};color:#fff;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:bold;border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,.3);">${i}</div>`,
+                    iconAnchor: [12, 12]
+                });
+                marcadoresPrincipal.push(
+                    L.marker([p.lat, p.lon], { icon: icono })
+                        .addTo(mapaPrincipal)
+                        .bindPopup(`<b>${p.nombre}</b>`)
+                );
+            });
+
+            mapaPrincipal.fitBounds(rutaLayerPrincipal.getBounds(), { padding: [30, 30] });
+        });
 }
 
 function mostrarToast(msg) {

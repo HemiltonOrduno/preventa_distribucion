@@ -105,10 +105,17 @@ def devoluciones_pendientes(request):
     """
     with connection.cursor() as cursor:
         cursor.execute("""
-            SELECT d.codigo, d.fecha, d.cantidad, d.motivo, d.entrega
+            SELECT d.codigo, d.fecha, d.cantidad, d.motivo, d.entrega,
+                   d.cod_producto, pr.nombre AS producto,
+                   pr.imagen, d.pedido, e.nombre AS establecimiento
             FROM devolucion d
             LEFT JOIN movimientos m ON m.devolucion = d.codigo
+            LEFT JOIN producto pr ON pr.codigo = d.cod_producto
+            LEFT JOIN pedido p ON p.num = d.pedido
+            LEFT JOIN visita v ON v.numero = p.visita
+            LEFT JOIN establecimiento e ON e.numero = v.establecimiento
             WHERE m.codigo IS NULL
+              AND d.motivo = 'Devolución completa sin reemplazo'
             ORDER BY d.fecha DESC, d.codigo DESC
         """)
         columns = [col[0] for col in cursor.description]
@@ -116,6 +123,8 @@ def devoluciones_pendientes(request):
 
     for dev in devoluciones:
         dev['fecha'] = dev['fecha'].strftime('%d/%m/%Y') if dev['fecha'] else None
+        if dev.get('imagen') and dev['imagen'].startswith('/img/'):
+            dev['imagen'] = '/static' + dev['imagen']
 
     return JsonResponse({"devoluciones": devoluciones}, json_dumps_params={'ensure_ascii': False})
 

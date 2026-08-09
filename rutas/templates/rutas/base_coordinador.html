@@ -4,61 +4,225 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Dashboard Coordinador{% endblock %} - Sabritas Tijuana</title>
-    <link rel="stylesheet" href="{% static 'rutas/css/leaflet.css' %}">
-    <link rel="stylesheet" href="{% static 'rutas/css/boxicons.min.css' %}">
-    <link rel="stylesheet" href="{% static 'rutas/css/coordinador.css' %}">
 
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/boxicons@2.0.5/css/boxicons.min.css" rel="stylesheet">
+
+    <link rel="stylesheet" href="{% static 'rutas/css/leaflet.css' %}">
+    <link rel="stylesheet" href="{% static 'rutas/css/coordinador.css' %}?v=3">
+    {% block extra_styles %}{% endblock %}
+
+    <title>{% block title %}Coordinador{% endblock %} - INPREDISROUTE</title>
+
+    <style>
+        /* La navegacion pasa de barra lateral a una barra superior flotante,
+           igual que en el modulo del vendedor. Se anulan aqui las reglas del
+           layout anterior para no tener que reescribir coordinador.css */
+        body {
+            display: block;
+            background: #f4f6fb;
+            font-family: 'Roboto', sans-serif;
+            padding: 14px;
+        }
+        #sidebar-left { display: none; }
+        /* El dashboard va en dos columnas: mapa a la izquierda y
+           resumen a la derecha. Las demas pantallas usan #layout. */
+        #dashboard-layout {
+            display: flex;
+            gap: 14px;
+            height: calc(100vh - 100px);
+            overflow: hidden;
+        }
+        #centro {
+            flex: 1;
+            position: relative;
+            border-radius: 16px;
+            overflow: hidden;
+            min-width: 0;
+        }
+        #map { width: 100%; height: 100%; }
+        #filtro-rutas {
+            position: absolute;
+            top: 12px; left: 50%;
+            transform: translateX(-50%);
+            z-index: 500;
+        }
+        #sidebar-right {
+            width: 320px;
+            flex-shrink: 0;
+            border-radius: 16px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background: #fff;
+        }
+
+        .top-nav {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            background: #fff;
+            padding: 10px 18px;
+            border-radius: 18px;
+            box-shadow: 0 4px 18px rgba(26,35,126,.08);
+            margin-bottom: 14px;
+        }
+        .top-nav__brand {
+            font-family: 'Sora', sans-serif;
+            font-weight: 700;
+            font-size: 15px;
+            color: #1a237e;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+        }
+        .top-nav__brand i { font-size: 20px; }
+        .top-nav__links {
+            display: flex;
+            gap: 6px;
+            flex: 1;
+            overflow-x: auto;
+        }
+        .top-nav__link {
+            color: #8a8fa3;
+            text-decoration: none;
+            font-size: 13px;
+            padding: 8px 14px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+            transition: background .15s, color .15s;
+        }
+        .top-nav__link:hover { background: #f0f2f8; color: #1a237e; }
+        .top-nav__link.active {
+            background: #e8eaf6;
+            color: #1a237e;
+            font-weight: 600;
+        }
+        .top-nav__link i { font-size: 16px; }
+
+        .top-nav__avatar {
+            width: 38px; height: 38px;
+            border-radius: 50%;
+            background: #e8eaf6;
+            color: #1a237e;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; font-size: 18px; flex-shrink: 0;
+        }
+        .top-nav__avatar:hover { background: #d7dcf5; }
+
+        /* Panel de perfil */
+        .perfil {
+            position: fixed;
+            display: none;
+            background: #fff;
+            border-radius: 14px;
+            box-shadow: 0 8px 28px rgba(0,0,0,.16);
+            padding: 14px;
+            gap: 12px;
+            align-items: center;
+            z-index: 3000;
+            min-width: 240px;
+        }
+        .perfil--abierto { display: flex; }
+        .perfil__avatar {
+            width: 42px; height: 42px; border-radius: 50%;
+            background: #e8eaf6; color: #1a237e;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 22px; flex-shrink: 0;
+        }
+        .perfil__datos { flex: 1; min-width: 0; }
+        .perfil__nombre { font-size: 14px; font-weight: 600; color: #333; }
+        .perfil__rol { font-size: 12px; color: #888; }
+        .perfil__logout {
+            color: #c62828; font-size: 20px; text-decoration: none;
+            padding: 8px; border-radius: 8px;
+        }
+        .perfil__logout:hover { background: #fbeaea; }
+
+        /* Modal de cierre de sesion */
+        .modal {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,.5);
+            align-items: center; justify-content: center;
+            z-index: 4000; padding: 20px;
+        }
+        .modal--abierto { display: flex; }
+        .modal__caja {
+            background: #fff; border-radius: 16px; padding: 26px;
+            max-width: 340px; width: 100%; text-align: center;
+        }
+        .modal__icono {
+            width: 54px; height: 54px; border-radius: 50%;
+            background: #fbeaea; color: #c62828;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 26px; margin: 0 auto 14px;
+        }
+        .modal__titulo {
+            font-family: 'Sora', sans-serif; font-size: 17px;
+            color: #333; margin-bottom: 6px;
+        }
+        .modal__texto { font-size: 13px; color: #777; margin-bottom: 20px; }
+        .modal__acciones { display: flex; gap: 10px; }
+        .modal__btn {
+            flex: 1; padding: 11px; border: none; border-radius: 10px;
+            font-size: 13px; font-weight: 600; cursor: pointer;
+            text-decoration: none; display: block;
+        }
+        .modal__btn--cancelar { background: #f0f2f5; color: #555; }
+        .modal__btn--confirmar { background: #c62828; color: #fff; }
+
+        @media screen and (max-width: 900px) {
+            .top-nav__brand span { display: none; }
+            .top-nav__link span { display: none; }
+        }
+    </style>
 </head>
 <body>
 
-<!-- SIDEBAR IZQUIERDO -->
-<div id="sidebar-left">
-    <a href="/api/rutas/coordinador/" class="logo">
-        🚚 Sabritas Tijuana
-        <span>Panel del Coordinador</span>
-    </a>
-    <nav>
-        <a href="/api/rutas/coordinador/" class="{% block nav_mapa %}{% endblock %}">
-            <span class="icon">🗺️</span> Mapa de rutas
-        </a>
-        <a href="/api/rutas/gestionar-rutas-visita/" class="{% block nav_rutas_visita %}{% endblock %}">
-            <span class="icon">🗓️</span> Rutas de visita
-        </a>
-        <a href="/api/rutas/gestionar-rutas-entrega/" class="{% block nav_rutas_entrega %}{% endblock %}">
-            <span class="icon">🚚</span> Rutas de entrega
-        </a>
-        <a href="/api/rutas/gestionar-zonas/" class="{% block nav_zonas %}{% endblock %}">
-            <span class="icon">📍</span> Gestionar zonas
-        </a>
-        <a href="/api/rutas/gestionar-establecimientos/" class="{% block nav_establecimientos %}{% endblock %}">
-            <span class="icon">🏪</span> Gestionar establecimientos
-        </a>
-        <a href="/api/rutas/historial-rutas/" class="{% block nav_historial %}{% endblock %}">
-            <span class="icon">📋</span> Historial de rutas
-        </a>
-    </nav>
-    <div id="sidebar-user">
-        <button id="sidebar-user-btn" onclick="toggleSidebarPerfil(event)">
-            <span class="icon"><i class='bx bx-user'></i></span> Mi cuenta
-        </button>
-
-        <div class="sidebar-perfil" id="sidebarPerfil">
-            <div class="sidebar-perfil__avatar"><i class='bx bx-user'></i></div>
-            <div class="sidebar-perfil__datos">
-                <div class="sidebar-perfil__nombre">{{ request.session.nombre_usuario|default:"Usuario" }}</div>
-                <div class="sidebar-perfil__rol">{{ request.session.rol|default:"COORDINADOR" }}</div>
-            </div>
-            <a href="/api/usuarios/logout/" class="sidebar-perfil__logout"
-               title="Cerrar sesión" aria-label="Cerrar sesión"
-               onclick="return abrirModalLogout(event);">
-                <i class='bx bx-log-out'></i>
-            </a>
-        </div>
+<nav class="top-nav">
+    <div class="top-nav__brand">
+        <i class='bx bx-package'></i> <span>INPREDISROUTE</span>
     </div>
+    <div class="top-nav__links">
+        <a href="/api/rutas/coordinador/" class="top-nav__link {% block nav_mapa %}{% endblock %}">
+            <i class='bx bx-map-alt'></i> <span>Mapa de rutas</span>
+        </a>
+        <a href="/api/rutas/gestionar-rutas-visita/" class="top-nav__link {% block nav_rutas_visita %}{% endblock %}">
+            <i class='bx bx-calendar'></i> <span>Rutas de visita</span>
+        </a>
+        <a href="/api/rutas/gestionar-rutas-entrega/" class="top-nav__link {% block nav_rutas_entrega %}{% endblock %}">
+            <i class='bx bx-package'></i> <span>Rutas de entrega</span>
+        </a>
+        <a href="/api/rutas/gestionar-zonas/" class="top-nav__link {% block nav_zonas %}{% endblock %}">
+            <i class='bx bx-map-pin'></i> <span>Zonas</span>
+        </a>
+        <a href="/api/rutas/gestionar-establecimientos/" class="top-nav__link {% block nav_establecimientos %}{% endblock %}">
+            <i class='bx bx-store'></i> <span>Establecimientos</span>
+        </a>
+        <a href="/api/rutas/historial-rutas/" class="top-nav__link {% block nav_historial %}{% endblock %}">
+            <i class='bx bx-history'></i> <span>Historial</span>
+        </a>
+    </div>
+    <div class="top-nav__avatar" onclick="togglePerfil(event)"><i class='bx bx-user'></i></div>
+</nav>
+
+<div class="perfil" id="menuPerfil">
+    <div class="perfil__avatar"><i class='bx bx-user'></i></div>
+    <div class="perfil__datos">
+        <div class="perfil__nombre">{{ request.session.nombre_usuario|default:"Usuario" }}</div>
+        <div class="perfil__rol">{{ request.session.rol }}</div>
+    </div>
+    <a href="{% url 'logout' %}" class="perfil__logout"
+       title="Cerrar sesión" onclick="return abrirModalLogout(event);">
+        <i class='bx bx-log-out'></i>
+    </a>
 </div>
 
-<!-- MODAL DE CONFIRMACION DE CIERRE DE SESION -->
 <div class="modal" id="modalLogout">
     <div class="modal__caja">
         <div class="modal__icono"><i class='bx bx-log-out'></i></div>
@@ -67,15 +231,14 @@
         <div class="modal__acciones">
             <button type="button" class="modal__btn modal__btn--cancelar"
                     onclick="cerrarModalLogout()">Cancelar</button>
-            <a href="/api/usuarios/logout/" class="modal__btn modal__btn--confirmar">
-                Sí, salir
-            </a>
+            <a href="{% url 'logout' %}" class="modal__btn modal__btn--confirmar">Sí, salir</a>
         </div>
     </div>
 </div>
 
+<div id="contenido">
 {% block main_content %}
-<!-- Dashboard por defecto: mapa + sidebar derecho -->
+<div id="dashboard-layout">
 <div id="centro">
     <div id="filtro-rutas">
         <button class="active" onclick="filtrarRutas('todas', this)">Todas</button>
@@ -108,54 +271,63 @@
         </div>
     </div>
 </div>
+</div>
 {% endblock %}
+</div>
+
+<script src="{% static 'rutas/js/leaflet.js' %}"></script>
+<script src="{% static 'rutas/js/sortable.min.js' %}"></script>
 
 <script>
-/*===== MODAL DE CIERRE DE SESION + PANEL DE PERFIL =====*/
-document.addEventListener("DOMContentLoaded", function(){
-    var modalLogout = document.getElementById("modalLogout");
+    var menuPerfil = document.getElementById("menuPerfil");
 
-    window.abrirModalLogout = function(e){
+    function togglePerfil(e){
         e.preventDefault();
         e.stopPropagation();
-        cerrarSidebarPerfil();
+        if (menuPerfil.classList.toggle("perfil--abierto")){
+            posicionarPerfil(e.currentTarget);
+        }
+    }
+
+    function posicionarPerfil(icono){
+        var r = icono.getBoundingClientRect();
+        var ancho = menuPerfil.offsetWidth;
+        var izq = r.right - ancho;
+        if (izq < 12){ izq = 12; }
+        menuPerfil.style.left = izq + "px";
+        menuPerfil.style.top = (r.bottom + 10) + "px";
+    }
+
+    var modalLogout = document.getElementById("modalLogout");
+
+    function abrirModalLogout(e){
+        e.preventDefault();
+        e.stopPropagation();
+        cerrarPerfil();
         modalLogout.classList.add("modal--abierto");
         return false;
-    };
+    }
 
-    window.cerrarModalLogout = function(){
+    function cerrarModalLogout(){
         modalLogout.classList.remove("modal--abierto");
-    };
+    }
 
     modalLogout.addEventListener("click", function(e){
         if (e.target === modalLogout){ cerrarModalLogout(); }
     });
     document.addEventListener("keydown", function(e){
-        if (e.key === "Escape"){ cerrarModalLogout(); cerrarSidebarPerfil(); }
+        if (e.key === "Escape"){ cerrarModalLogout(); }
     });
 
-    /*===== PANEL DE PERFIL EN SIDEBAR =====*/
-    var sidebarPerfil = document.getElementById("sidebarPerfil");
+    document.addEventListener("click", cerrarPerfil);
+    window.addEventListener("resize", cerrarPerfil);
+    menuPerfil.addEventListener("click", function(e){ e.stopPropagation(); });
 
-    window.toggleSidebarPerfil = function(e){
-        e.preventDefault();
-        e.stopPropagation();
-        sidebarPerfil.classList.toggle("sidebar-perfil--abierto");
-    };
-
-    window.cerrarSidebarPerfil = function(){
-        sidebarPerfil.classList.remove("sidebar-perfil--abierto");
-    };
-
-    sidebarPerfil.addEventListener("click", function(e){ e.stopPropagation(); });
-    document.addEventListener("click", cerrarSidebarPerfil);
-});
+    function cerrarPerfil(){
+        menuPerfil.classList.remove("perfil--abierto");
+    }
 </script>
 
-<script src="{% static 'rutas/js/leaflet.js' %}"></script>
-
-{% block extra_scripts %}
-<!-- Scripts del dashboard por defecto -->
 <script>
 const tijuanaBounds = L.latLngBounds([32.38, -117.15], [32.62, -116.88]);
 const map = L.map('map', {
@@ -365,6 +537,7 @@ function cerrarDetalleRuta() {
 
 window.addEventListener('load', cargarDatos);
 </script>
-{% endblock %}
+
+{% block extra_scripts %}{% endblock %}
 </body>
 </html>
