@@ -95,6 +95,7 @@ function inicializarMapa() {
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap contributors'
     }).addTo(mapa);
+    agregarBotonCentrar(mapa, [32.5149, -117.0382], 12);
 }
 
 function cargarDatos() {

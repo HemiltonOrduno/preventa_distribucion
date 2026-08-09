@@ -69,6 +69,8 @@ function inicializarMapa() {
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap contributors'
     }).addTo(mapa);
+
+    agregarBotonCentrar(mapa, [32.5149, -117.0382], 11);
 }
 
 function cargarDatos() {
@@ -139,31 +141,7 @@ function renderizarZonas() {
     });
 }
 
-function dibujarZonasEnMapa() {
-    Object.values(capasZonas).forEach(c => mapa.removeLayer(c));
-    capasZonas = {};
-
-    zonas.forEach((z, idx) => {
-        if (!z.lat_min || !z.lat_max || !z.lon_min || !z.lon_max) return;
-
-        const color = COLORES[idx % COLORES.length];
-        const bounds = [[z.lat_min, z.lon_min], [z.lat_max, z.lon_max]];
-
-        const rect = L.rectangle(bounds, {
-            color: color,
-            weight: 2,
-            fillColor: color,
-            fillOpacity: 0.15
-        }).addTo(mapa)
-        .bindTooltip(`<b>${z.nombre}</b><br>${z.total_establecimientos} establecimientos`, {
-            permanent: false,
-            direction: 'center'
-        })
-        .on('click', () => seleccionarZona(z.id));
-
-        capasZonas[z.id] = rect;
-    });
-}
+dibujarZonasEnMapa
 
 function seleccionarZona(zonaId) {
     if (zonaSeleccionada) {

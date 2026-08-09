@@ -968,3 +968,12 @@ body {
 }
 
 .sidebar-perfil__logout:hover { background: var(--color-danger); color: white; }
+
+/* El coordinador puede achicar el bloque de datos para dar mas espacio
+   a la lista de paradas cuando la ruta tiene muchas */
+#panel-edicion-form {
+    resize: vertical;
+    overflow: auto;
+    min-height: 80px;
+    max-height: 60vh;
+}

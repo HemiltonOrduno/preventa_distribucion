@@ -432,7 +432,8 @@ def rutas_visita_hoy(request):
 def asignar_vendedor_ruta(request, ruta_id):
     """
     Asigna un vendedor a una ruta de visita y la marca como Asignada.
-    Solo se puede asignar si la ruta está Activa (no si ya fue asignada).
+    Solo se puede asignar si la ruta está Activa (no si ya fue asignada),
+    y si el vendedor no tiene ya otra ruta ese mismo día.
     """
     if request.method != 'POST':
         return JsonResponse({"error": "Método no permitido"}, status=405)
@@ -447,6 +448,21 @@ def asignar_vendedor_ruta(request, ruta_id):
         return JsonResponse({"error": "Se requiere vendedor_id"}, status=400)
 
     with connection.cursor() as cursor:
+        # Un vendedor no puede cubrir dos zonas el mismo día
+        cursor.execute("""
+            SELECT rv.nombre FROM ruta_visita rv
+            WHERE rv.empleado = %s
+              AND rv.dia = (SELECT dia FROM ruta_visita WHERE numero = %s)
+              AND rv.numero <> %s
+              AND rv.edo_ruta_visita IN ('ERV006', 'ERV003')
+            LIMIT 1
+        """, [vendedor_id, ruta_id, ruta_id])
+        ocupada = cursor.fetchone()
+        if ocupada:
+            return JsonResponse({
+                "error": f"Ese vendedor ya tiene asignada la ruta '{ocupada[0]}' ese día"
+            }, status=409)
+
         cursor.execute("""
             UPDATE ruta_visita
             SET empleado = %s, edo_ruta_visita = 'ERV006'

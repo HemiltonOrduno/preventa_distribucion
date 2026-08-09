@@ -67,8 +67,12 @@
                     </div>
                     <p style="font-size:11px;color:#888;">Haz clic en los establecimientos del mapa en el orden de visita.</p>
                 </div>
-                <div style="font-size:12px;font-weight:bold;color:#333;padding:8px 12px;border-top:1px solid #dee2e6;border-bottom:1px solid #dee2e6;background:#f8f9fa;flex-shrink:0;">
-                    Paradas <span id="contador-paradas" style="font-weight:normal;color:#888;font-size:11px;"></span>
+                <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:bold;color:#333;padding:8px 12px;border-top:1px solid #dee2e6;border-bottom:1px solid #dee2e6;background:#f8f9fa;flex-shrink:0;">
+                    <span>Paradas <span id="contador-paradas" style="font-weight:normal;color:#888;font-size:11px;"></span></span>
+                    <button onclick="rutaAutomatica()" title="Arma la ruta con todos los establecimientos de la zona"
+                            style="padding:4px 9px;background:#e8eaf6;color:#1a237e;border:none;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600;">
+                            Automático
+                    </button>
                 </div>
                 <div id="lista-paradas-modal" style="flex:1;overflow-y:auto;padding:8px;"></div>
             </div>
@@ -94,6 +98,8 @@ let modoEdicion = null; // null = ver, 'crear' = nueva ruta, 'editar' = editar r
 let rutaEditandoId = null;
 let sortableParadas = null;
 let cargandoEdicion = false; // evita que se borren las paradas al precargar una ruta
+let diaFiltroActual = 'hoy';
+let rutaLayerEdicion = null;
 
 // Mapa principal
 let mapaRutas = null;
@@ -117,6 +123,8 @@ function inicializarMapaRutas() {
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap contributors'
     }).addTo(mapaRutas);
+
+    agregarBotonCentrar(mapaRutas, [32.505, -117.010], 12);
 
     // Marcador del almacén siempre visible
     const iconoAlmacen = L.divIcon({
@@ -153,7 +161,9 @@ function cargarDatos() {
 
         const btnActivo = document.querySelector('.filtro-dia button.active')
             || document.querySelector('.filtro-dia button');
-        filtrarDia('hoy', btnActivo);
+        // Se conserva el dia que el coordinador tenia seleccionado, para que
+        // la lista no salte a "Hoy" despues de asignar o editar una ruta
+        filtrarDia(diaFiltroActual, btnActivo);
 
         // Si llegamos desde "Gestionar zonas" con una zona ya elegida, abre
         // directamente el panel de nueva ruta con esa zona preseleccionada
@@ -166,6 +176,7 @@ function cargarDatos() {
 }
 
 function filtrarDia(dia, btn) {
+    diaFiltroActual = dia;
     document.querySelectorAll('.filtro-dia button').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     const filtradas = dia === 'hoy'
@@ -408,6 +419,10 @@ function cerrarEdicion() {
     document.getElementById('panel-rutas').style.display = '';
 
     limpiarMarcadoresEdicion();
+    if (rutaLayerEdicion) {
+        mapaRutas.removeLayer(rutaLayerEdicion);
+        rutaLayerEdicion = null;
+    }
     limpiarRutaVisualizada();
 
     setTimeout(() => mapaRutas.invalidateSize(), 100);
@@ -549,6 +564,7 @@ function ordenarConOSRM(callback) {
             callback();
             return;
         }
+
         const ordenPorId = {};
         data.paradas.forEach(p => {
             if (p.tipo === 'establecimiento') ordenPorId[p.establecimiento_id] = p.orden;
@@ -558,6 +574,20 @@ function ordenarConOSRM(callback) {
             const ob = ordenPorId[b.id] ?? 999;
             return oa - ob;
         });
+
+        // Se dibuja el recorrido propuesto para que el coordinador lo vea
+        // antes de guardar la ruta
+        if (rutaLayerEdicion) {
+            mapaRutas.removeLayer(rutaLayerEdicion);
+            rutaLayerEdicion = null;
+        }
+        if (data.geometria && data.geometria.coordinates) {
+            const coords = data.geometria.coordinates.map(c => [c[1], c[0]]);
+            rutaLayerEdicion = L.polyline(coords, {
+                color: '#1a237e', weight: 4, opacity: .7, dashArray: '8,6'
+            }).addTo(mapaRutas);
+        }
+
         callback();
     })
     .catch(() => {
@@ -565,6 +595,36 @@ function ordenarConOSRM(callback) {
         callback();
     });
 }
+
+/* El coordinador puede pedir que el sistema proponga el recorrido mas
+   corto en lugar de ordenar las paradas a mano. Sigue pudiendo
+   ajustarlo despues arrastrando la lista. */
+/* Arma la ruta sola: toma todos los establecimientos de la zona y los
+   deja en el orden de recorrido mas corto. El coordinador puede quitar
+   los que no apliquen o reacomodarlos arrastrando antes de guardar. */
+function rutaAutomatica() {
+    const zonaId = parseInt(document.getElementById('ruta-zona').value);
+    if (!zonaId) { alert('Selecciona primero una zona'); return; }
+
+    const estsZona = establecimientos.filter(
+        e => e.zona_id === zonaId && e.latitud && e.longitud
+    );
+
+    if (estsZona.length < 2) {
+        alert('Esta zona no tiene suficientes establecimientos');
+        return;
+    }
+
+    paradasSeleccionadas = [...estsZona];
+
+    mostrarToast('Calculando el recorrido...');
+    ordenarConOSRM(() => {
+        actualizarNumerosEnMarcadores();
+        actualizarListaParadas();
+        mostrarToast(`✓ ${paradasSeleccionadas.length} paradas ordenadas — ajústalas si hace falta`);
+    });
+}
+
 
 function guardarRuta(nombre, dia, descripcion, zonaId, eraEdicion) {
     const url = eraEdicion

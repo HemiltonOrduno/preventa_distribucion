@@ -279,6 +279,23 @@
 <script src="{% static 'rutas/js/sortable.min.js' %}"></script>
 
 <script>
+    /* Agrega un boton para regresar la vista al area de trabajo.
+   Se usa en todos los mapas del sistema. */
+function agregarBotonCentrar(mapa, centro, zoom) {
+    const ctrl = L.control({ position: 'topleft' });
+    ctrl.onAdd = function () {
+        const div = L.DomUtil.create('div', 'leaflet-bar');
+        div.innerHTML = `<a href="#" title="Centrar mapa"
+            style="display:flex;align-items:center;justify-content:center;
+                   width:30px;height:30px;font-size:16px;text-decoration:none;">⌖</a>`;
+        div.onclick = (e) => {
+            e.preventDefault();
+            mapa.setView(centro, zoom || 12);
+        };
+        return div;
+    };
+    ctrl.addTo(mapa);
+}
     var menuPerfil = document.getElementById("menuPerfil");
 
     function togglePerfil(e){
@@ -329,12 +346,22 @@
 </script>
 
 <script>
-const tijuanaBounds = L.latLngBounds([32.38, -117.15], [32.62, -116.88]);
+
+// Los limites se amplian para que el coordinador pueda moverse con holgura;
+// la viscosidad baja permite arrastrar sin que el mapa rebote
+// El dashboard solo existe cuando ninguna pantalla hija sobrescribe el
+// contenido; en las demas no hay div#map y este bloque no debe correr
+if (document.getElementById('map')) {
+
+const tijuanaBounds = L.latLngBounds([32.30, -117.30], [32.70, -116.70]);
 const map = L.map('map', {
     center: [32.5149, -117.0382],
-    zoom: 12, minZoom: 12, maxZoom: 18,
-    maxBounds: tijuanaBounds, maxBoundsViscosity: 1.0
+    zoom: 12, minZoom: 10, maxZoom: 18,
+    maxBounds: tijuanaBounds, maxBoundsViscosity: 0.3
 });
+
+// Boton para regresar la vista al area de trabajo
+agregarBotonCentrar(map, [32.5149, -117.0382], 12);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors'
@@ -536,6 +563,7 @@ function cerrarDetalleRuta() {
 }
 
 window.addEventListener('load', cargarDatos);
+}
 </script>
 
 {% block extra_scripts %}{% endblock %}
