@@ -323,7 +323,7 @@ INSERT INTO ZONA (num, nombre, descripcion, empleado, lat_min, lat_max, lon_min,
 (8,  'Suroeste 2', 'Villa del Campo, Terrazas del Valle',         3, 32.430000, 32.470000, -117.130000, -117.060000),
 (9,  'Suroeste',   'Natura, Santa Fe',                            3, 32.430000, 32.470000, -117.060000, -116.990000),
 (10, 'Sureste 2',  'Valle Redondo, Los Álamos',                   3, 32.430000, 32.508000, -116.820000, -116.780000),
-(11, 'Noreste',    'El Refugio, Villa Fontana',                   3, 32.508000, 32.560000, -116.910000, -116.820000),
+(11, 'Noreste',    'El Refugio, Villa Fontana',                   3, 32.508000, 32.580000, -116.910000, -116.820000),
 (12, 'Este',       'El Niño, Lomas del Valle',                    3, 32.470000, 32.508000, -116.910000, -116.820000),
 (13, 'Sureste',    'La Morita, Villa del Prado',                  3, 32.430000, 32.470000, -116.910000, -116.820000);
 

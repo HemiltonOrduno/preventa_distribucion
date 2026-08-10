@@ -230,8 +230,12 @@ function renderizarRutas(rutas) {
             `;
         } else {
             let optionsHTML = vendedoresDisponibles.map(v =>
-                `<option value="${v.id}" ${v.id == r.vendedor_id ? 'selected' : ''}>${v.nombre}</option>`
-            ).join('');
+            `<option value="${v.id}"
+                     ${v.id == r.vendedor_id ? 'selected' : ''}
+                     ${(!v.disponible && v.id != r.vendedor_id) ? 'disabled' : ''}>
+                ${v.nombre}${v.disponible ? '' : ' — ya tiene ruta ese día'}
+             </option>`
+        ).join('');
             filaAsignacion = `
                 <div class="asignar-row" onclick="event.stopPropagation()">
                     <select id="sel-${r.id}">${optionsHTML}</select>

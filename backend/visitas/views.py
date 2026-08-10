@@ -81,8 +81,8 @@ def _cerrar_ruta_si_completa(cursor, visita_id):
         return False
 
     cursor.execute("""
-        UPDATE ruta_visita SET edo_ruta_visita = 'ERV004'
-        WHERE numero = %s AND edo_ruta_visita = 'ERV003'
+        UPDATE ruta_visita_semana SET edo_ruta_visita = 'ERV004'
+        WHERE ruta_visita = %s AND fecha = CURDATE() AND edo_ruta_visita = 'ERV003'
     """, [ruta_id])
     return cursor.rowcount > 0
 
@@ -98,19 +98,17 @@ def ruta_del_dia_api(request):
     if not empleado_num:
         return JsonResponse({"error": "Sesión no válida, inicia sesión de nuevo"}, status=401)
 
-    dias = {0: 'Lunes', 1: 'Martes', 2: 'Miércoles', 3: 'Jueves', 4: 'Viernes', 5: 'Sábado', 6: 'Domingo'}
-    dia_hoy = dias[date.today().weekday()]
-
     with connection.cursor() as cursor:
+        # La ejecucion de hoy: la fecha del registro ya garantiza que la
+        # ruta corresponde al dia en curso, sin comparar el nombre del dia
         cursor.execute("""
-            SELECT rv.numero, rv.edo_ruta_visita
-            FROM ruta_visita rv
-            WHERE rv.empleado = %s
-              AND rv.dia = %s
-              AND rv.edo_ruta_visita IN ('ERV006', 'ERV003')
-            ORDER BY rv.numero DESC
+            SELECT rvs.ruta_visita, rvs.edo_ruta_visita
+            FROM ruta_visita_semana rvs
+            WHERE rvs.empleado = %s
+              AND rvs.fecha = CURDATE()
+              AND rvs.edo_ruta_visita IN ('ERV006', 'ERV003')
             LIMIT 1
-        """, [empleado_num, dia_hoy])
+        """, [empleado_num])
         ruta_row = cursor.fetchone()
         if not ruta_row:
             return JsonResponse({"error": "No tienes una ruta de visita asignada"}, status=404)
@@ -129,6 +127,7 @@ def ruta_del_dia_api(request):
                   WHERE v.ruta_visita = rvo.ruta_visita
                     AND v.establecimiento = rvo.establecimiento
                     AND v.edo_visita IN ('EVI004', 'EVI005')
+                    AND DATE(v.fecha) = CURDATE()
               )
             ORDER BY rvo.orden ASC
             LIMIT 1
@@ -166,7 +165,7 @@ def iniciar_visita(request):
     """
     RF08: crea la visita con estado "En camino" cuando el vendedor
     empieza a trasladarse hacia el establecimiento. Si es la primera
-    visita de la ruta, la pasa de Asignada a Iniciada.
+    visita del día, la ejecución de la ruta pasa de Asignada a Iniciada.
     """
     if request.method != 'POST':
         return JsonResponse({"error": "Método no permitido"}, status=405)
@@ -187,19 +186,20 @@ def iniciar_visita(request):
 
     with transaction.atomic():
         with connection.cursor() as cursor:
-            # Verifica que la ruta sea del vendedor logueado
+            # La ejecución de hoy debe estar asignada a este vendedor
             cursor.execute("""
-                SELECT edo_ruta_visita FROM ruta_visita
-                WHERE numero = %s AND empleado = %s
+                SELECT edo_ruta_visita FROM ruta_visita_semana
+                WHERE ruta_visita = %s AND fecha = CURDATE() AND empleado = %s
             """, [ruta_visita_id, empleado_num])
             ruta_row = cursor.fetchone()
             if not ruta_row:
                 return JsonResponse({"error": "Esta ruta no te pertenece"}, status=403)
 
-            # Si es la primera visita de la ruta (estaba Asignada), pásala a Iniciada
+            # Si es la primera visita del día, la ruta pasa a Iniciada
             if ruta_row[0] == 'ERV006':
                 cursor.execute("""
-                    UPDATE ruta_visita SET edo_ruta_visita = 'ERV003' WHERE numero = %s
+                    UPDATE ruta_visita_semana SET edo_ruta_visita = 'ERV003'
+                    WHERE ruta_visita = %s AND fecha = CURDATE()
                 """, [ruta_visita_id])
 
             # Reutiliza la visita si ya hay una abierta para este establecimiento,
@@ -216,9 +216,6 @@ def iniciar_visita(request):
                     "mensaje": "Visita ya iniciada, continuando",
                     "visita_id": existente[0]
                 }, json_dumps_params={'ensure_ascii': False})
-
-            cursor.execute("SELECT COALESCE(MAX(numero), 0) + 1 FROM visita")
-            nueva_visita = cursor.fetchone()[0]
 
             cursor.execute("""
                 INSERT INTO visita
@@ -554,27 +551,25 @@ def almacenista_pedidos_view(request):
 
 def mapa_ruta_del_dia_api(request):
     """
-    Regresa todas las paradas de la ruta activa del vendedor (Asignada/
-    Iniciada) del día de hoy, marcando cuál ya fue visitada, cuál es la
-    actual (siguiente pendiente) y cuáles faltan. Para pintar el mapa.
+    Regresa todas las paradas de la ruta que el vendedor tiene asignada
+    hoy, marcando cuál ya fue visitada, cuál es la actual (siguiente
+    pendiente) y cuáles faltan. Para pintar el mapa.
     """
     empleado_num = _empleado_de_sesion(request)
     if not empleado_num:
         return JsonResponse({"error": "Sesión no válida, inicia sesión de nuevo"}, status=401)
 
-    dias = {0: 'Lunes', 1: 'Martes', 2: 'Miércoles', 3: 'Jueves', 4: 'Viernes', 5: 'Sábado', 6: 'Domingo'}
-    dia_hoy = dias[date.today().weekday()]
-
     with connection.cursor() as cursor:
+        # La ejecución de hoy: la fecha del registro ya garantiza que la
+        # ruta corresponde al día en curso
         cursor.execute("""
-            SELECT rv.numero
-            FROM ruta_visita rv
-            WHERE rv.empleado = %s
-              AND rv.dia = %s
-              AND rv.edo_ruta_visita IN ('ERV006', 'ERV003')
-            ORDER BY rv.numero DESC
+            SELECT rvs.ruta_visita
+            FROM ruta_visita_semana rvs
+            WHERE rvs.empleado = %s
+              AND rvs.fecha = CURDATE()
+              AND rvs.edo_ruta_visita IN ('ERV006', 'ERV003')
             LIMIT 1
-        """, [empleado_num, dia_hoy])
+        """, [empleado_num])
         ruta_row = cursor.fetchone()
         if not ruta_row:
             return JsonResponse({"error": "No tienes una ruta de visita asignada"}, status=404)
@@ -589,6 +584,7 @@ def mapa_ruta_del_dia_api(request):
                     WHERE v.ruta_visita = rvo.ruta_visita
                       AND v.establecimiento = rvo.establecimiento
                       AND v.edo_visita IN ('EVI004', 'EVI005')
+                      AND DATE(v.fecha) = CURDATE()
                 ) THEN 1 ELSE 0 END AS visitado
             FROM ruta_visita_orden rvo
             INNER JOIN establecimiento e ON e.numero = rvo.establecimiento

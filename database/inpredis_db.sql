@@ -151,6 +151,7 @@ CREATE TABLE ZONA(
     nombre VARCHAR(20) UNIQUE NOT NULL,
     descripcion VARCHAR(100),
     empleado INT NOT NULL,
+    poligono TEXT NULL,
     lat_min DECIMAL(10,6),
     lat_max DECIMAL(10,6),
     lon_min DECIMAL(10,6),
@@ -444,3 +445,62 @@ CREATE TABLE DETALLE_MOVIMIENTO(
 
 SHOW TABLES LIKE 'django_%';
 SELECT app, name FROM django_migrations WHERE app IN ('contenttypes','auth','admin','sessions');
+
+ALTER TABLE zona ADD COLUMN poligono TEXT NULL;
+
+UPDATE zona SET lat_max = 32.560 WHERE nombre IN ('Noroeste 2', 'Noroeste', 'Noreste');
+
+UPDATE zona SET lat_max = 32.560 WHERE nombre IN ('Noroeste 2', 'Noroeste', 'Noreste');
+
+UPDATE zona SET poligono = '[[32.53902, -117.07002], [32.53435, -117.12425], [32.5259, -117.12435], [32.52033, -117.12392], [32.51446, -117.12427], [32.51171, -117.1247], [32.50961, -117.1247], [32.50869, -117.12444], [32.50841, -117.12451], [32.50816, -117.1245], [32.50802, -117.12452], [32.50802, -117.07003]]' WHERE nombre = 'Noroeste 2';
+
+UPDATE zona SET poligono = '[[32.53903, -117.07], [32.50803, -117.07001], [32.50802, -116.99001], [32.54582, -116.99002]]' WHERE nombre = 'Noroeste';
+
+UPDATE zona SET poligono = '[[32.54583, -116.99], [32.50803, -116.99001], [32.50802, -116.91001], [32.55262, -116.91002]]' WHERE nombre = 'Norte';
+
+UPDATE zona SET poligono = '[[32.55262, -116.91], [32.50803, -116.91001], [32.50817, -116.82005], [32.56002, -116.82008]]' WHERE nombre = 'Noreste';
+
+UPDATE zona SET poligono = '[[32.508, -117.06002], [32.50801, -117.12452], [32.50778, -117.12449], [32.50748, -117.12451], [32.5072, -117.12454], [32.50691, -117.12455], [32.50664, -117.12452], [32.50641, -117.12444], [32.50623, -117.12444], [32.50596, -117.12437], [32.50559, -117.12423], [32.50533, -117.12414], [32.50507, -117.12408], [32.50487, -117.12401], [32.50461, -117.12392], [32.5043, -117.12393], [32.50408, -117.12393], [32.5037, -117.12398], [32.50344, -117.12397], [32.5031, -117.12385], [32.50271, -117.12377], [32.50239, -117.12389], [32.50221, -117.12396], [32.50194, -117.12384], [32.50166, -117.12384], [32.5014, -117.12384], [32.50117, -117.12385], [32.50086, -117.12373], [32.50006, -117.12358], [32.49981, -117.12363], [32.49941, -117.1235], [32.49901, -117.12342], [32.49873, -117.12319], [32.49828, -117.12318], [32.49787, -117.12306], [32.49715, -117.12314], [32.4967, -117.12307], [32.49627, -117.1231], [32.49521, -117.12269], [32.49492, -117.12273], [32.49449, -117.12303], [32.49456, -117.1235], [32.49444, -117.12329], [32.49418, -117.1233], [32.49424, -117.1237], [32.49418, -117.12376], [32.49399, -117.12346], [32.49361, -117.12325], [32.49322, -117.12325], [32.49296, -117.12341], [32.49294, -117.12348], [32.49295, -117.12367], [32.49226, -117.12413], [32.49219, -117.12401], [32.49223, -117.12391], [32.49219, -117.12383], [32.49205, -117.12372], [32.49194, -117.12375], [32.49162, -117.12423], [32.49156, -117.12412], [32.49161, -117.12386], [32.49128, -117.12353], [32.48999, -117.12336], [32.48967, -117.12355], [32.48963, -117.12371], [32.48947, -117.12376], [32.48935, -117.12364], [32.48913, -117.1238], [32.48901, -117.12381], [32.48887, -117.12366], [32.48873, -117.12342], [32.48853, -117.12332], [32.4883, -117.1233], [32.48815, -117.12336], [32.48805, -117.12376], [32.48789, -117.12369], [32.48774, -117.12376], [32.48761, -117.12392], [32.4874, -117.1238], [32.48708, -117.12349], [32.48677, -117.12346], [32.48635, -117.12358], [32.48605, -117.12345], [32.48579, -117.12335], [32.4856, -117.12354], [32.48552, -117.124], [32.48532, -117.12404], [32.48527, -117.12386], [32.48518, -117.12372], [32.48499, -117.12362], [32.4846, -117.12358], [32.48426, -117.12332], [32.48415, -117.1233], [32.48404, -117.1234], [32.48404, -117.12352], [32.48381, -117.12352], [32.48359, -117.12287], [32.48338, -117.1228], [32.48322, -117.12287], [32.48286, -117.12295], [32.48275, -117.12241], [32.48274, -117.12213], [32.48253, -117.12192], [32.48238, -117.12185], [32.48227, -117.12187], [32.48222, -117.12207], [32.48216, -117.12201], [32.48215, -117.1218], [32.48183, -117.12173], [32.47867, -117.12081], [32.47795, -117.12099], [32.47614, -117.12013], [32.47454, -117.12004], [32.47422, -117.12047], [32.47374, -117.12021], [32.47333, -117.12029], [32.47325, -117.12047], [32.47239, -117.12022], [32.47188, -117.1203], [32.47094, -117.12018], [32.47028, -117.1198], [32.47008, -117.11989], [32.47001, -117.11988], [32.47002, -117.06002]]' WHERE nombre = 'Oeste 2';
+
+
+CREATE TABLE RUTA_VISITA_SEMANA(
+    numero INT PRIMARY KEY AUTO_INCREMENT,
+    ruta_visita INT NOT NULL,
+    fecha DATE NOT NULL,
+    empleado INT NULL,
+    edo_ruta_visita VARCHAR(10) NOT NULL,
+    UNIQUE (ruta_visita, fecha),
+    FOREIGN KEY (ruta_visita) REFERENCES RUTA_VISITA(numero),
+    FOREIGN KEY (empleado) REFERENCES EMPLEADO(num),
+    FOREIGN KEY (edo_ruta_visita) REFERENCES EDO_RUTA_VISITA(codigo)
+);
+
+INSERT INTO ruta_visita_semana (ruta_visita, fecha, empleado, edo_ruta_visita)
+SELECT rv.numero,
+       -- fecha del dia de la semana que le toca, dentro de la semana actual
+       DATE_ADD(
+           DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY),
+           INTERVAL CASE rv.dia
+               WHEN 'Lunes'     THEN 0
+               WHEN 'Martes'    THEN 1
+               WHEN 'Miércoles' THEN 2
+               WHEN 'Jueves'    THEN 3
+               WHEN 'Viernes'   THEN 4
+               WHEN 'Sábado'    THEN 5
+               ELSE 0 END DAY
+       ),
+       rv.empleado,
+       rv.edo_ruta_visita
+FROM ruta_visita rv
+WHERE rv.edo_ruta_visita <> 'ERV001';
+
+SELECT rvs.numero, rv.nombre, rv.dia, rvs.fecha, rvs.empleado, rvs.edo_ruta_visita
+FROM ruta_visita_semana rvs
+INNER JOIN ruta_visita rv ON rv.numero = rvs.ruta_visita
+ORDER BY rvs.fecha;
+
+ALTER TABLE ruta_visita DROP FOREIGN KEY ruta_visita_ibfk_2;
+ALTER TABLE ruta_visita DROP FOREIGN KEY ruta_visita_ibfk_3;
+ALTER TABLE ruta_visita DROP COLUMN empleado;
+ALTER TABLE ruta_visita DROP COLUMN edo_ruta_visita;
+

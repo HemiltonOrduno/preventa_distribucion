@@ -977,3 +977,20 @@ body {
     min-height: 80px;
     max-height: 60vh;
 }
+
+/* Las tarjetas de zona ahora tienen cuatro acciones: se acomodan en
+   rejilla de dos columnas para que no se desborden del panel */
+.zona-botones {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-top: 8px;
+}
+.zona-botones button {
+    width: 100%;
+    font-size: 11px;
+    padding: 6px 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}

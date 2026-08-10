@@ -5,6 +5,7 @@ class Zona(models.Model):
     num = models.AutoField(primary_key=True)
     nombre = models.CharField(max_length=20, unique=True)
     descripcion = models.CharField(max_length=100, blank=True, null=True)
+    poligono = models.TextField(blank=True, null=True)
     empleado = models.ForeignKey(
         'usuarios.Empleado', on_delete=models.DO_NOTHING, db_column='empleado'
     )

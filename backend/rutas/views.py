@@ -1,3 +1,5 @@
+from unittest import result
+
 import requests
 import json
 from django.shortcuts import render
@@ -5,6 +7,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.db import connection
 from usuarios.permissions import rol_requerido
+from datetime import date, timedelta
 
 # Coordenadas del almacén (Pepsico El Florido, Tijuana)
 ALMACEN = {
@@ -275,24 +278,30 @@ def rutas_activas(request):
     """
     with connection.cursor() as cursor:
         # Rutas de visita activas
+# Rutas de visita en curso: las que ya tienen ejecucion registrada
+        # para hoy y todavia no se completan
         cursor.execute("""
             SELECT 
                 rv.numero AS id,
                 rv.nombre,
                 erv.nombre AS estado,
                 z.nombre AS zona,
-                CONCAT(em.empNombre, ' ', em.empApellPat) AS vendedor,
-                COUNT(v.numero) AS total_establecimientos,
-                SUM(CASE WHEN ev.nombre IN ('Completada', 'Completada sin pedido') THEN 1 ELSE 0 END) AS completadas
-            FROM ruta_visita rv
-            INNER JOIN edo_ruta_visita erv ON erv.codigo = rv.edo_ruta_visita
+                COALESCE(CONCAT(em.empNombre, ' ', em.empApellPat), 'Sin asignar') AS vendedor,
+                (SELECT COUNT(*) FROM ruta_visita_orden rvo
+                  WHERE rvo.ruta_visita = rv.numero) AS total_establecimientos,
+                (SELECT COUNT(DISTINCT v.establecimiento) FROM visita v
+                  WHERE v.ruta_visita = rv.numero
+                    AND v.edo_visita IN ('EVI004','EVI005')
+                    AND DATE(v.fecha) = rvs.fecha) AS completadas
+            FROM ruta_visita_semana rvs
+            INNER JOIN ruta_visita rv ON rv.numero = rvs.ruta_visita
             INNER JOIN zona z ON z.num = rv.zona
-            INNER JOIN empleado em ON em.num = rv.empleado
-            LEFT JOIN visita v ON v.ruta_visita = rv.numero
-            LEFT JOIN edo_visita ev ON ev.codigo = v.edo_visita
-            WHERE erv.nombre NOT IN ('Inactiva', 'Completada')
-            GROUP BY rv.numero, rv.nombre, erv.nombre, z.nombre, em.empNombre, em.empApellPat
-        """)
+            INNER JOIN edo_ruta_visita erv ON erv.codigo = rvs.edo_ruta_visita
+            LEFT JOIN empleado em ON em.num = rvs.empleado
+            WHERE rvs.fecha = %s
+              AND erv.nombre NOT IN ('Inactiva', 'Completada')
+            ORDER BY rv.numero
+        """, [date.today()])
         columns = [col[0] for col in cursor.description]
         rutas_visita = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
@@ -383,44 +392,53 @@ def rutas_visita_hoy(request):
     Regresa las rutas de visita que corresponden al día de hoy
     y los vendedores disponibles para asignarles.
     """
-    from datetime import date
     dias = {0: 'Lunes', 1: 'Martes', 2: 'Miércoles', 3: 'Jueves', 4: 'Viernes', 5: 'Sábado', 6: 'Domingo'}
     dia_hoy = dias[date.today().weekday()]
 
     with connection.cursor() as cursor:
-        # Rutas del día de hoy
+        # Rutas del dia de hoy, con la ejecucion de hoy si ya se asigno
         cursor.execute("""
             SELECT
                 rv.numero AS id,
                 rv.nombre,
                 rv.dia,
-                erv.nombre AS estado,
+                COALESCE(erv.nombre, 'Activa') AS estado,
                 z.nombre AS zona,
-                CONCAT(em.empNombre, ' ', em.empApellPat) AS vendedor_asignado,
-                em.num AS vendedor_id
+                COALESCE(CONCAT(em.empNombre, ' ', em.empApellPat), 'Sin asignar') AS vendedor_asignado,
+                rvs.empleado AS vendedor_id
             FROM ruta_visita rv
-            INNER JOIN edo_ruta_visita erv ON erv.codigo = rv.edo_ruta_visita
             INNER JOIN zona z ON z.num = rv.zona
-            INNER JOIN empleado em ON em.num = rv.empleado
-            WHERE rv.dia = %s AND erv.nombre = 'Activa'
-        """, [dia_hoy])
+            LEFT JOIN ruta_visita_semana rvs
+                   ON rvs.ruta_visita = rv.numero AND rvs.fecha = %s
+            LEFT JOIN edo_ruta_visita erv ON erv.codigo = rvs.edo_ruta_visita
+            LEFT JOIN empleado em ON em.num = rvs.empleado
+            WHERE rv.dia = %s
+        """, [date.today(), dia_hoy])
         columns = [col[0] for col in cursor.description]
         rutas_hoy = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
-        # Vendedores disponibles
+        # Vendedores activos, marcando los que ya llevan una ruta ese dia
         cursor.execute("""
             SELECT
                 em.num AS id,
                 CONCAT(em.empNombre, ' ', em.empApellPat) AS nombre,
-                ede.nombre AS estado
+                ede.nombre AS estado,
+                (SELECT COUNT(*) FROM ruta_visita_semana rvs
+                  WHERE rvs.empleado = em.num
+                    AND rvs.fecha = %s
+                    AND rvs.edo_ruta_visita IN ('ERV006', 'ERV003')) AS rutas_ese_dia
             FROM empleado em
             INNER JOIN rol r ON r.codigo = em.rol
             INNER JOIN edo_empleado ede ON ede.codigo = em.edo_empleado
             WHERE r.nombre = 'Vendedor'
             AND ede.nombre = 'Activo'
-        """)
+            ORDER BY rutas_ese_dia ASC, em.empNombre
+        """, [date.today()])
         columns = [col[0] for col in cursor.description]
         vendedores = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+        for v in vendedores:
+            v['disponible'] = v['rutas_ese_dia'] == 0
 
     return JsonResponse({
         "dia_hoy": dia_hoy,
@@ -448,34 +466,48 @@ def asignar_vendedor_ruta(request, ruta_id):
         return JsonResponse({"error": "Se requiere vendedor_id"}, status=400)
 
     with connection.cursor() as cursor:
-        # Un vendedor no puede cubrir dos zonas el mismo día
+        cursor.execute("SELECT dia FROM ruta_visita WHERE numero = %s", [ruta_id])
+        row = cursor.fetchone()
+        if not row:
+            return JsonResponse({"error": "Ruta no encontrada"}, status=404)
+
+        fecha = _fecha_de_ruta(row[0])
+
+        # Un vendedor no puede cubrir dos rutas la misma fecha
         cursor.execute("""
-            SELECT rv.nombre FROM ruta_visita rv
-            WHERE rv.empleado = %s
-              AND rv.dia = (SELECT dia FROM ruta_visita WHERE numero = %s)
-              AND rv.numero <> %s
-              AND rv.edo_ruta_visita IN ('ERV006', 'ERV003')
+            SELECT rv.nombre FROM ruta_visita_semana rvs
+            INNER JOIN ruta_visita rv ON rv.numero = rvs.ruta_visita
+            WHERE rvs.empleado = %s AND rvs.fecha = %s
+              AND rvs.ruta_visita <> %s
+              AND rvs.edo_ruta_visita IN ('ERV006', 'ERV003')
             LIMIT 1
-        """, [vendedor_id, ruta_id, ruta_id])
+        """, [vendedor_id, fecha, ruta_id])
         ocupada = cursor.fetchone()
         if ocupada:
             return JsonResponse({
                 "error": f"Ese vendedor ya tiene asignada la ruta '{ocupada[0]}' ese día"
             }, status=409)
 
+        # Se registra la ejecución de esa fecha; si ya existía, se
+        # rechaza para no reasignar una ruta que ya está en curso
         cursor.execute("""
-            UPDATE ruta_visita
-            SET empleado = %s, edo_ruta_visita = 'ERV006'
-            WHERE numero = %s AND edo_ruta_visita = 'ERV001'
-        """, [vendedor_id, ruta_id])
+            SELECT edo_ruta_visita FROM ruta_visita_semana
+            WHERE ruta_visita = %s AND fecha = %s
+        """, [ruta_id, fecha])
+        existente = cursor.fetchone()
+        if existente:
+            return JsonResponse({"error": "La ruta ya fue asignada para esa fecha"}, status=409)
 
-        if cursor.rowcount == 0:
-            return JsonResponse({"error": "La ruta ya fue asignada o no está activa"}, status=409)
+        cursor.execute("""
+            INSERT INTO ruta_visita_semana (ruta_visita, fecha, empleado, edo_ruta_visita)
+            VALUES (%s, %s, %s, 'ERV006')
+        """, [ruta_id, fecha, vendedor_id])
 
     return JsonResponse({
         "mensaje": "Vendedor asignado correctamente",
         "ruta_id": ruta_id,
-        "vendedor_id": vendedor_id
+        "vendedor_id": vendedor_id,
+        "fecha": fecha.isoformat()
     }, json_dumps_params={'ensure_ascii': False})
     
 @csrf_exempt
@@ -582,29 +614,39 @@ def rutas_visita_todas(request):
                 rv.numero AS id,
                 rv.nombre,
                 rv.dia,
-                erv.nombre AS estado,
                 z.nombre AS zona,
+                COALESCE(erv.nombre, 'Activa') AS estado,
                 COALESCE(CONCAT(em.empNombre, ' ', em.empApellPat), 'Sin asignar') AS vendedor,
-                em.num AS vendedor_id,
-                COUNT(v.numero) AS total_establecimientos,
-                SUM(CASE WHEN ev.nombre IN ('Completada', 'Completada sin pedido') THEN 1 ELSE 0 END) AS completadas
+                rvs.empleado AS vendedor_id,
+                rvs.fecha,
+                (SELECT COUNT(*) FROM ruta_visita_orden rvo
+                  WHERE rvo.ruta_visita = rv.numero) AS total_establecimientos,
+                (SELECT COUNT(DISTINCT v.establecimiento) FROM visita v
+                  WHERE v.ruta_visita = rv.numero
+                    AND v.edo_visita IN ('EVI004','EVI005')
+                    AND DATE(v.fecha) = rvs.fecha) AS completadas
             FROM ruta_visita rv
-            INNER JOIN edo_ruta_visita erv ON erv.codigo = rv.edo_ruta_visita
             INNER JOIN zona z ON z.num = rv.zona
-            LEFT JOIN empleado em ON em.num = rv.empleado
-            LEFT JOIN visita v ON v.ruta_visita = rv.numero
-            LEFT JOIN edo_visita ev ON ev.codigo = v.edo_visita
-            WHERE erv.nombre != 'Inactiva'
-            GROUP BY rv.numero, rv.nombre, rv.dia, erv.nombre, z.nombre, em.empNombre, em.empApellPat, em.num
-            ORDER BY rv.dia, rv.numero
-        """)
+            LEFT JOIN ruta_visita_semana rvs
+                   ON rvs.ruta_visita = rv.numero
+                  AND rvs.fecha = (
+                      SELECT MAX(r2.fecha) FROM ruta_visita_semana r2
+                      WHERE r2.ruta_visita = rv.numero AND r2.fecha >= %s
+                  )
+            LEFT JOIN edo_ruta_visita erv ON erv.codigo = rvs.edo_ruta_visita
+            LEFT JOIN empleado em ON em.num = rvs.empleado
+            ORDER BY rv.numero
+        """, [date.today()])
         columns = [col[0] for col in cursor.description]
         rutas = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+    for r in rutas:
+        r['fecha'] = r['fecha'].isoformat() if r.get('fecha') else None
 
     return JsonResponse({
         "rutas": rutas
     }, json_dumps_params={'ensure_ascii': False})
-    
+        
 @csrf_exempt
 def guardar_orden_ruta_entrega(request, ruta_id):
     """
@@ -643,15 +685,14 @@ def zonas(request):
     with connection.cursor() as cursor:
         cursor.execute("""
             SELECT
-                z.num AS id,
-                z.nombre,
-                z.descripcion,
-                z.lat_min, z.lat_max,
-                z.lon_min, z.lon_max,
+                z.num AS id, z.nombre, z.descripcion,
+                z.lat_min, z.lat_max, z.lon_min, z.lon_max,
+                z.poligono,
                 COUNT(e.numero) AS total_establecimientos
             FROM zona z
             LEFT JOIN establecimiento e ON e.zona = z.num
-            GROUP BY z.num, z.nombre, z.descripcion, z.lat_min, z.lat_max, z.lon_min, z.lon_max
+            GROUP BY z.num, z.nombre, z.descripcion, z.lat_min, z.lat_max,
+                     z.lon_min, z.lon_max, z.poligono
             ORDER BY z.num
         """)
         columns = [col[0] for col in cursor.description]
@@ -661,6 +702,9 @@ def zonas(request):
         for campo in ['lat_min', 'lat_max', 'lon_min', 'lon_max']:
             if r[campo] is not None:
                 r[campo] = float(r[campo])
+        # El contorno se guarda como JSON: se devuelve ya convertido
+        if r.get('poligono'):
+            r['poligono'] = json.loads(r['poligono'])
 
     return JsonResponse({"zonas": result}, json_dumps_params={'ensure_ascii': False})
 
@@ -735,6 +779,58 @@ def actualizar_establecimiento(request, est_id):
 
     return JsonResponse({"mensaje": "Establecimiento actualizado"}, json_dumps_params={'ensure_ascii': False})
 
+
+DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+
+
+def _dias_contiguos(dia):
+    """
+    Devuelve el día anterior, el mismo y el siguiente. Un establecimiento
+    no debe recibir visita en días consecutivos: se atiende una vez por
+    semana y hay que dejar margen entre recorridos.
+    """
+    if dia not in DIAS_SEMANA:
+        return [dia]
+    i = DIAS_SEMANA.index(dia)
+    dias = [dia]
+    if i > 0:
+        dias.append(DIAS_SEMANA[i - 1])
+    if i < len(DIAS_SEMANA) - 1:
+        dias.append(DIAS_SEMANA[i + 1])
+    return dias
+
+
+def _establecimientos_ocupados(cursor, dia, establecimientos, ruta_excluir=None):
+    """
+    De la lista dada, devuelve los que ya están en otra ruta de visita
+    programada para un día contiguo. Ahora que la ruta es una plantilla
+    permanente, basta con revisar el día: si existe la ruta, el
+    establecimiento se visita ese día todas las semanas.
+    """
+    if not establecimientos:
+        return []
+
+    dias = _dias_contiguos(dia)
+    marcas_dias = ','.join(['%s'] * len(dias))
+    marcas_est = ','.join(['%s'] * len(establecimientos))
+
+    sql = f"""
+        SELECT DISTINCT e.nombre, rv.nombre AS ruta, rv.dia
+        FROM ruta_visita_orden rvo
+        INNER JOIN ruta_visita rv ON rv.numero = rvo.ruta_visita
+        INNER JOIN establecimiento e ON e.numero = rvo.establecimiento
+        WHERE rvo.establecimiento IN ({marcas_est})
+          AND rv.dia IN ({marcas_dias})
+    """
+    params = list(establecimientos) + dias
+
+    if ruta_excluir:
+        sql += " AND rv.numero <> %s"
+        params.append(ruta_excluir)
+
+    cursor.execute(sql, params)
+    return [{"establecimiento": r[0], "ruta": r[1], "dia": r[2]} for r in cursor.fetchall()]
+
 @csrf_exempt
 def crear_ruta_visita(request):
     if request.method != 'POST':
@@ -755,20 +851,25 @@ def crear_ruta_visita(request):
         return JsonResponse({"error": "Faltan datos requeridos"}, status=400)
 
     with connection.cursor() as cursor:
-        cursor.execute("""
-            SELECT em.num FROM empleado em
-            INNER JOIN rol r ON r.codigo = em.rol
-            WHERE r.nombre = 'Vendedor'
-            AND em.edo_empleado = 'EE001'
-            LIMIT 1
-        """)
-        vendedor = cursor.fetchone()
-        vendedor_id = vendedor[0] if vendedor else None
+        # Un establecimiento no puede recibir visita en dias contiguos:
+        # se atiende una vez por semana y hay que dejar margen entre rutas
+        conflictos = _establecimientos_ocupados(cursor, dia, establecimientos)
+        if conflictos:
+            detalle = '; '.join(
+                f"{c['establecimiento']} ya está en '{c['ruta']}' ({c['dia']})"
+                for c in conflictos[:5]
+            )
+            return JsonResponse({
+                "error": f"Algunos establecimientos ya reciben visita en días cercanos: {detalle}",
+                "conflictos": conflictos
+            }, status=409)
 
+        # La ruta nace sin vendedor: el coordinador lo asigna cada semana
+        # y ese registro vive en ruta_visita_semana
         cursor.execute("""
-            INSERT INTO ruta_visita (nombre, descripcion, dia, zona, empleado, edo_ruta_visita)
-            VALUES (%s, %s, %s, %s, %s, 'ERV001')
-        """, [nombre, descripcion, dia, zona_id, vendedor_id])
+            INSERT INTO ruta_visita (nombre, descripcion, dia, zona)
+            VALUES (%s, %s, %s, %s)
+        """, [nombre, descripcion, dia, zona_id])
         nuevo_num = cursor.lastrowid
 
         # Guardar orden en ruta_visita_orden
@@ -786,20 +887,32 @@ def crear_ruta_visita(request):
     
 def ruta_visita_datos(request, ruta_id):
     """
-    Regresa los datos de una ruta de visita para edición.
+    Regresa los datos de una ruta de visita para edición. El estado y el
+    vendedor salen de la ejecución vigente; si la ruta todavía no se ha
+    asignado esta semana, se reporta como Activa.
     """
     with connection.cursor() as cursor:
         cursor.execute("""
             SELECT rv.numero AS id, rv.nombre, rv.dia, rv.descripcion,
                    rv.zona AS zona_id, z.nombre AS zona_nombre,
-                   erv.nombre AS estado, rv.empleado AS vendedor_id
+                   COALESCE(erv.nombre, 'Activa') AS estado,
+                   rvs.empleado AS vendedor_id
             FROM ruta_visita rv
             INNER JOIN zona z ON z.num = rv.zona
-            INNER JOIN edo_ruta_visita erv ON erv.codigo = rv.edo_ruta_visita
+            LEFT JOIN ruta_visita_semana rvs
+                   ON rvs.ruta_visita = rv.numero
+                  AND rvs.fecha = (
+                      SELECT MAX(r2.fecha) FROM ruta_visita_semana r2
+                      WHERE r2.ruta_visita = rv.numero AND r2.fecha >= %s
+                  )
+            LEFT JOIN edo_ruta_visita erv ON erv.codigo = rvs.edo_ruta_visita
             WHERE rv.numero = %s
-        """, [ruta_id])
+        """, [date.today(), ruta_id])
         columns = [col[0] for col in cursor.description]
-        ruta = dict(zip(columns, cursor.fetchone()))
+        fila = cursor.fetchone()
+        if not fila:
+            return JsonResponse({"error": "Ruta no encontrada"}, status=404)
+        ruta = dict(zip(columns, fila))
 
         # Obtener establecimientos en orden
         cursor.execute("""
@@ -867,8 +980,10 @@ def editar_ruta_visita(request, ruta_id):
 def historial_rutas(request):
     """
     Historial unificado de rutas de visita y de entrega, con filtros
-    por tipo, estado y responsable. El detalle de paradas se pide
-    aparte para no cargar todo de golpe.
+    por tipo, estado y responsable. En las de visita cada fila es una
+    ejecución semanal, así queda registro de quién llevó la ruta cada
+    semana. El detalle de paradas se pide aparte para no cargar todo
+    de golpe.
     """
     tipo = request.GET.get('tipo', '')
     estado = request.GET.get('estado', '')
@@ -880,7 +995,9 @@ def historial_rutas(request):
     with connection.cursor() as cursor:
         if tipo in ('', 'visita'):
             sql = """
-                SELECT rv.numero AS id, rv.nombre, rv.dia,
+                SELECT rvs.numero AS ejecucion_id,
+                       rv.numero AS id, rv.nombre, rv.dia,
+                       rvs.fecha,
                        erv.nombre AS estado, z.nombre AS zona,
                        COALESCE(CONCAT(em.empNombre, ' ', em.empApellPat), 'Sin asignar') AS responsable,
                        em.num AS responsable_id,
@@ -888,16 +1005,20 @@ def historial_rutas(request):
                          WHERE rvo.ruta_visita = rv.numero) AS total_paradas,
                        (SELECT COUNT(DISTINCT v.establecimiento) FROM visita v
                          WHERE v.ruta_visita = rv.numero
-                           AND v.edo_visita IN ('EVI004','EVI005')) AS completadas,
+                           AND v.edo_visita IN ('EVI004','EVI005')
+                           AND DATE(v.fecha) = rvs.fecha) AS completadas,
                        (SELECT COUNT(DISTINCT v.establecimiento) FROM visita v
                          WHERE v.ruta_visita = rv.numero
-                           AND v.edo_visita = 'EVI005') AS sin_pedido,
+                           AND v.edo_visita = 'EVI005'
+                           AND DATE(v.fecha) = rvs.fecha) AS sin_pedido,
                        (SELECT MAX(v.fecha) FROM visita v
-                         WHERE v.ruta_visita = rv.numero) AS ultima_actividad
-                FROM ruta_visita rv
-                INNER JOIN edo_ruta_visita erv ON erv.codigo = rv.edo_ruta_visita
+                         WHERE v.ruta_visita = rv.numero
+                           AND DATE(v.fecha) = rvs.fecha) AS ultima_actividad
+                FROM ruta_visita_semana rvs
+                INNER JOIN ruta_visita rv ON rv.numero = rvs.ruta_visita
+                INNER JOIN edo_ruta_visita erv ON erv.codigo = rvs.edo_ruta_visita
                 INNER JOIN zona z ON z.num = rv.zona
-                LEFT JOIN empleado em ON em.num = rv.empleado
+                LEFT JOIN empleado em ON em.num = rvs.empleado
                 WHERE 1 = 1
             """
             params = []
@@ -905,9 +1026,9 @@ def historial_rutas(request):
                 sql += " AND erv.nombre = %s"
                 params.append(estado)
             if empleado:
-                sql += " AND rv.empleado = %s"
+                sql += " AND rvs.empleado = %s"
                 params.append(empleado)
-            sql += " ORDER BY rv.numero DESC"
+            sql += " ORDER BY rvs.fecha DESC, rv.numero"
 
             cursor.execute(sql, params)
             columns = [c[0] for c in cursor.description]
@@ -967,7 +1088,9 @@ def historial_rutas(request):
         r['monto'] = float(r['monto'] or 0)
         r['fecha_creacion'] = r['fecha_creacion'].isoformat() if r['fecha_creacion'] else None
         r['fecha_entrega'] = r['fecha_entrega'].isoformat() if r['fecha_entrega'] else None
+
     for r in rutas_visita:
+        r['fecha'] = r['fecha'].isoformat() if r.get('fecha') else None
         r['ultima_actividad'] = r['ultima_actividad'].isoformat() if r['ultima_actividad'] else None
 
     return JsonResponse({
@@ -1178,3 +1301,45 @@ def trazar_ruta_orden(request):
         "duracion_total_min": round(ruta["duration"] / 60, 2),
         "geometria": ruta["geometry"]
     }, json_dumps_params={'ensure_ascii': False})
+    
+@csrf_exempt
+def guardar_poligono_zona(request, zona_id):
+    """
+    Guarda el contorno que el coordinador dibujó sobre el mapa. Es solo
+    para visualización: los límites que determinan a qué zona pertenece
+    un establecimiento siguen siendo lat_min/lat_max/lon_min/lon_max.
+    """
+    if request.method != 'POST':
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+
+    try:
+        puntos = json.loads(request.body).get('puntos')
+    except Exception:
+        return JsonResponse({"error": "JSON inválido"}, status=400)
+
+    # Un contorno vacío borra el dibujo y devuelve la zona a su rectángulo
+    valor = json.dumps(puntos) if puntos and len(puntos) >= 3 else None
+
+    with connection.cursor() as cursor:
+        cursor.execute("UPDATE zona SET poligono = %s WHERE num = %s", [valor, zona_id])
+        if cursor.rowcount == 0:
+            return JsonResponse({"error": "Zona no encontrada"}, status=404)
+
+    return JsonResponse({"mensaje": "Contorno guardado", "zona_id": zona_id})
+
+def _fecha_de_ruta(dia):
+    """
+    Fecha en que corre la ruta de ese día de la semana. Se toma la
+    ocurrencia de la semana en curso; si ya pasó, la de la siguiente.
+    Así el coordinador puede asignar con anticipación sin elegir fecha.
+    """
+    
+    if dia not in DIAS_SEMANA:
+        return date.today()
+
+    hoy = date.today()
+    lunes = hoy - timedelta(days=hoy.weekday())
+    fecha = lunes + timedelta(days=DIAS_SEMANA.index(dia))
+    if fecha < hoy:
+        fecha += timedelta(days=7)
+    return fecha

@@ -18,7 +18,18 @@
                 <div id="lista-zonas">Cargando zonas...</div>
             </div>
 
-            <div id="mapa-zonas"></div>
+            <div id="mapa-zonas" style="position:relative;">
+                <div id="barra-dibujo" style="display:none;position:absolute;top:12px;left:50%;
+                     transform:translateX(-50%);z-index:600;background:#fff;padding:8px 14px;
+                     border-radius:12px;box-shadow:0 4px 14px rgba(0,0,0,.18);
+                     align-items:center;gap:10px;font-size:12px;">
+                    <span>Trazando <b id="dibujo-zona-nombre"></b></span>
+                    <span id="dibujo-contador" style="color:#888;">0 puntos</span>
+                    <button onclick="deshacerPunto()" style="padding:5px 10px;border:1px solid #dee2e6;background:#fff;border-radius:7px;cursor:pointer;font-size:11px;">&#8630; Deshacer</button>
+                    <button onclick="guardarDibujo()" style="padding:5px 10px;border:none;background:#1a237e;color:#fff;border-radius:7px;cursor:pointer;font-size:11px;">&#10003; Guardar</button>
+                    <button onclick="cancelarDibujo()" style="padding:5px 10px;border:none;background:#f0f2f5;border-radius:7px;cursor:pointer;font-size:11px;">Cancelar</button>
+                </div>
+            </div>
 
             <div id="panel-establecimientos">
                 <div id="panel-est-header">
@@ -71,6 +82,8 @@ function inicializarMapa() {
     }).addTo(mapa);
 
     agregarBotonCentrar(mapa, [32.5149, -117.0382], 11);
+
+    mapa.on('click', agregarPuntoDibujo);
 }
 
 function cargarDatos() {
@@ -134,15 +147,153 @@ function renderizarZonas() {
                     <button class="btn-guardar-zona" onclick="guardarZona(${z.id}, event)">
                         💾 Guardar
                     </button>
+                    <button class="btn-ver-est" onclick="iniciarDibujo(${z.id}, '${z.nombre}')">
+                        ✏️ Trazar límites
+                    </button>
+                    ${z.poligono ? `<button class="btn-ver-est" onclick="borrarDibujo(${z.id})">↺ Rectángulo</button>` : ''}
                 </div>
             </div>
         `;
         lista.appendChild(div);
     });
 }
+let modoDibujo = null;        // id de la zona que se esta trazando
+let puntosDibujo = [];
+let capaDibujo = null;
+let marcadoresDibujo = [];
 
-dibujarZonasEnMapa
+function dibujarZonasEnMapa() {
+    Object.values(capasZonas).forEach(c => mapa.removeLayer(c));
+    capasZonas = {};
 
+    zonas.forEach((z, idx) => {
+        if (!z.lat_min || !z.lat_max || !z.lon_min || !z.lon_max) return;
+
+        const color = COLORES[idx % COLORES.length];
+
+        // Si el coordinador trazó un contorno se usa ese; si no, el
+        // rectángulo que definen los límites numéricos de la zona
+        const capa = (z.poligono && z.poligono.length >= 3)
+            ? L.polygon(z.poligono, {
+                color: color, weight: 2,
+                fillColor: color, fillOpacity: 0.15
+              })
+            : L.rectangle([[z.lat_min, z.lon_min], [z.lat_max, z.lon_max]], {
+                color: color, weight: 2,
+                fillColor: color, fillOpacity: 0.15
+              });
+
+        capa.addTo(mapa)
+            .bindTooltip(`<b>${z.nombre}</b><br>${z.total_establecimientos} establecimientos`, {
+                permanent: false,
+                direction: 'center'
+            })
+            .on('click', () => { if (!modoDibujo) seleccionarZona(z.id); });
+
+        capasZonas[z.id] = capa;
+    });
+}
+
+/* El coordinador puede trazar el contorno real de una zona haciendo clic
+   sobre el mapa, para que el dibujo siga la costa o la frontera en lugar
+   de ser un rectángulo. Es solo visual: a qué zona pertenece cada
+   establecimiento lo siguen decidiendo los límites numéricos. */
+function iniciarDibujo(zonaId, zonaNombre) {
+    modoDibujo = zonaId;
+    puntosDibujo = [];
+    limpiarDibujo();
+
+    document.getElementById('barra-dibujo').style.display = 'flex';
+    document.getElementById('dibujo-zona-nombre').innerText = zonaNombre;
+    document.getElementById('dibujo-contador').innerText = '0 puntos';
+    mapa.getContainer().style.cursor = 'crosshair';
+    mostrarToast('Haz clic para marcar el contorno de la zona');
+
+    L.DomEvent.disableClickPropagation(document.getElementById('barra-dibujo'));
+}
+
+function agregarPuntoDibujo(e) {
+    if (!modoDibujo) return;
+
+    const p = [+e.latlng.lat.toFixed(5), +e.latlng.lng.toFixed(5)];
+    puntosDibujo.push(p);
+
+    marcadoresDibujo.push(
+        L.circleMarker(p, {
+            radius: 5, color: '#c62828', fillColor: '#c62828', fillOpacity: 1
+        }).addTo(mapa)
+    );
+
+    redibujarTrazo();
+}
+
+function redibujarTrazo() {
+    if (capaDibujo) { mapa.removeLayer(capaDibujo); capaDibujo = null; }
+    if (puntosDibujo.length >= 2) {
+        capaDibujo = L.polygon(puntosDibujo, {
+            color: '#c62828', weight: 2, dashArray: '6,4',
+            fillColor: '#c62828', fillOpacity: 0.1
+        }).addTo(mapa);
+    }
+    document.getElementById('dibujo-contador').innerText = `${puntosDibujo.length} puntos`;
+}
+
+function deshacerPunto(e) {
+    if (e) e.stopPropagation();
+    if (puntosDibujo.length === 0) return;
+    puntosDibujo.pop();
+    const ultimo = marcadoresDibujo.pop();
+    if (ultimo) mapa.removeLayer(ultimo);
+    redibujarTrazo();
+}
+
+function limpiarDibujo() {
+    marcadoresDibujo.forEach(m => mapa.removeLayer(m));
+    marcadoresDibujo = [];
+    if (capaDibujo) { mapa.removeLayer(capaDibujo); capaDibujo = null; }
+}
+
+function cancelarDibujo() {
+    modoDibujo = null;
+    puntosDibujo = [];
+    limpiarDibujo();
+    document.getElementById('barra-dibujo').style.display = 'none';
+    mapa.getContainer().style.cursor = '';
+}
+
+function guardarDibujo() {
+    if (puntosDibujo.length < 3) {
+        alert('Marca al menos tres puntos para cerrar el contorno');
+        return;
+    }
+
+    fetch(`/api/rutas/zonas/${modoDibujo}/poligono/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ puntos: puntosDibujo })
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.error) { alert('Error: ' + d.error); return; }
+        mostrarToast('✓ Contorno guardado');
+        cancelarDibujo();
+        cargarDatos();
+    })
+    .catch(() => alert('Error de conexión'));
+}
+
+/* Devuelve la zona a su forma rectangular */
+function borrarDibujo(zonaId) {
+    if (!confirm('¿Devolver esta zona a su forma rectangular?')) return;
+
+    fetch(`/api/rutas/zonas/${zonaId}/poligono/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ puntos: [] })
+    })
+    .then(r => r.json())
+    .then(() => { mostrarToast('✓ Contorno eliminado'); cargarDatos(); });
+}
 function seleccionarZona(zonaId) {
     if (zonaSeleccionada) {
         document.getElementById(`zona-card-${zonaSeleccionada}`)?.classList.remove('activa');

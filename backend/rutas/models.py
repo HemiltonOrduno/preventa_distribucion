@@ -16,11 +16,31 @@ class EdoRutaVisita(models.Model):
 
 
 class RutaVisita(models.Model):
+    """Plantilla permanente de la ruta: qué zona se recorre y qué día."""
     numero = models.AutoField(primary_key=True)
     nombre = models.CharField(max_length=20)
     descripcion = models.CharField(max_length=150, blank=True, null=True)
     dia = models.CharField(max_length=10, default='Lunes')
     zona = models.ForeignKey(Zona, on_delete=models.DO_NOTHING, db_column='zona')
+
+    class Meta:
+        managed = False
+        db_table = 'ruta_visita'
+
+    def __str__(self):
+        return self.nombre
+
+
+class RutaVisitaSemana(models.Model):
+    """
+    Ejecución semanal de la ruta: quién la llevó esa fecha y en qué
+    estado terminó. Así queda historial de todas las semanas.
+    """
+    numero = models.AutoField(primary_key=True)
+    ruta_visita = models.ForeignKey(
+        RutaVisita, on_delete=models.DO_NOTHING, db_column='ruta_visita'
+    )
+    fecha = models.DateField()
     empleado = models.ForeignKey(
         'usuarios.Empleado', on_delete=models.DO_NOTHING,
         db_column='empleado', blank=True, null=True
@@ -31,10 +51,8 @@ class RutaVisita(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'ruta_visita'
-
-    def __str__(self):
-        return self.nombre
+        db_table = 'ruta_visita_semana'
+        unique_together = (('ruta_visita', 'fecha'),)
 
 
 class RutaVisitaOrden(models.Model):
