@@ -1,0 +1,8 @@
+# Se fija la version para que coincida con los archivos ya procesados
+FROM ghcr.io/project-osrm/osrm-backend:v26.7.3-debian
+
+COPY osrm-data/ /data/
+
+EXPOSE 5000
+
+CMD ["osrm-routed", "--algorithm", "mld", "/data/baja_california-latest.osrm"]
