@@ -1,9 +1,16 @@
 import os
 from pathlib import Path
-from decouple import Config, RepositoryEnv
+from decouple import Config, RepositoryEnv, config as config_env
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 ROOT_DIR = BASE_DIR.parent
+
+
+# En local las credenciales vienen del .env de la raiz; en produccion,
+# de las variables de entorno del servidor
+_env_file = ROOT_DIR / '.env'
+config = Config(RepositoryEnv(_env_file)) if _env_file.exists() else config_env
+
 
 # El .env vive en la raiz del proyecto, no dentro de backend/
 config = Config(RepositoryEnv(ROOT_DIR / '.env'))
