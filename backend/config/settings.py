@@ -78,6 +78,12 @@ DATABASES = {
         'PASSWORD': config('DB_PASSWORD'),
         'HOST': config('DB_HOST'),
         'PORT': config('DB_PORT'),
+        'CONN_MAX_AGE': 600,
+        'OPTIONS': {
+            # La base está en la nube y corre en UTC: se fija la zona de
+            # Tijuana para que CURDATE() coincida con el día local
+            'init_command': "SET time_zone = '-07:00'",
+        },
     }
 }
 
