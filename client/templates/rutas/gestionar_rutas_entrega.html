@@ -5,7 +5,7 @@
 
 {% block main_content %}
 <div id="page-header">
-    🚚 Gestionar Rutas de Entrega
+    <i class='bx bxs-truck'></i> Gestionar Rutas de Entrega
 </div>
 <div id="page-body" style="padding:0;overflow:hidden;">
     <div id="layout">
@@ -16,7 +16,7 @@
                 <div style="font-size:13px;font-weight:bold;color:#333;">Rutas de entrega</div>
             </div>
             <div class="filtro-estado" style="padding:8px 12px;">
-                <button class="active" onclick="filtrar('por-crear', this)">📦 Por crear</button>
+                <button class="active" onclick="filtrar('por-crear', this)"><i class='bx bx-package'></i> Por crear</button>
                 <button onclick="filtrar('todas', this)">Todas</button>
                 <button onclick="filtrar('En camino', this)">En camino</button>
                 <button onclick="filtrar('Pausada', this)">Pausadas</button>
@@ -32,7 +32,7 @@
             <div id="panel-edicion-header">
                 <div id="edicion-titulo" style="font-size:13px;font-weight:bold;color:#1a237e;">Ruta</div>
                 <button onclick="cerrarEdicion()"
-                        style="padding:5px 10px;background:#f0f2f5;border:none;border-radius:5px;font-size:11px;cursor:pointer;">✕</button>
+                        style="padding:5px 10px;background:#f0f2f5;border:none;border-radius:5px;font-size:11px;cursor:pointer;"><i class='bx bx-x'></i></button>
             </div>
 
             <div id="modal-paradas-header" style="padding:8px 12px;">
@@ -58,12 +58,12 @@
                     </select>
                 </div>
                 <button class="btn-guardar" style="width:100%;padding:10px;"
-                        onclick="aprobarRuta()">✓ Liberar ruta</button>
+                        onclick="aprobarRuta()"><i class='bx bx-check'></i> Liberar ruta</button>
             </div>
 
             <div id="modal-footer">
                 <button class="btn-resetear" onclick="resetearOrden()">↺ Resetear</button>
-                <button class="btn-guardar" onclick="guardarOrden()">✓ Guardar orden</button>
+                <button class="btn-guardar" onclick="guardarOrden()"><i class='bx bx-check'></i> Guardar orden</button>
             </div>
         </div>
 
@@ -181,7 +181,7 @@ function renderizar(rutas, porCrear) {
             </div>
             ${porCrear ? '' : `<div class="progress-bar"><div class="fill" style="width:${progreso}%"></div></div>`}
             <button class="btn-ver-mapa" onclick="abrirMapa(${r.id}, ${r.entrega_id}, '${r.nombre}', '${r.estado_entrega}')">
-                ${porCrear ? '➕ Generar ruta de entrega' : '🗺️ Ver y editar ruta en mapa'}
+                ${porCrear ? '<i class="bx bx-plus"></i> Generar ruta de entrega' : '<i class="bx bx-map-alt"></i> Ver y editar ruta en mapa'}
             </button>
         `;
         lista.appendChild(div);
@@ -421,7 +421,7 @@ function guardarOrden() {
     .then(res => res.json())
     .then(data => {
         if (data.error) { alert('Error: ' + data.error); return; }
-        mostrarToast('✓ Orden de ruta guardado correctamente');
+        mostrarToast(' Orden de ruta guardado correctamente');
         cerrarEdicion();
     })
     .catch(() => alert('Error de conexión'));
@@ -469,8 +469,8 @@ function aprobarRuta() {
     .then(data => {
         if (data.error) { alert('Error: ' + data.error); return; }
         mostrarToast(data.asignada
-            ? '✓ Ruta creada y asignada al repartidor'
-            : '✓ Ruta creada, disponible para cualquier repartidor');
+            ? ' Ruta creada y asignada al repartidor'
+            : ' Ruta creada, disponible para cualquier repartidor');
         cerrarEdicion();
         setTimeout(() => location.reload(), 1200);
     })

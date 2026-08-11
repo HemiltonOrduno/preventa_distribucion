@@ -85,7 +85,7 @@ function regresarRuta() {
     .then(res => res.json())
     .then(data => {
         if (data.error) { alert('Error: ' + data.error); return; }
-        mostrarToast('✓ Ruta liberada');
+        mostrarToast(' Ruta liberada');
         entregaId = null;
         rutaId = null;
         cargarRuta();
@@ -119,7 +119,7 @@ function mostrarEntregasDisponibles() {
                 div.className = 'parada-item';
                 div.style.cursor = 'pointer';
                 div.innerHTML = `
-                    <div class="parada-num almacen">📦</div>
+                    <div class="parada-num almacen"><i class='bx bx-package'></i></div>
                     <div class="parada-info">
                         <div class="parada-nombre">Entrega #${e.entrega_id}</div>
                         <div class="parada-sub">Ruta #${e.ruta_entrega_id} · ${e.total_pedidos} pedidos · ${e.peso_total_kg.toFixed(1)} kg</div>
@@ -163,7 +163,7 @@ function tomarYIniciarEntrega(rutaEntregaId, entregaIdParam) {
     .then(data => {
         if (!data) return;
         if (data.error) { alert('Error: ' + data.error); return; }
-        mostrarToast('✓ Ruta tomada e iniciada');
+        mostrarToast(' Ruta tomada e iniciada');
         cargarRuta();
     })
     .catch(err => { if (err !== 'ya-tomada') console.error(err); });
@@ -182,7 +182,7 @@ function tomarEntrega(rutaEntregaId) {
             mostrarEntregasDisponibles(); // refresca, por si alguien más ya se la ganó
             return;
         }
-        mostrarToast('✓ Entrega tomada');
+        mostrarToast(' Entrega tomada');
         cargarRuta();
     })
     .catch(() => alert('Error de conexión'));
@@ -203,7 +203,7 @@ function renderizarParadas() {
             div.className = 'parada-item';
             div.style.cursor = 'default';
             div.innerHTML = `
-                <div class="parada-num almacen">🏭</div>
+                <div class="parada-num almacen"><i class='bx bx-building'></i></div>
                 <div class="parada-info">
                     <div class="parada-nombre">${p.nombre}</div>
                     <div class="parada-sub">Punto de salida</div>
@@ -217,7 +217,7 @@ function renderizarParadas() {
         div.className = `parada-item ${p.entregado ? 'entregada' : ''}`;
         div.id = `parada-${p.establecimiento_id}`;
         div.innerHTML = `
-            <div class="parada-num ${p.entregado ? 'entregada' : ''}">${p.entregado ? '✓' : i}</div>
+            <div class="parada-num ${p.entregado ? 'entregada' : ''}">${p.entregado ? '<i class="bx bx-check"></i>' : i}</div>
             <div class="parada-info">
                 <div class="parada-nombre">${p.nombre}</div>
                 <div class="parada-sub">${p.colonia} · Pedido #${p.pedido_id}</div>
@@ -285,7 +285,7 @@ function iniciarRuta() {
         if (data.error) { alert('Error: ' + data.error); return; }
         rutaIniciada = true;
         document.getElementById('btn-iniciar').style.display = 'none';
-        mostrarToast('✓ Ruta iniciada');
+        mostrarToast(' Ruta iniciada');
     });
 }
 
@@ -389,7 +389,7 @@ function abrirModalParada(parada) {
                             <div class="producto-cancelado-detalle">
                                 Solicitado: ${c.cantidad_solicitada} piezas · ${c.motivo || 'Sin stock disponible'}
                             </div>
-                            <div class="producto-cancelado-fecha">📅 Disponible aprox.: ${fechaTexto}</div>
+                            <div class="producto-cancelado-fecha"><i class='bx bx-calendar'></i> Disponible aprox.: ${fechaTexto}</div>
                         </div>
                     `;
                 });
@@ -426,7 +426,7 @@ function actualizarEstadoCobroModal(pedidoId) {
 
             if (d.pagado) {
                 habilitarConfirmacion(true);
-                aviso.innerText = '✓ Cobro ya registrado';
+                aviso.innerText = ' Cobro ya registrado';
                 aviso.style.display = 'block';
                 aviso.style.color = '#2e7d32';
 
@@ -598,7 +598,7 @@ function guardarCobro() {
         if (data.cambio > 0) {
             alert(`Cobro registrado: $${data.cobrado.toFixed(2)}\n\nCambio a entregar: $${data.cambio.toFixed(2)}`);
         } else {
-            mostrarToast('✓ Cobro registrado');
+            mostrarToast(' Cobro registrado');
         }
 
         // Regresa al detalle de la parada y desbloquea la confirmación
@@ -737,7 +737,7 @@ function guardarDevolucion() {
                   `Debes entregar al cliente $${data.reembolso.toFixed(2)} ` +
                   `por el producto devuelto.`);
         } else {
-            mostrarToast('✓ Devolución registrada');
+            mostrarToast(' Devolución registrada');
         }
 
         document.getElementById('modal-parada').classList.add('visible');
@@ -800,12 +800,12 @@ function confirmarEntrega() {
             m.setIcon(icono);
         }
 
-        mostrarToast(`✓ Entrega confirmada · ${fechaTexto} ${horaTexto}`);
+        mostrarToast(` Entrega confirmada · ${fechaTexto} ${horaTexto}`);
 
         // RF37: el sistema cerró la entrega al quedar todos los pedidos entregados
         if (data.entrega_completada) {
             setTimeout(() => {
-                alert('✓ Ruta completada\n\nTodos los pedidos fueron entregados. La entrega se cerró automáticamente.');
+                alert(' Ruta completada\n\nTodos los pedidos fueron entregados. La entrega se cerró automáticamente.');
                 location.reload();
             }, 800);
         }
@@ -831,12 +831,12 @@ window.addEventListener('load', () => {
 const TIPOS_DEVOLUCION = {
     sustitucion: {
         valor: 'Producto dañado con sustitución',
-        etiqueta: '✓ Registrar devolución con sustitución',
+        etiqueta: '<i class="bx bx-check"></i> Registrar devolución con sustitución',
         clase: 'btn-confirmar-dev--sustitucion'
     },
     completa: {
         valor: 'Devolución completa sin reemplazo',
-        etiqueta: '⚠ Confirmar devolución completa sin reemplazo',
+        etiqueta: '<i class="bx bx-error"></i> Confirmar devolución completa sin reemplazo',
         clase: 'btn-confirmar-dev--completa'
     }
 };

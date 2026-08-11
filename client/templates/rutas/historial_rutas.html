@@ -7,7 +7,7 @@
 {% block main_content %}
 <div id="contenido">
     <div id="page-header">
-        📋 Historial de Rutas
+        <i class='bx bx-history'></i> Historial de Rutas
     </div>
     <div id="page-body" style="overflow-y:auto;padding:16px;">
 
@@ -236,7 +236,7 @@ function renderizar() {
     }
 
     if (visita.length) {
-        lista.innerHTML += '<div class="hist-seccion">🗓️ Rutas de visita</div>';
+        lista.innerHTML += '<div class="hist-seccion"><i class="bx bx-calendar"></i> Rutas de visita</div>';
         visita.forEach(r => {
             const total = r.total_paradas || 0;
             const pct = total ? Math.round(r.completadas / total * 100) : 0;
@@ -245,9 +245,9 @@ function renderizar() {
                     <div>
                         <div class="hist-nombre">${r.nombre}</div>
                         <div class="hist-meta">
-                            <span>📍 ${r.zona}</span>
-                            <span>📅 ${r.dia}</span>
-                            <span>👤 ${r.responsable}</span>
+                            <span><i class='bx bx-map-pin'></i> ${r.zona}</span>
+                            <span><i class='bx bx-calendar'></i> ${r.dia}</span>
+                            <span><i class='bx bx-user'></i> ${r.responsable}</span>
                             ${r.sin_pedido ? `<span class="hist-badge b-sinpedido">${r.sin_pedido} sin pedido</span>` : ''}
                         </div>
                     </div>
@@ -261,7 +261,7 @@ function renderizar() {
     }
 
     if (entrega.length) {
-        lista.innerHTML += '<div class="hist-seccion">🚚 Rutas de entrega</div>';
+        lista.innerHTML += '<div class="hist-seccion"><i class="bx bxs-truck"></i> Rutas de entrega</div>';
         entrega.forEach(r => {
             const total = r.total_paradas || 0;
             const hechas = parseInt(r.completadas) || 0;
@@ -274,10 +274,10 @@ function renderizar() {
                     <div>
                         <div class="hist-nombre">${r.nombre}</div>
                         <div class="hist-meta">
-                            <span>👤 ${r.responsable}</span>
-                            ${r.placas ? `<span>🚚 ${r.placas}</span>` : ''}
-                            <span>📅 ${r.fecha_creacion || '-'}</span>
-                            <span>💵 $${monto}</span>
+                            <span><i class='bx bx-user'></i> ${r.responsable}</span>
+                            ${r.placas ? `<span><i class='bx bxs-truck'></i> ${r.placas}</span>` : ''}
+                            <span><i class='bx bx-calendar'></i> ${r.fecha_creacion || '-'}</span>
+                            <span><i class='bx bx-money'></i> $${monto}</span>
                         </div>
                     </div>
                     <div class="hist-derecha">

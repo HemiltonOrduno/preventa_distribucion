@@ -7,7 +7,7 @@
 {% block main_content %}
 <div id="contenido">
     <div id="page-header">
-        📍 Gestionar Zonas
+        <i class='bx bx-map-pin'></i> Gestionar Zonas
     </div>
     <div id="page-body">
         <div id="layout">
@@ -37,8 +37,8 @@
                     <button onclick="cerrarPanelEst()">×</button>
                 </div>
                 <div id="panel-est-acciones">
-                    <button class="btn-nueva-ruta" onclick="crearRutaConZona('visita')">🗓️ Ruta de visita</button>
-                    <button class="btn-nueva-ruta" onclick="crearRutaConZona('entrega')">🚚 Ruta de entrega</button>
+                    <button class="btn-nueva-ruta" onclick="crearRutaConZona('visita')"><i class='bx bx-calendar'></i> Ruta de visita</button>
+                    <button class="btn-nueva-ruta" onclick="crearRutaConZona('entrega')"><i class='bx bxs-truck'></i> Ruta de entrega</button>
                 </div>
                 <div id="panel-est-body"></div>
             </div>
@@ -142,13 +142,13 @@ function renderizarZonas() {
                 </div>
                 <div class="zona-botones">
                     <button class="btn-ver-est" onclick="verEstablecimientos(${z.id}, '${z.nombre}', event)">
-                        🏪 Ver establecimientos
+                        <i class='bx bx-store'></i> Ver establecimientos
                     </button>
                     <button class="btn-guardar-zona" onclick="guardarZona(${z.id}, event)">
-                        💾 Guardar
+                        <i class='bx bx-save'></i> Guardar
                     </button>
                     <button class="btn-ver-est" onclick="iniciarDibujo(${z.id}, '${z.nombre}')">
-                        ✏️ Trazar límites
+                        <i class='bx bx-edit'></i> Trazar límites
                     </button>
                     ${z.poligono ? `<button class="btn-ver-est" onclick="borrarDibujo(${z.id})">↺ Rectángulo</button>` : ''}
                 </div>
@@ -275,7 +275,7 @@ function guardarDibujo() {
     .then(r => r.json())
     .then(d => {
         if (d.error) { alert('Error: ' + d.error); return; }
-        mostrarToast('✓ Contorno guardado');
+        mostrarToast('Contorno guardado');
         cancelarDibujo();
         cargarDatos();
     })
@@ -292,7 +292,7 @@ function borrarDibujo(zonaId) {
         body: JSON.stringify({ puntos: [] })
     })
     .then(r => r.json())
-    .then(() => { mostrarToast('✓ Contorno eliminado'); cargarDatos(); });
+    .then(() => { mostrarToast(' Contorno eliminado'); cargarDatos(); });
 }
 function seleccionarZona(zonaId) {
     if (zonaSeleccionada) {
@@ -353,7 +353,7 @@ function verEstablecimientos(zonaId, zonaNombre, event) {
         const div = document.createElement('div');
         div.className = 'est-item';
         div.innerHTML = `
-            <div class="est-icono">🏪</div>
+            <div class="est-icono"><i class='bx bx-store'></i></div>
             <div>
                 <div class="est-nombre">${e.nombre}</div>
                 <div class="est-colonia">${e.colonia} · ${e.telefono}</div>
@@ -416,7 +416,7 @@ function guardarZona(zonaId, event) {
         }
         dibujarZonasEnMapa();
         seleccionarZona(zonaId);
-        mostrarToast('✓ Zona actualizada correctamente');
+        mostrarToast(' Zona actualizada correctamente');
     })
     .catch(() => alert('Error de conexión'));
 }

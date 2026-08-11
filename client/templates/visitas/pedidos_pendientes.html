@@ -2,7 +2,7 @@
 
 {% block title %}Pedidos Pendientes{% endblock %}
 {% block nav_pedidos %}active{% endblock %}
-{% block page_icon %}📋{% endblock %}
+{% block page_icon %}<i class='bx bx-clipboard'></i>{% endblock %}
 {% block page_title %}Pedidos Pendientes de Validación{% endblock %}
 
 {% block content %}
@@ -53,7 +53,7 @@
                         <strong>Pedido #${p.pedido_id}</strong> — ${p.establecimiento_nombre}
                         <div style="font-size:12px; color:#666;">Zona: ${p.zona_nombre} · Total: $${p.total.toFixed(2)}</div>
                         ${p.observaciones
-                            ? `<div style="font-size:12px; color:#8a6d1f; margin-top:4px;">📝 ${escapar(p.observaciones)}</div>`
+                            ? `<div style="font-size:12px; color:#8a6d1f; margin-top:4px;"><i class='bx bx-note'></i> ${escapar(p.observaciones)}</div>`
                             : ''}
                     </div>
                     <button class="btn btn-primary" onclick="verDetalle(${p.pedido_id})">Validar</button>
@@ -116,7 +116,7 @@ ${p.detalle.map(d => `
             </table>
             <p style="margin-top:12px; font-weight:bold;">Total: $${p.total.toFixed(2)}</p>
             <button class="btn btn-primary" style="width:100%; margin-top:10px;"
-                onclick="confirmarPedido(${p.pedido_id})">✔ Confirmar pedido</button>
+                onclick="confirmarPedido(${p.pedido_id})"><i class='bx bx-check'></i> Confirmar pedido</button>
         `;
     }
 

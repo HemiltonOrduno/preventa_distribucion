@@ -58,7 +58,7 @@
 
 <div class="pedidos-wrap">
     <div class="pedidos-header">
-        <div class="pedidos-titulo">📦 Pedidos de mi ruta</div>
+        <div class="pedidos-titulo"><i class='bx bx-package'></i> Pedidos de mi ruta</div>
         <span id="pedidos-entrega" style="font-size:11px;color:#888;"></span>
     </div>
 
@@ -162,8 +162,8 @@ function renderizarPedidos() {
         div.onclick = () => toggleProductos(p.pedido_id);
 
         const badge = p.entregado
-            ? '<span class="pedido-badge badge-entregado">✓ Entregado</span>'
-            : '<span class="pedido-badge badge-pendiente">⏳ Pendiente</span>';
+            ? '<span class="pedido-badge badge-entregado"><i class="bx bx-check"></i> Entregado</span>'
+            : '<span class="pedido-badge badge-pendiente">Pendiente</span>';
 
         const monto = (p.subtotal || 0).toLocaleString('es-MX', {
             minimumFractionDigits: 2, maximumFractionDigits: 2
@@ -173,15 +173,15 @@ function renderizarPedidos() {
             <div class="pedido-card__top">
                 <div>
                     <div class="pedido-card__nombre">${p.nombre}</div>
-                    <div class="pedido-card__colonia">📍 ${p.colonia || 'Sin colonia'}</div>
+                    <div class="pedido-card__colonia"><i class='bx bx-map-pin'></i> ${p.colonia || 'Sin colonia'}</div>
                 </div>
                 <div class="pedido-card__monto">$${monto}</div>
             </div>
             <div class="pedido-card__meta">
-                <span>Pedido #${p.pedido_id}</span>
+                <span>Pedido #${p.pedido_id}</span>|
                 ${badge}
-                ${p.representante ? `<span>👤 ${p.representante}</span>` : ''}
-                ${p.telefono ? `<span>📞 ${p.telefono}</span>` : ''}
+                ${p.representante ? `<span><i class='bx bx-user'></i> ${p.representante}</span>` : ''}
+                ${p.telefono ? `<span><i class='bx bx-phone'></i> ${p.telefono}</span>` : ''}
             </div>
             <div class="pedido-productos" id="productos-${p.pedido_id}">
                 <p style="font-size:12px;color:#888;">Cargando productos...</p>

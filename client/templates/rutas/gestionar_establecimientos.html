@@ -6,13 +6,13 @@
 {% block main_content %}
 <div id="contenido">
     <div id="page-header">
-        🏪 Gestionar Establecimientos
+        <i class='bx bx-store'></i> Gestionar Establecimientos
     </div>
     <div id="page-body">
         <div id="layout">
             <div id="panel-lista">
                 <div class="toolbar">
-                    <input type="text" class="search-box" id="buscador" placeholder="🔍 Buscar establecimiento..." oninput="filtrar()">
+                    <input type="text" class="search-box" id="buscador" placeholder="Buscar establecimiento..." oninput="filtrar()">
                     <div class="filtros-row">
                         <select class="filtro-select" id="filtro-zona" onchange="filtrar()">
                             <option value="">Todas las zonas</option>
@@ -148,7 +148,7 @@ function renderizar(establecimientos) {
         div.className = 'est-item';
         div.id = `item-${e.id}`;
         div.innerHTML = `
-            <div class="est-icono">🏪</div>
+            <div class="est-icono"><i class='bx bx-store'></i></div>
             <div class="est-info">
                 <div class="est-nombre">${e.nombre}</div>
                 <div class="est-sub">
@@ -246,7 +246,7 @@ function guardarEstablecimiento() {
     .then(data => {
         if (data.error) { alert('Error: ' + data.error); return; }
         cerrarModal();
-        mostrarToast('✓ Establecimiento actualizado');
+        mostrarToast('Establecimiento actualizado');
         cargarDatos();
     })
     .catch(() => alert('Error de conexión'));

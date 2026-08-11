@@ -11,7 +11,7 @@
     <!-- PANEL IZQUIERDO: Lista de paradas -->
     <div class="ruta-panel">
         <div class="ruta-panel__header">
-            <div class="ruta-panel__titulo">🗺️ Ruta del día</div>
+            <div class="ruta-panel__titulo"><i class='bx bx-map-alt'></i> Ruta del día</div>
             <button class="btn-iniciar-ruta" id="btn-iniciar" onclick="iniciarRuta()">
                 ▶ Iniciar ruta
             </button>
@@ -55,11 +55,11 @@
 
         <div class="modal-acciones" id="modal-acciones">
             <button class="btn-cobro" id="btn-abrir-cobro" onclick="abrirCobro()">
-                💳 Registrar cobro
+                <i class='bx bx-credit-card'></i> Registrar cobro
             </button>
             <button class="btn-confirmar-entrega" id="btn-confirmar-entrega"
                     onclick="confirmarEntrega()" disabled>
-                📦 Confirmar entrega
+                <i class='bx bx-package'></i> Confirmar entrega
             </button>
             <div id="aviso-cobro" style="font-size:11px;color:#888;text-align:center;">
                 Registra el cobro para poder confirmar la entrega
@@ -74,17 +74,17 @@
 <div class="modal-overlay" id="modal-cobro" onclick="cerrarModalCobro(event)">
     <div class="modal">
         <div class="modal-handle"></div>
-        <div class="modal-titulo">💳 Registrar cobro</div>
+        <div class="modal-titulo"><i class='bx bx-credit-card'></i> Registrar cobro</div>
         <div class="modal-subtitulo" id="cobro-est-nombre"></div>
 
         <div class="form-group">
             <label>Tipo de pago</label>
             <div class="tipo-pago-selector">
                 <button class="tipo-pago-btn active" id="btn-efectivo" onclick="seleccionarPago('TP001', this)">
-                    💵 Efectivo
+                    <i class='bx bx-money'></i> Efectivo
                 </button>
                 <button class="tipo-pago-btn" id="btn-tarjeta" onclick="seleccionarPago('TP002', this)">
-                    💳 Tarjeta
+                    <i class='bx bx-credit-card'></i> Tarjeta
                 </button>
             </div>
         </div>
@@ -117,7 +117,7 @@
         </div>
 
         <div class="modal-acciones">
-            <button class="btn-cobro" onclick="guardarCobro()">✓ Guardar cobro</button>
+            <button class="btn-cobro" onclick="guardarCobro()"><i class='bx bx-check'></i> Guardar cobro</button>
             <button class="btn-cancelar-modal" onclick="cerrarModalCobro()">Cancelar</button>
         </div>
 
@@ -177,7 +177,7 @@
         <div class="modal-acciones">
             <button class="btn-confirmar-dev btn-confirmar-dev--sustitucion"
                     id="btn-guardar-dev" onclick="guardarDevolucion()">
-                ✓ Registrar devolución con sustitución
+                <i class='bx bx-check'></i> Registrar devolución con sustitución
             </button>
             <button class="btn-cancelar-modal" onclick="cerrarModalDevolucion()">Cancelar</button>
         </div>

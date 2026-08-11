@@ -2,7 +2,7 @@
 
 {% block title %}Inventario{% endblock %}
 {% block nav_inventario %}active{% endblock %}
-{% block page_icon %}📦{% endblock %}
+{% block page_icon %}<i class='bx bx-package'></i>{% endblock %}
 {% block page_title %}Registrar Movimiento de Inventario{% endblock %}
 
 {% block extra_styles %}
@@ -204,7 +204,7 @@
                    title="El precio lo define el administrador"
                    style="width:130px; padding:6px; border-radius:6px; border:1px solid #ccc;
                           background:#f0f2f5; color:#555; cursor:not-allowed;">
-            <button class="btn btn-danger" style="padding:6px 10px;" onclick="document.getElementById('linea-${contadorLineas}').remove()">✕</button>
+            <button class="btn btn-danger" style="padding:6px 10px;" onclick="document.getElementById('linea-${contadorLineas}').remove()"><i class='bx bx-x'></i></button>
         `;
         document.getElementById('lineas-detalle').appendChild(div);
 

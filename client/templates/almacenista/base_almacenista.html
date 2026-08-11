@@ -1,9 +1,11 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'rutas/css/boxicons.min.css' %}">
     <title>{% block title %}Panel Almacenista{% endblock %} - Sabritas Tijuana</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -251,6 +253,12 @@
         white-space: nowrap;
         transition: background .15s, color .15s;
     }
+    .top-nav__link i,
+    .top-nav__brand i {
+        font-size: 16px;
+        vertical-align: middle;
+        margin-right: 2px;
+    }
     .top-nav__link:hover { background: #f0f2f8; color: #1a237e; }
     .top-nav__link.active { background: #e8eaf6; color: #1a237e; font-weight: 600; }
 
@@ -320,20 +328,20 @@
 <body>
 
 <nav class="top-nav">
-    <div class="top-nav__brand">📦 INPREDISROUTE</div>
+    <div class="top-nav__brand"><i class='bx bxs-box'></i> INPREDISROUTE</div>
     <div class="top-nav__links">
         <a href="/api/visitas/almacenista/pedidos/" class="top-nav__link {% block nav_pedidos %}{% endblock %}">
-            📋 Pedidos pendientes
+            <i class='bx bx-clipboard'></i> Pedidos pendientes
         </a>
         <a href="/api/inventario/almacenista/movimientos/" class="top-nav__link {% block nav_movimientos %}{% endblock %}">
-            📦 Inventario
+            <i class='bx bx-package'></i> Inventario
             <span class="badge-pendientes" id="badge-devoluciones"></span>
         </a>
         <a href="/api/entregas/almacenista/cargar-camion/" class="top-nav__link {% block nav_entregas %}{% endblock %}">
-            🚚 Cargar camión
+            <i class='bx bxs-truck'></i> Cargar camión
         </a>
         <a href="/api/productos/almacenista/nuevo/" class="top-nav__link {% block nav_productos %}{% endblock %}">
-            🏷️ Nuevo producto
+            <i class='bx bx-purchase-tag'></i> Nuevo producto
         </a>
     </div>
     <div class="top-nav__avatar" id="perfil-avatar" onclick="togglePerfil(event)">--</div>

@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{% static 'rutas/css/boxicons.min.css' %}">
     <link rel="stylesheet" href="{% static 'rutas/css/leaflet.css' %}">
     <link rel="stylesheet" href="{% static 'entregas/css/repartidor.css' %}?v=2">
     <title>{% block title %}Repartidor{% endblock %} - INPREDISROUTE</title>
@@ -12,18 +13,18 @@
 
 <nav class="top-nav">
     <div class="top-nav__brand">
-        <span class="brand-icon">🚚</span> INPREDISROUTE
+        <span class="brand-icon"><i class='bx bxs-truck'></i></span> INPREDISROUTE
     </div>
     <div class="top-nav__links">
         <a href="/api/entregas/ruta-entrega/" class="top-nav__link {% block nav_ruta %}{% endblock %}">
-            🗺️ Ruta del día
+            <i class='bx bx-map-alt'></i> Ruta del día
         </a>
         <a href="/api/entregas/pedidos/" class="top-nav__link {% block nav_pedidos %}{% endblock %}">
-            📦 Pedidos
+            <i class='bx bx-package'></i> Pedidos
         </a>
     </div>
     <a href="{% url 'logout' %}" class="top-nav__avatar" title="Cerrar sesión"
-       onclick="return confirm('¿Cerrar sesión?');">🚪</a>
+       onclick="return confirm('¿Cerrar sesión?');"><i class='bx bx-log-out'></i></a>
 </nav>
 
 <div class="page {% block page_class %}{% endblock %}">
@@ -32,14 +33,14 @@
 
 <nav class="bottom-nav">
     <a href="/api/entregas/ruta-entrega/" class="bottom-nav__item {% block nav_ruta_m %}{% endblock %}">
-        🗺️ <span>Ruta</span>
+        <i class='bx bx-map-alt'></i> <span>Ruta</span>
     </a>
     <a href="/api/entregas/pedidos/" class="bottom-nav__item {% block nav_pedidos_m %}{% endblock %}">
-        📦 <span>Pedidos</span>
+        <i class='bx bx-package'></i> <span>Pedidos</span>
     </a>
     <a href="{% url 'logout' %}" class="bottom-nav__item"
        onclick="return confirm('¿Cerrar sesión?');">
-        🚪 <span>Salir</span>
+        <i class='bx bx-log-out'></i> <span>Salir</span>
     </a>
 </nav>
 

@@ -7,7 +7,7 @@
 {% block main_content %}
 <div id="contenido">
     <div id="page-header">
-        🗓️ Gestionar Rutas de Visita
+        <i class='bx bx-calendar'></i> Gestionar Rutas de Visita
     </div>
     <div id="page-body">
         <div id="layout">
@@ -35,8 +35,8 @@
                 <div id="panel-edicion-header">
                     <div id="edicion-titulo" style="font-size:13px;font-weight:bold;color:#1a237e;">Nueva ruta</div>
                     <div style="display:flex;gap:6px;">
-                        <button class="btn-asignar" onclick="guardarRutaDesdePanel()">✓ Guardar</button>
-                        <button onclick="cerrarEdicion()" style="padding:5px 10px;background:#f0f2f5;border:none;border-radius:5px;font-size:11px;cursor:pointer;">✕</button>
+                        <button class="btn-asignar" onclick="guardarRutaDesdePanel()"><i class='bx bx-check'></i> Guardar</button>
+                        <button onclick="cerrarEdicion()" style="padding:5px 10px;background:#f0f2f5;border:none;border-radius:5px;font-size:11px;cursor:pointer;"><i class='bx bx-x'></i></button>
                     </div>
                 </div>
                 <div id="panel-edicion-form">
@@ -245,17 +245,17 @@ function renderizarRutas(rutas) {
         }
 
         const botonEditar = bloqueada
-            ? `<button disabled style="margin-top:8px;width:100%;padding:6px;background:#e9ecef;border:1px solid #dee2e6;border-radius:6px;font-size:11px;color:#aaa;cursor:not-allowed;">✏️ Editar ruta</button>`
+            ? `<button disabled style="margin-top:8px;width:100%;padding:6px;background:#e9ecef;border:1px solid #dee2e6;border-radius:6px;font-size:11px;color:#aaa;cursor:not-allowed;"><i class='bx bx-edit'></i> Editar ruta</button>`
             : `<button onclick="event.stopPropagation(); abrirEditarRuta(${r.id})"
                 style="margin-top:8px;width:100%;padding:6px;background:#f0f2f5;border:1px solid #dee2e6;border-radius:6px;font-size:11px;cursor:pointer;color:#555;">
-                ✏️ Editar ruta
+                <i class='bx bx-edit'></i> Editar ruta
               </button>`;
 
         div.innerHTML = `
             <div class="ruta-nombre">${r.nombre}</div>
             <div class="ruta-info">
-                <span>📍 ${r.zona}</span>
-                <span>📅 ${r.dia}</span>
+                <span><i class='bx bx-map-pin'></i> ${r.zona}</span>
+                <span><i class='bx bx-calendar'></i> ${r.dia}</span>
                 <span class="badge ${getBadgeClass(r.estado)}">${r.estado}</span>
             </div>
             <div style="font-size:11px;color:#888;margin-bottom:4px;">${completadas}/${total} visitas (${progreso}%)</div>
@@ -315,7 +315,7 @@ function asignarVendedor(rutaId) {
     .then(res => res.json().then(data => ({ status: res.status, data })))
     .then(({ status, data }) => {
         if (status !== 200) { alert('Error: ' + (data.error || 'no se pudo asignar')); cargarDatos(); return; }
-        mostrarToast(`✓ ${vendedorNombre} asignado`);
+        mostrarToast(` ${vendedorNombre} asignado`);
         cargarDatos(); // recarga la lista para que la tarjeta muestre el nuevo estado
     })
     .catch(() => alert('Error de conexión'));
@@ -625,7 +625,7 @@ function rutaAutomatica() {
     ordenarConOSRM(() => {
         actualizarNumerosEnMarcadores();
         actualizarListaParadas();
-        mostrarToast(`✓ ${paradasSeleccionadas.length} paradas ordenadas — ajústalas si hace falta`);
+        mostrarToast(` ${paradasSeleccionadas.length} paradas ordenadas — ajústalas si hace falta`);
     });
 }
 
@@ -648,7 +648,7 @@ function guardarRuta(nombre, dia, descripcion, zonaId, eraEdicion) {
     .then(data => {
         if (data.error) { alert('Error: ' + data.error); return; }
         cerrarEdicion();
-        mostrarToast(eraEdicion ? '✓ Ruta actualizada' : '✓ Ruta creada');
+        mostrarToast(eraEdicion ? ' Ruta actualizada' : '✓ Ruta creada');
         cargarDatos();
     })
     .catch(() => alert('Error de conexión'));
