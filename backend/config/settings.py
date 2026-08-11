@@ -8,9 +8,9 @@ ROOT_DIR = BASE_DIR.parent
 # El .env vive en la raiz del proyecto, no dentro de backend/
 config = Config(RepositoryEnv(ROOT_DIR / '.env'))
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-
-ROOT_DIR = BASE_DIR.parent
+# En local apunta al contenedor de Docker; en produccion, al servicio
+# de OSRM desplegado
+OSRM_URL = config('OSRM_URL', default='http://127.0.0.1:5000')
 
 SECRET_KEY = config('SECRET_KEY')
 
@@ -41,6 +41,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -100,11 +101,6 @@ TIME_ZONE = 'America/Tijuana'
 USE_I18N = True
 USE_TZ = False
 
-STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(ROOT_DIR, 'staticfiles')
-STATICFILES_DIRS = [
-    os.path.join(ROOT_DIR, 'client', 'static'),
-]
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = ROOT_DIR / 'media'
@@ -130,3 +126,17 @@ BaseDatabaseWrapper.check_database_version_supported = lambda self: None
 # Desactiva la sintaxis RETURNING para MariaDB 10.4
 DatabaseFeatures.can_return_columns_from_insert = False
 
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(ROOT_DIR, 'staticfiles')
+STATICFILES_DIRS = [
+    os.path.join(ROOT_DIR, 'client', 'static'),
+]
+# Sin manifiesto: los CSS de terceros (Leaflet, Boxicons) referencian
+# imágenes y fuentes que no se descargaron, y el modo con manifiesto
+# falla al no encontrarlas
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+
+# Railway asigna el dominio en tiempo de ejecución
+CSRF_TRUSTED_ORIGINS = [
+    'https://*.up.railway.app',
+]

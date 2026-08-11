@@ -1,5 +1,5 @@
 from unittest import result
-
+from django.conf import settings
 import requests
 import json
 from django.shortcuts import render
@@ -16,7 +16,7 @@ ALMACEN = {
     "nombre": "Almacén Sabritas - El Florido"
 }
 
-OSRM_URL = "http://127.0.0.1:5000"
+OSRM_URL = settings.OSRM_URL
 
 @rol_requerido('Coordinador', 'Administrador')
 def coordinador(request):

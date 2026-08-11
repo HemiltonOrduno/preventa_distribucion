@@ -301,7 +301,7 @@ def mi_ruta(request):
     coords_str = ";".join(f"{lon},{lat}" for lon, lat in coords)
 
     try:
-        r = req.get(f"http://127.0.0.1:5000/route/v1/driving/{coords_str}",
+        r = req.get(f"{OSRM_URL}/route/v1/driving/{coords_str}",
                     params={"geometries": "geojson", "overview": "full"}, timeout=10)
         osrm = r.json()
         geometria = osrm["routes"][0]["geometry"] if osrm.get("code") == "Ok" else None

@@ -6,6 +6,8 @@ from django.views.decorators.csrf import csrf_exempt
 from usuarios.permissions import rol_requerido
 from datetime import date
 import requests as req
+from django.conf import settings
+OSRM_URL = settings.OSRM_URL
 
 
 @rol_requerido('Vendedor', 'Administrador')
@@ -622,7 +624,7 @@ def mapa_ruta_del_dia_api(request):
     if len(coords) >= 2:
         coords_str = ";".join(f"{lon},{lat}" for lon, lat in coords)
         try:
-            r = req.get(f"http://127.0.0.1:5000/route/v1/driving/{coords_str}",
+            r = req.get(f"{OSRM_URL}/route/v1/driving/{coords_str}",
                         params={"geometries": "geojson", "overview": "full"}, timeout=15)
             osrm = r.json()
             if osrm.get("code") == "Ok":
