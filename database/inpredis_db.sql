@@ -504,3 +504,10 @@ ALTER TABLE ruta_visita DROP FOREIGN KEY ruta_visita_ibfk_3;
 ALTER TABLE ruta_visita DROP COLUMN empleado;
 ALTER TABLE ruta_visita DROP COLUMN edo_ruta_visita;
 
+-- Producto que el cliente pide a cambio del devuelto
+ALTER TABLE devolucion ADD COLUMN cod_producto_cambio VARCHAR(10) NULL;
+ALTER TABLE devolucion ADD FOREIGN KEY (cod_producto_cambio) REFERENCES producto(codigo);
+
+-- Marca el pedido que nace de una devolución, para darle prioridad
+ALTER TABLE pedido ADD COLUMN devolucion_origen INT NULL;
+ALTER TABLE pedido ADD FOREIGN KEY (devolucion_origen) REFERENCES devolucion(codigo);

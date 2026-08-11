@@ -365,7 +365,10 @@ function abrirModalParada(parada) {
                         <div class="producto-item">
                             <div>
                                 <div class="producto-nombre">${p.nombre}</div>
-                                <div class="producto-cantidad">${p.cantidad} piezas</div>
+                                <div class="producto-cantidad">
+                                ${p.cantidad} piezas
+                                ${p.devuelto > 0 ? `<span style="color:#e65100;"> (${p.devuelto} devueltas)</span>` : ''}
+                            </div>
                             </div>
                             <div class="producto-importe">$${parseFloat(p.importe).toFixed(2)}</div>
                         </div>
@@ -642,6 +645,24 @@ function cargarProductosDevolucion() {
         .catch(() => {
             select.innerHTML = '<option value="">No se pudieron cargar los productos</option>';
         });
+
+    // El cliente puede pedir a cambio cualquier producto del catálogo,
+    // no solo el que está devolviendo
+    const selCambio = document.getElementById('dev-producto-cambio');
+    selCambio.innerHTML = '<option value="">Cargando...</option>';
+
+    fetch('/api/inventario/catalogo-stock/')
+        .then(r => r.json())
+        .then(d => {
+            const productos = d.productos || [];
+            selCambio.innerHTML = '<option value="">Selecciona un producto...</option>' +
+                productos.map(p =>
+                    `<option value="${p.codigo}">${p.nombre} — $${parseFloat(p.precio).toFixed(2)}</option>`
+                ).join('');
+        })
+        .catch(() => {
+            selCambio.innerHTML = '<option value="">No se pudo cargar el catálogo</option>';
+        });
 }
 
 function actualizarMaximoDevolucion() {
@@ -677,8 +698,13 @@ function guardarDevolucion() {
     const cantidad = parseInt(document.getElementById('dev-cantidad').value);
     const motivo = document.getElementById('dev-motivo').value.trim();
     const tipo = TIPOS_DEVOLUCION[tipoDevolucionActual].valor;
+    const codCambio = document.getElementById('dev-producto-cambio').value;
 
     if (!codProducto) { alert('Selecciona el producto a devolver'); return; }
+    if (tipoDevolucionActual === 'sustitucion' && !codCambio) {
+        alert('Selecciona el producto que el cliente recibe a cambio');
+        return;
+    }
     if (!cantidad || cantidad <= 0) { alert('Ingresa una cantidad válida'); return; }
     if (maximo && cantidad > maximo) { alert(`No puedes devolver más de ${maximo} piezas`); return; }
     if (!motivo) { alert('Ingresa el motivo de la devolución'); return; }
@@ -695,6 +721,7 @@ function guardarDevolucion() {
             entrega_id: entregaId,
             pedido_id: paradaActual.pedido_id,
             cod_producto: codProducto,
+            cod_producto_cambio: codCambio || null,
             cantidad: cantidad,
             motivo: tipo,
             descripcion: motivo
@@ -826,6 +853,13 @@ function seleccionarTipoDevolucion(tipo, btn) {
     confirmar.classList.remove('btn-confirmar-dev--sustitucion', 'btn-confirmar-dev--completa');
     confirmar.classList.add(TIPOS_DEVOLUCION[tipo].clase);
     confirmar.innerText = TIPOS_DEVOLUCION[tipo].etiqueta;
+
+    // El producto de cambio solo aplica con sustitución: en la devolución
+    // completa se cancela de la venta y no hay reposición
+    const grupoCambio = document.getElementById('grupo-producto-cambio');
+    if (grupoCambio) {
+        grupoCambio.style.display = (tipo === 'sustitucion') ? '' : 'none';
+    }
 }
 
 /* Dibuja un camion con la caja rellenandose segun el porcentaje de

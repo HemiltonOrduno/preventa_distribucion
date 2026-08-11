@@ -80,6 +80,8 @@ def pedidos_validados_por_zona(request):
 
 @rol_requerido('Almacenista', 'Administrador')
 @csrf_exempt
+@rol_requerido('Almacenista', 'Administrador')
+@csrf_exempt
 def crear_entrega(request):
     """
     RF24-26: agrupa pedidos validados de una misma zona, los asigna a un
@@ -111,15 +113,64 @@ def crear_entrega(request):
     if not vehiculo_id or not pedidos_ids:
         return JsonResponse({"error": "Se requiere vehiculo y pedidos"}, status=400)
 
+    with connection.cursor() as cursor:
+        # Zona de los pedidos que se quieren cargar
+        marcas = ','.join(['%s'] * len(pedidos_ids))
+        cursor.execute(f"""
+            SELECT e.zona
+            FROM pedido p
+            INNER JOIN visita v ON v.numero = p.visita
+            INNER JOIN establecimiento e ON e.numero = v.establecimiento
+            WHERE p.num IN ({marcas})
+            GROUP BY e.zona
+        """, pedidos_ids)
+        filas = cursor.fetchall()
+
+        if not filas:
+            return JsonResponse({"error": "Los pedidos seleccionados no existen"}, status=400)
+        if len(filas) > 1:
+            return JsonResponse({
+                "error": "Los pedidos seleccionados son de zonas distintas"
+            }, status=400)
+
+        zona_pedidos = filas[0][0]
+
+        # Si ya hay un camión en carga de esa misma zona con espacio, hay
+        # que terminar de llenarlo antes de abrir otro
+        cursor.execute("""
+            SELECT en.numero, veh.placas, mdl.capacidad,
+                   COALESCE(SUM(dp.cantidad * pr.peso) / 1000, 0) AS cargado,
+                   (SELECT e2.zona FROM pedido p2
+                     INNER JOIN visita v2 ON v2.numero = p2.visita
+                     INNER JOIN establecimiento e2 ON e2.numero = v2.establecimiento
+                     WHERE p2.entrega = en.numero LIMIT 1) AS zona
+            FROM entrega en
+            LEFT JOIN vehiculo veh ON veh.entrega = en.numero
+            LEFT JOIN modelo mdl ON mdl.numero = veh.modelo
+            LEFT JOIN pedido p ON p.entrega = en.numero
+            LEFT JOIN detalle_pedido dp ON dp.num_pedido = p.num
+            LEFT JOIN producto pr ON pr.codigo = dp.cod_producto
+            WHERE en.edo_entrega = 'EEN005'
+            GROUP BY en.numero, veh.placas, mdl.capacidad
+        """)
+        for num, placas, capacidad, cargado, zona in cursor.fetchall():
+            if zona != zona_pedidos:
+                continue
+            restante = float(capacidad or 0) - float(cargado)
+            if restante > 0:
+                return JsonResponse({
+                    "error": f"El camión {placas} (entrega #{num}) sigue en carga y le "
+                             f"quedan {restante:.1f} kg de esa zona. Termina de llenarlo "
+                             f"antes de abrir otro.",
+                    "entrega_sugerida": num
+                }, status=409)
+
     pedidos_incluidos = []
     pedidos_rechazados = []
 
     try:
         with transaction.atomic():
             with connection.cursor() as cursor:
-                cursor.execute("SELECT COALESCE(MAX(numero), 0) + 1 FROM entrega")
-                nueva_entrega = cursor.fetchone()[0]
-
                 cursor.execute("""
                     INSERT INTO entrega (fecha_creacion, fecha_entrega, empleado, edo_entrega)
                     VALUES (CURDATE(), NULL, %s, 'EEN005')
@@ -131,9 +182,6 @@ def crear_entrega(request):
                 """, [nueva_entrega, vehiculo_id])
                 if cursor.rowcount == 0:
                     raise ValueError(f"Vehículo {vehiculo_id} no encontrado")
-
-                cursor.execute("SELECT COALESCE(MAX(numero), 0) + 1 FROM ruta_entrega")
-                nueva_ruta_entrega = cursor.fetchone()[0]
 
                 cursor.execute("""
                     INSERT INTO ruta_entrega (nombre, descripcion, empleado, entrega, edo_ruta_entrega)
@@ -276,9 +324,30 @@ def mi_ruta(request):
     
     
 def detalle_pedido(request, pedido_id):
+    """
+    Detalle que ve el repartidor. Las cantidades e importes salen netos:
+    lo que el cliente devolvió ya no se le cobra en este pedido, se le
+    cobra en el de reposición.
+    """
     with connection.cursor() as cursor:
         cursor.execute("""
-            SELECT dp.cod_producto, pr.nombre, dp.cantidad, dp.precioUnitario, dp.importe
+            SELECT dp.cod_producto, pr.nombre,
+                   dp.cantidad - COALESCE((
+                       SELECT SUM(d.cantidad) FROM devolucion d
+                       WHERE d.pedido = dp.num_pedido
+                         AND d.cod_producto = dp.cod_producto
+                   ), 0) AS cantidad,
+                   dp.precioUnitario,
+                   dp.importe - COALESCE((
+                       SELECT SUM(d.importe) FROM devolucion d
+                       WHERE d.pedido = dp.num_pedido
+                         AND d.cod_producto = dp.cod_producto
+                   ), 0) AS importe,
+                   COALESCE((
+                       SELECT SUM(d.cantidad) FROM devolucion d
+                       WHERE d.pedido = dp.num_pedido
+                         AND d.cod_producto = dp.cod_producto
+                   ), 0) AS devuelto
             FROM detalle_pedido dp
             INNER JOIN producto pr ON pr.codigo = dp.cod_producto
             WHERE dp.num_pedido = %s
@@ -300,6 +369,7 @@ def detalle_pedido(request, pedido_id):
     for p in productos:
         p['precioUnitario'] = float(p['precioUnitario'])
         p['importe'] = float(p['importe'])
+        p['devuelto'] = int(p['devuelto'] or 0)
 
     for c in cancelados:
         c['fecha_disponible_estimada'] = (
@@ -459,11 +529,14 @@ def registrar_cobro(request):
 def registrar_devolucion(request):
     """
     RF38: registra la devolución de producto en la entrega.
-    Con sustitución -> el repartidor repone la pieza del inventario del
-    camión, no entra al almacén.
-    Completa sin reemplazo -> el producto regresa al almacén y se
-    registra el movimiento de entrada por devolución (TM004).
-    Si el pedido ya estaba cobrado, se genera el reembolso al cliente.
+
+    Con sustitución -> el cliente pide otro producto a cambio. Se guarda
+    cuál, para que el almacenista genere después el pedido de reposición.
+    Completa sin reemplazo -> el producto se cancela de la venta.
+
+    En ambos casos, si el pedido ya estaba cobrado se genera el reembolso.
+    La entrada al almacén la registra el almacenista cuando recibe la
+    mercancía, no aquí.
     """
     if request.method != 'POST':
         return JsonResponse({"error": "Método no permitido"}, status=405)
@@ -483,6 +556,7 @@ def registrar_devolucion(request):
     cantidad = body.get('cantidad')
     motivo = body.get('motivo')
     descripcion = body.get('descripcion', '')
+    cod_producto_cambio = body.get('cod_producto_cambio')
 
     if not entrega_id or not pedido_id or not cod_producto or not cantidad:
         return JsonResponse({"error": "Faltan datos requeridos"}, status=400)
@@ -494,6 +568,13 @@ def registrar_devolucion(request):
 
     if cantidad <= 0:
         return JsonResponse({"error": "La cantidad debe ser mayor a cero"}, status=400)
+
+    # En la sustitución el cliente recibe otro producto, así que hay que
+    # saber cuál para poder reponerlo después
+    if motivo != 'Devolución completa sin reemplazo' and not cod_producto_cambio:
+        return JsonResponse({
+            "error": "Indica el producto que el cliente recibe a cambio"
+        }, status=400)
 
     with transaction.atomic():
         with connection.cursor() as cursor:
@@ -524,11 +605,12 @@ def registrar_devolucion(request):
             importe_devuelto = round(cantidad * precio_unitario, 2)
 
             cursor.execute("""
-                INSERT INTO devolucion (fecha, cantidad, motivo, descripcion, entrega, cod_producto, pedido, importe)
-                VALUES (CURDATE(), %s, %s, %s, %s, %s, %s, %s)
-            """, [cantidad, motivo, descripcion, entrega_id, cod_producto, pedido_id, importe_devuelto])
+                INSERT INTO devolucion (fecha, cantidad, motivo, descripcion, entrega,
+                                        cod_producto, pedido, importe, cod_producto_cambio)
+                VALUES (CURDATE(), %s, %s, %s, %s, %s, %s, %s, %s)
+            """, [cantidad, motivo, descripcion, entrega_id, cod_producto,
+                  pedido_id, importe_devuelto, cod_producto_cambio])
             nuevo_codigo = cursor.lastrowid
-
 
             # El establecimiento se deriva del pedido, no viene en el body
             cursor.execute("""
@@ -989,7 +1071,7 @@ def estado_cobro_pedido(request, pedido_id):
                 COALESCE((SELECT SUM(pg.monto) FROM pago pg WHERE pg.pedido = p.num), 0),
                 COALESCE((
                     SELECT SUM(d.importe) FROM devolucion d
-                    WHERE d.pedido = p.num AND d.motivo = 'Devolución completa sin reemplazo'
+                    WHERE d.pedido = p.num
                 ), 0)
             FROM pedido p
             WHERE p.num = %s

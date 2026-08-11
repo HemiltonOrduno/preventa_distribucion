@@ -91,14 +91,23 @@
 
         <div id="bloque-devolucion" style="display:none;">
             <label style="font-size:13px; font-weight:600;">Devolución</label>
-            <select id="devolucion-id" style="width:100%; padding:8px; margin:6px 0 14px; border-radius:6px; border:1px solid #ccc;">
+            <select id="devolucion-id" onchange="llenarDetalleDevolucion()"
+                    style="width:100%; padding:8px; margin:6px 0 14px; border-radius:6px; border:1px solid #ccc;">
                 <option value="">Cargando devoluciones pendientes...</option>
+            </select>
+
+            <label style="font-size:13px; font-weight:600;">Estado del producto devuelto</label>
+            <select id="estado-devolucion" style="width:100%; padding:8px; margin:6px 0 14px; border-radius:6px; border:1px solid #ccc;">
+                <option value="bueno">Buen estado — regresa al inventario</option>
+                <option value="danado">Dañado — se registra la merma</option>
             </select>
         </div>
     </div>
 
-    <label style="font-size:13px; font-weight:600;">Número de empleado</label>
-    <input type="number" id="empleado" placeholder="Ej. 4" style="width:100%; padding:8px; margin:6px 0 14px; border-radius:6px; border:1px solid #ccc;">
+    <label style="font-size:13px; font-weight:600;">Registrado por</label>
+    <input type="text" id="empleado-nombre" readonly value="Cargando..."
+           style="width:100%; padding:8px; margin:6px 0 14px; border-radius:6px;
+                  border:1px solid #ccc; background:#f0f2f5; color:#555; cursor:not-allowed;">
 
     <label style="font-size:13px; font-weight:600;">Observaciones</label>
     <input type="text" id="observaciones" placeholder="Ej. Entrada de mercancía planta Toluca" style="width:100%; padding:8px; margin:6px 0 14px; border-radius:6px; border:1px solid #ccc;">
@@ -122,6 +131,16 @@
 
 {% block extra_scripts %}
 <script>
+    // El movimiento queda a nombre de quien tiene la sesion abierta
+    fetch('/api/inventario/perfil-actual/')
+        .then(r => r.json())
+        .then(d => {
+            document.getElementById('empleado-nombre').value = d.nombre || 'Sesión activa';
+        })
+        .catch(() => {
+            document.getElementById('empleado-nombre').value = 'Sesión activa';
+        });
+
     let contadorLineas = 0;
     let catalogoProductos = [];
     let devolucionesPendientes = [];
@@ -156,7 +175,9 @@
 
             select.innerHTML = '<option value="">Selecciona una devolución...</option>' +
                 devolucionesPendientes.map(d =>
-                    `<option value="${d.codigo}">Devolución #${d.codigo} — ${d.producto || 'Producto'} — ${d.cantidad} pza(s) — ${d.establecimiento || 'Sin establecimiento'} (${d.fecha})</option>`
+                    `<option value="${d.codigo}"
+                             data-producto="${d.cod_producto}"
+                             data-cantidad="${d.cantidad}">Devolución #${d.codigo} — ${d.producto || 'Producto'} — ${d.cantidad} pza(s) (${d.fecha})</option>`
                 ).join('');
         } catch (e) {
             select.innerHTML = '<option value="">Error al cargar devoluciones</option>';
@@ -179,7 +200,10 @@
                 ${opciones}
             </select>
             <input type="number" placeholder="Cantidad" class="prod-cantidad" style="width:100px; padding:6px; border-radius:6px; border:1px solid #ccc;">
-            <input type="number" placeholder="Precio unitario" class="prod-precio" step="0.01" style="width:130px; padding:6px; border-radius:6px; border:1px solid #ccc;">
+            <input type="number" placeholder="Precio unitario" class="prod-precio" step="0.01" readonly
+                   title="El precio lo define el administrador"
+                   style="width:130px; padding:6px; border-radius:6px; border:1px solid #ccc;
+                          background:#f0f2f5; color:#555; cursor:not-allowed;">
             <button class="btn btn-danger" style="padding:6px 10px;" onclick="document.getElementById('linea-${contadorLineas}').remove()">✕</button>
         `;
         document.getElementById('lineas-detalle').appendChild(div);
@@ -198,6 +222,30 @@
         }
     }
 
+    /* Al elegir la devolución, el producto y la cantidad ya los definió
+       el repartidor al registrarla: se llenan solos y no se editan */
+    function llenarDetalleDevolucion() {
+        const sel = document.getElementById('devolucion-id');
+        const op = sel.options[sel.selectedIndex];
+        if (!op || !op.dataset.producto) return;
+
+        document.getElementById('lineas-detalle').innerHTML = '';
+        agregarLinea(op.dataset.producto);
+
+        const fila = document.getElementById('lineas-detalle').lastElementChild;
+        const inputCant = fila.querySelector('.prod-cantidad');
+        inputCant.value = op.dataset.cantidad;
+        inputCant.readOnly = true;
+        inputCant.style.background = '#f0f2f5';
+        inputCant.style.cursor = 'not-allowed';
+
+        const selProd = fila.querySelector('.prod-codigo');
+        selProd.disabled = true;
+        selProd.style.background = '#f0f2f5';
+
+        fila.querySelector('.btn-danger')?.remove();
+    }
+
     function agregarDesdeCatalogo(codigo) {
         agregarLinea(codigo);
         document.querySelector('.card').scrollIntoView({ behavior: 'smooth' });
@@ -206,7 +254,6 @@
 
     async function registrarMovimiento() {
         let tipo_movimiento = document.getElementById('tipo-movimiento').value;
-        const empleado = document.getElementById('empleado').value;
         const observaciones = document.getElementById('observaciones').value;
 
         // RF40: el origen define el tipo_movimiento real cuando es Entrada.
@@ -234,14 +281,16 @@
             }
         });
 
-        if (!empleado || detalle.length === 0) {
-            mostrarToast('Falta el número de empleado o agregar al menos un producto', 'error');
+        if (detalle.length === 0) {
+            mostrarToast('Agrega al menos un producto', 'error');
             return;
         }
 
-        const payload = { tipo_movimiento, empleado: parseInt(empleado), observaciones, detalle };
+        const payload = { tipo_movimiento, observaciones, detalle };
+        
         if (devolucion) {
             payload.devolucion = parseInt(devolucion);
+            payload.estado_devolucion = document.getElementById('estado-devolucion').value;
         }
 
         const res = await fetch('/api/inventario/movimientos/', {

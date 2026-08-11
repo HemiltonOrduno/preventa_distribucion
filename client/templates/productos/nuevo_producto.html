@@ -17,7 +17,8 @@
     <input type="number" id="precio" step="0.01" placeholder="Ej. 16.50" style="width:100%; padding:8px; margin:6px 0 14px; border-radius:6px; border:1px solid #ccc;">
 
     <label style="font-size:13px; font-weight:600;">Fecha de caducidad</label>
-    <input type="date" id="fecha_caducidad" style="width:100%; padding:8px; margin:6px 0 14px; border-radius:6px; border:1px solid #ccc;">
+    <input type="date" id="fecha_caducidad"
+           style="width:100%; padding:8px; margin:6px 0 14px; border-radius:6px; border:1px solid #ccc;">
 
     <label style="font-size:13px; font-weight:600;">Stock inicial</label>
     <input type="number" id="stock" placeholder="Ej. 800" style="width:100%; padding:8px; margin:6px 0 14px; border-radius:6px; border:1px solid #ccc;">
@@ -37,6 +38,11 @@
 
 {% block extra_scripts %}
 <script>
+    // Un producto nuevo no puede entrar al catálogo ya caducado
+    const manana = new Date();
+    manana.setDate(manana.getDate() + 1);
+    document.getElementById('fecha_caducidad').min = manana.toISOString().split('T')[0];
+
     document.getElementById('imagen').addEventListener('change', function(e) {
         const file = e.target.files[0];
         const preview = document.getElementById('preview');
@@ -57,6 +63,12 @@
 
         if (!nombre || !precio || !fecha_caducidad || !peso) {
             mostrarToast('Faltan campos obligatorios', 'error');
+            return;
+        }
+
+        // Un producto nuevo no puede entrar al catálogo ya caducado
+        if (new Date(fecha_caducidad) <= new Date()) {
+            mostrarToast('La fecha de caducidad debe ser posterior a hoy', 'error');
             return;
         }
 

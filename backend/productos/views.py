@@ -5,6 +5,7 @@ from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.db import connection
 from usuarios.permissions import rol_requerido
+from datetime import date as _date
 
 @rol_requerido('Almacenista', 'Administrador')
 @csrf_exempt
@@ -28,6 +29,17 @@ def registrar_producto(request):
     if not nombre or not precio or not fecha_caducidad or not peso:
         return JsonResponse({
             "error": "Se requiere nombre, precio, fecha_caducidad y peso"
+        }, status=400)
+
+    # Un producto no puede registrarse ya caducado
+    try:
+        caduca = _date.fromisoformat(fecha_caducidad)
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "La fecha de caducidad no es válida"}, status=400)
+
+    if caduca <= _date.today():
+        return JsonResponse({
+            "error": "La fecha de caducidad debe ser posterior a hoy"
         }, status=400)
 
     with connection.cursor() as cursor:

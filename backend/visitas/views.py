@@ -55,8 +55,8 @@ def _empleado_de_sesion(request):
 
 def _cerrar_ruta_si_completa(cursor, visita_id):
     """
-    RF13: cuando ya no quedan visitas pendientes en la ruta,
-    la pasa de Iniciada (ERV003) a Completada (ERV004).
+    RF13: cuando ya no quedan visitas pendientes de HOY en la ruta,
+    la ejecución de esa fecha pasa de Iniciada (ERV003) a Completada.
     """
     cursor.execute("SELECT ruta_visita FROM visita WHERE numero = %s", [visita_id])
     row = cursor.fetchone()
@@ -64,7 +64,8 @@ def _cerrar_ruta_si_completa(cursor, visita_id):
         return False
     ruta_id = row[0]
 
-    # ¿Quedan establecimientos de la ruta sin visitar?
+    # ¿Quedan establecimientos de la ruta sin visitar hoy? Las visitas de
+    # semanas anteriores no cuentan: la ruta se recorre cada semana
     cursor.execute("""
         SELECT COUNT(*)
         FROM ruta_visita_orden rvo
@@ -74,6 +75,7 @@ def _cerrar_ruta_si_completa(cursor, visita_id):
               WHERE v.ruta_visita = rvo.ruta_visita
                 AND v.establecimiento = rvo.establecimiento
                 AND v.edo_visita IN ('EVI004', 'EVI005')
+                AND DATE(v.fecha) = CURDATE()
           )
     """, [ruta_id])
 
@@ -379,14 +381,15 @@ def pedidos_pendientes(request):
                 ep.nombre AS estado,
                 e.numero AS establecimiento_id,
                 e.nombre AS establecimiento_nombre,
-                z.nombre AS zona_nombre
+                z.nombre AS zona_nombre,
+                p.devolucion_origen
             FROM pedido p
             INNER JOIN edo_pedido ep ON ep.codigo = p.edo_pedido
             INNER JOIN visita v ON v.numero = p.visita
             INNER JOIN establecimiento e ON e.numero = v.establecimiento
             INNER JOIN zona z ON z.num = e.zona
             WHERE p.edo_pedido = 'EPD001'
-            ORDER BY p.fecha ASC
+            ORDER BY p.devolucion_origen IS NULL, p.fecha ASC
         """)
         columns = [col[0] for col in cursor.description]
         pedidos = [dict(zip(columns, row)) for row in cursor.fetchall()]
