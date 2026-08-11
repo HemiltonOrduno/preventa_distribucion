@@ -1,6 +1,12 @@
 import os
 from pathlib import Path
-from decouple import config
+from decouple import Config, RepositoryEnv
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+ROOT_DIR = BASE_DIR.parent
+
+# El .env vive en la raiz del proyecto, no dentro de backend/
+config = Config(RepositoryEnv(ROOT_DIR / '.env'))
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
