@@ -994,3 +994,24 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+/* El nombre del vendedor puede ser largo: el selector se encoge para
+   que el botón de asignar no se salga de la tarjeta */
+.asignar-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-top: 8px;
+}
+.asignar-row select {
+    flex: 1;
+    min-width: 0;
+    padding: 5px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    font-size: 11px;
+}
+.asignar-row .btn-asignar {
+    flex-shrink: 0;
+    white-space: nowrap;
+}

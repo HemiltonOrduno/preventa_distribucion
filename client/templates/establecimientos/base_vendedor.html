@@ -25,6 +25,24 @@
     </script>
 
     <title>{% block title %}Vendedor{% endblock %} - INPREDISROUTE</title>
+
+    <style>
+    /* Fuerza los <select> nativos a los colores del tema alto contraste,
+       incluyendo la lista desplegable de opciones (RFN-19) */
+    html.alto-contraste select.form__input,
+    html.alto-contraste select {
+        background-color: #000 !important;
+        color: #ffe600 !important;
+        border-color: #ffe600 !important;
+        color-scheme: dark;
+    }
+    html.alto-contraste select.form__input option,
+    html.alto-contraste select option {
+        background-color: #000;
+        color: #ffe600;
+    }
+</style>
+
 </head>
 <body>
 
@@ -37,7 +55,7 @@
         <a href="{% url 'ruta_del_dia' %}" class="top-nav__link {% block nav_ruta_d %}{% endblock %}">
             <i class='bx bx-map-alt'></i> Ruta del día
         </a>
-        <a href="#" class="top-nav__link {% block nav_pedidos_d %}{% endblock %}">
+        <a href="{% url 'mis_pedidos' %}" class="top-nav__link {% block nav_pedidos_d %}{% endblock %}">
             <i class='bx bx-cart'></i> Pedidos
         </a>
         <a href="{% url 'registro_cliente' %}" class="top-nav__link {% block nav_clientes_d %}{% endblock %}">
@@ -105,7 +123,7 @@
         <i class='bx bx-map-alt'></i>
         <span>Ruta</span>
     </a>
-    <a href="#" class="bottom-nav__item {% block nav_pedidos_m %}{% endblock %}">
+    <a href="{% url 'mis_pedidos' %}" class="bottom-nav__item {% block nav_pedidos_m %}{% endblock %}">
         <i class='bx bx-cart'></i>
         <span>Pedidos</span>
     </a>

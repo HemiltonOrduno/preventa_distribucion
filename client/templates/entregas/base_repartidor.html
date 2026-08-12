@@ -8,6 +8,60 @@
     <link rel="stylesheet" href="{% static 'rutas/css/leaflet.css' %}">
     <link rel="stylesheet" href="{% static 'entregas/css/repartidor.css' %}?v=2">
     <title>{% block title %}Repartidor{% endblock %} - INPREDISROUTE</title>
+
+
+    <style>
+    .top-nav__avatar { cursor: pointer; }
+    .perfil {
+        position: fixed; display: none; background: #fff;
+        border-radius: 14px; box-shadow: 0 8px 28px rgba(0,0,0,.16);
+        padding: 14px; gap: 12px; align-items: center;
+        z-index: 3000; min-width: 240px;
+    }
+    .perfil--abierto { display: flex; }
+    .perfil__avatar {
+        width: 42px; height: 42px; border-radius: 50%;
+        background: #e8eaf6; color: #1a237e;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 22px; flex-shrink: 0;
+    }
+    .perfil__datos { flex: 1; min-width: 0; }
+    .perfil__nombre { font-size: 14px; font-weight: 600; color: #333; }
+    .perfil__rol { font-size: 12px; color: #888; }
+    .perfil__logout {
+        color: #c62828; font-size: 20px; text-decoration: none;
+        padding: 8px; border-radius: 8px;
+    }
+    .perfil__logout:hover { background: #fbeaea; }
+    .modal-logout {
+        display: none; position: fixed; inset: 0;
+        background: rgba(0,0,0,.5);
+        align-items: center; justify-content: center;
+        z-index: 4000; padding: 20px;
+    }
+    .modal-logout.modal--abierto { display: flex; }
+    .modal__caja {
+        background: #fff; border-radius: 16px; padding: 26px;
+        max-width: 340px; width: 100%; text-align: center;
+    }
+    .modal__icono {
+        width: 54px; height: 54px; border-radius: 50%;
+        background: #fbeaea; color: #c62828;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 26px; margin: 0 auto 14px;
+    }
+    .modal__titulo { font-size: 17px; color: #333; margin-bottom: 6px; }
+    .modal__texto { font-size: 13px; color: #777; margin-bottom: 20px; }
+    .modal__acciones { display: flex; gap: 10px; }
+    .modal__btn {
+        flex: 1; padding: 11px; border: none; border-radius: 10px;
+        font-size: 13px; font-weight: 600; cursor: pointer;
+        text-decoration: none; display: block;
+    }
+    .modal__btn--cancelar { background: #f0f2f5; color: #555; }
+    .modal__btn--confirmar { background: #c62828; color: #fff; }
+</style>
+
 </head>
 <body>
 
@@ -23,9 +77,33 @@
             <i class='bx bx-package'></i> Pedidos
         </a>
     </div>
-    <a href="{% url 'logout' %}" class="top-nav__avatar" title="Cerrar sesión"
-       onclick="return confirm('¿Cerrar sesión?');"><i class='bx bx-log-out'></i></a>
+    <div class="top-nav__avatar" onclick="togglePerfil(event)"><i class='bx bx-user'></i></div>
 </nav>
+
+<div class="perfil" id="menuPerfil">
+    <div class="perfil__avatar"><i class='bx bx-user'></i></div>
+    <div class="perfil__datos">
+        <div class="perfil__nombre">{{ request.session.nombre_usuario|default:"Usuario" }}</div>
+        <div class="perfil__rol">{{ request.session.rol }}</div>
+    </div>
+    <a href="{% url 'logout' %}" class="perfil__logout"
+       title="Cerrar sesión" onclick="return abrirModalLogout(event);">
+        <i class='bx bx-log-out'></i>
+    </a>
+</div>
+
+<div class="modal-logout" id="modalLogout">
+    <div class="modal__caja">
+        <div class="modal__icono"><i class='bx bx-log-out'></i></div>
+        <h3 class="modal__titulo">Cerrar sesión</h3>
+        <p class="modal__texto">¿Seguro que quieres salir del sistema?</p>
+        <div class="modal__acciones">
+            <button type="button" class="modal__btn modal__btn--cancelar"
+                    onclick="cerrarModalLogout()">Cancelar</button>
+            <a href="{% url 'logout' %}" class="modal__btn modal__btn--confirmar">Sí, salir</a>
+        </div>
+    </div>
+</div>
 
 <div class="page {% block page_class %}{% endblock %}">
     {% block content %}{% endblock %}
@@ -45,6 +123,56 @@
 </nav>
 
 <script src="{% static 'rutas/js/leaflet.js' %}"></script>
+
+<script>
+    var menuPerfil = document.getElementById("menuPerfil");
+
+    function togglePerfil(e){
+        e.preventDefault();
+        e.stopPropagation();
+        if (menuPerfil.classList.toggle("perfil--abierto")){
+            posicionarPerfil(e.currentTarget);
+        }
+    }
+
+    function posicionarPerfil(icono){
+        var r = icono.getBoundingClientRect();
+        var ancho = menuPerfil.offsetWidth;
+        var izq = r.right - ancho;
+        if (izq < 12){ izq = 12; }
+        menuPerfil.style.left = izq + "px";
+        menuPerfil.style.top = (r.bottom + 10) + "px";
+    }
+
+    function cerrarPerfil(){
+        menuPerfil.classList.remove("perfil--abierto");
+    }
+
+    var modalLogout = document.getElementById("modalLogout");
+
+    function abrirModalLogout(e){
+        e.preventDefault();
+        e.stopPropagation();
+        cerrarPerfil();
+        modalLogout.classList.add("modal--abierto");
+        return false;
+    }
+
+    function cerrarModalLogout(){
+        modalLogout.classList.remove("modal--abierto");
+    }
+
+    modalLogout.addEventListener("click", function(e){
+        if (e.target === modalLogout){ cerrarModalLogout(); }
+    });
+    document.addEventListener("keydown", function(e){
+        if (e.key === "Escape"){ cerrarModalLogout(); }
+    });
+
+    document.addEventListener("click", cerrarPerfil);
+    window.addEventListener("resize", cerrarPerfil);
+</script>
+
 {% block extra_scripts %}{% endblock %}
 </body>
 </html>

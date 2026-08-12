@@ -132,7 +132,7 @@
         }
         #perfil-info { flex: 1; min-width: 0; }
         #perfil-nombre {
-            color: white;
+            color: #1a56db;
             font-size: 12px;
             font-weight: 600;
             white-space: nowrap;
@@ -140,17 +140,10 @@
             text-overflow: ellipsis;
         }
         #perfil-rol {
-            color: #a5d6a7;
+            color: #5a6b8c;
             font-size: 10px;
-            text-transform: uppercase;
+            text-transform: none;
             letter-spacing: 0.5px;
-        }
-        #perfil-email {
-            color: rgba(255,255,255,0.6);
-            font-size: 10px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
         }
         #btn-logout {
             background: rgba(255,255,255,0.1);
@@ -168,7 +161,7 @@
 
         {% block extra_styles %}{% endblock %}
     </style>
-    <style>
+   <style>
     .badge-pendientes {
         display: none;
         background: #c62828;
@@ -183,6 +176,37 @@
         margin-left: 6px;
         padding: 0 4px;
     }
+
+    .modal {
+        display: none; position: fixed; inset: 0;
+        background: rgba(0,0,0,.5);
+        align-items: center; justify-content: center;
+        z-index: 4000; padding: 20px;
+    }
+    .modal--abierto { display: flex; }
+    .modal__caja {
+        background: #fff; border-radius: 16px; padding: 26px;
+        max-width: 340px; width: 100%; text-align: center;
+    }
+    .modal__icono {
+        width: 54px; height: 54px; border-radius: 50%;
+        background: #fbeaea; color: #c62828;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 26px; margin: 0 auto 14px;
+    }
+    .modal__titulo {
+        font-family: 'Sora', sans-serif; font-size: 17px;
+        color: #333; margin-bottom: 6px;
+    }
+    .modal__texto { font-size: 13px; color: #777; margin-bottom: 20px; }
+    .modal__acciones { display: flex; gap: 10px; }
+    .modal__btn {
+        flex: 1; padding: 11px; border: none; border-radius: 10px;
+        font-size: 13px; font-weight: 600; cursor: pointer;
+        text-decoration: none; display: block;
+    }
+    .modal__btn--cancelar { background: #f0f2f5; color: #555; }
+    .modal__btn--confirmar { background: #c62828; color: #fff; }
 </style>
 
 <script>
@@ -288,7 +312,6 @@
     .perfil__datos { flex: 1; min-width: 0; }
     .perfil__nombre { font-size: 14px; font-weight: 600; color: #333; }
     .perfil__rol { font-size: 12px; color: #888; }
-    .perfil__email { font-size: 11px; color: #aaa; }
     .perfil__logout {
         background: none; border: none;
         color: #c62828; font-size: 20px;
@@ -352,10 +375,23 @@
     <div class="perfil__datos">
         <div class="perfil__nombre" id="perfil-nombre">Cargando...</div>
         <div class="perfil__rol" id="perfil-rol"></div>
-        <div class="perfil__email" id="perfil-email"></div>
     </div>
     <button class="perfil__logout" title="Cerrar sesión" onclick="cerrarSesion()">⏻</button>
 </div>
+
+<div class="modal" id="modalLogout">
+    <div class="modal__caja">
+        <div class="modal__icono"><i class='bx bx-log-out'></i></div>
+        <h3 class="modal__titulo">Cerrar sesión</h3>
+        <p class="modal__texto">¿Seguro que quieres salir del sistema?</p>
+        <div class="modal__acciones">
+            <button type="button" class="modal__btn modal__btn--cancelar"
+                    onclick="cerrarModalLogout()">Cancelar</button>
+            <a href="/api/usuarios/logout/" class="modal__btn modal__btn--confirmar">Sí, salir</a>
+        </div>
+    </div>
+</div>
+
 
 <div id="contenido">
     <div id="page-header">
@@ -378,11 +414,23 @@
         setTimeout(() => { toast.style.display = 'none'; }, 3500);
     }
 
+    var modalLogout = document.getElementById("modalLogout");
+
     function cerrarSesion() {
-        if (confirm('¿Cerrar sesión?')) {
-            window.location.href = '/api/usuarios/logout/';
-        }
+        menuPerfil.classList.remove("perfil--abierto");
+        modalLogout.classList.add("modal--abierto");
     }
+
+    function cerrarModalLogout() {
+        modalLogout.classList.remove("modal--abierto");
+    }
+
+    modalLogout.addEventListener("click", function(e){
+        if (e.target === modalLogout){ cerrarModalLogout(); }
+    });
+    document.addEventListener("keydown", function(e){
+        if (e.key === "Escape"){ cerrarModalLogout(); }
+    });
 
     async function cargarPerfil() {
         try {
@@ -392,7 +440,6 @@
 
             document.getElementById('perfil-nombre').textContent = data.nombre;
             document.getElementById('perfil-rol').textContent = data.rol;
-            document.getElementById('perfil-email').textContent = data.email;
 
             const iniciales = data.nombre.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
             document.getElementById('perfil-avatar').textContent = iniciales;
@@ -420,26 +467,7 @@
     });
     menuPerfil.addEventListener("click", function(e){ e.stopPropagation(); });
 
-    var menuPerfil = document.getElementById("menuPerfil");
-
-    function togglePerfil(e){
-        e.preventDefault();
-        e.stopPropagation();
-        if (menuPerfil.classList.toggle("perfil--abierto")){
-            var r = e.currentTarget.getBoundingClientRect();
-            var izq = r.right - menuPerfil.offsetWidth;
-            menuPerfil.style.left = (izq < 12 ? 12 : izq) + "px";
-            menuPerfil.style.top = (r.bottom + 10) + "px";
-        }
-    }
-
-    document.addEventListener("click", function(){
-        menuPerfil.classList.remove("perfil--abierto");
-    });
-    menuPerfil.addEventListener("click", function(e){ e.stopPropagation(); });
-
     cargarPerfil();
-
 </script>
 {% block extra_scripts %}{% endblock %}
 </body>

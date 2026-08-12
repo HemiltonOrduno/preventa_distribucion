@@ -63,6 +63,13 @@
         padding:24px 12px; background:white;
         border:1px dashed #dee2e6; border-radius:10px;
     }
+
+    .zona-badge {
+        display:inline-block; background:#e3f2fd; color:#0d47a1;
+        font-weight:700; font-size:12px; padding:2px 9px;
+        border-radius:8px; margin-right:4px;
+    }
+    .zona-badge.camion { font-size:10px; padding:1px 7px; }
 {% endblock %}
 
 {% block content %}
@@ -140,7 +147,9 @@
             <label style="display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #eee; font-size:13px;">
                 <input type="checkbox" class="pedido-check" value="${p.pedido_id}">
                 <span><strong>#${p.pedido_id}</strong> — ${p.establecimiento_nombre}
-                    <span style="color:#666;"> · Zona: ${p.zona_nombre} · Peso: ${p.peso_estimado} kg · $${p.total.toFixed(2)}</span>
+                    <br>
+                    <span class="zona-badge">${p.zona_nombre}</span>
+                    <span style="color:#666;">Peso: ${p.peso_estimado} kg · $${p.total.toFixed(2)}</span>
                 </span>
             </label>
         `).join('');
@@ -200,7 +209,9 @@
                 <div class="camion-pedido">
                     <span>
                         <strong>#${p.pedido_id}</strong> ${p.establecimiento}
-                        <small>${p.zona} · ${p.peso.toFixed(1)} kg</small>
+                        <br>
+                        <span class="zona-badge camion">${p.zona}</span>
+                        <small>${p.peso.toFixed(1)} kg</small>
                     </span>
                     <span style="color:#1b5e20;font-weight:600;white-space:nowrap;">
                         $${p.total.toFixed(2)}

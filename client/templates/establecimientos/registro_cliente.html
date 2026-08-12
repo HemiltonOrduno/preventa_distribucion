@@ -11,7 +11,15 @@
     <i class='bx bx-user-plus'></i> NUEVO CLIENTE
 </div>
 
-<form id="formCliente" onsubmit="return continuarARegistroEstablecimiento(event)">
+<style>
+    .form__error {
+        display: block; color: #c62828; font-size: 12px;
+        margin-top: 3px; min-height: 15px;
+    }
+    .form__input--error { border-color: #c62828 !important; }
+</style>
+
+<form id="formCliente" onsubmit="return validarClienteYContinuar(event)">
 
     <div class="form__div">
         <div class="form__icon"><i class='bx bx-user'></i></div>
@@ -42,6 +50,7 @@
         <div class="form__div-input">
             <label class="form__label">RFC</label>
             <input type="text" id="rfc" class="form__input" maxlength="13" required>
+            <span class="form__error" id="error_rfc"></span>
         </div>
     </div>
 
@@ -49,7 +58,9 @@
         <div class="form__icon"><i class='bx bx-phone'></i></div>
         <div class="form__div-input">
             <label class="form__label">Teléfono</label>
-            <input type="tel" id="telefono" class="form__input" required>
+            <input type="tel" id="telefono" class="form__input" maxlength="10"
+                   oninput="this.value = this.value.replace(/[^0-9]/g, '')" required>
+            <span class="form__error" id="error_telefono"></span>
         </div>
     </div>
 
@@ -58,6 +69,7 @@
         <div class="form__div-input">
             <label class="form__label">Email</label>
             <input type="email" id="email" class="form__input" required>
+            <span class="form__error" id="error_email"></span>
         </div>
     </div>
 
@@ -71,5 +83,68 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script>
+    function limpiarError(id) {
+        document.getElementById('error_' + id).textContent = '';
+        document.getElementById(id).classList.remove('form__input--error');
+    }
+
+    function marcarError(id, mensaje) {
+        document.getElementById('error_' + id).textContent = mensaje;
+        document.getElementById(id).classList.add('form__input--error');
+    }
+
+    function validarRFC(valor) {
+        const rfc = valor.trim().toUpperCase();
+        // Persona física: 4 letras + 6 dígitos (fecha) + 3 homoclave
+        const patron = /^[A-ZÑ&]{4}\d{6}[A-Z0-9]{3}$/;
+        return patron.test(rfc);
+    }
+
+    function validarTelefono(valor) {
+        const limpio = valor.replace(/[\s\-()]/g, '');
+        return /^\d{10}$/.test(limpio);
+    }
+
+    function validarEmail(valor) {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valor.trim());
+    }
+
+    function validarClienteYContinuar(event) {
+        event.preventDefault();
+
+        const rfc = document.getElementById('rfc');
+        const telefono = document.getElementById('telefono');
+        const email = document.getElementById('email');
+
+        ['rfc', 'telefono', 'email'].forEach(limpiarError);
+
+        let valido = true;
+
+        if (!validarRFC(rfc.value)) {
+            marcarError('rfc', 'RFC inválido. Formato: 4 letras + 6 dígitos + 3 caracteres (ej. VECJ880326XX1)');
+            valido = false;
+        }
+
+        if (!validarTelefono(telefono.value)) {
+            marcarError('telefono', 'Teléfono inválido. Deben ser 10 dígitos.');
+            valido = false;
+        }
+
+        if (!validarEmail(email.value)) {
+            marcarError('email', 'Correo electrónico inválido.');
+            valido = false;
+        }
+
+        if (!valido) {
+            return false;
+        }
+
+        // RFC normalizado a mayúsculas antes de continuar
+        rfc.value = rfc.value.trim().toUpperCase();
+
+        return continuarARegistroEstablecimiento(event);
+    }
+</script>
 <script src="{% static 'establecimientos/js/registro_cliente.js' %}"></script>
 {% endblock %}

@@ -188,6 +188,38 @@ tbody tr:focus-visible{outline:2px solid var(--primario);outline-offset:-2px}
 /* ---------- Adaptable ---------- */
 .abrir-menu{display:none;background:transparent;border:1px solid var(--borde);
   border-radius:8px;min-width:44px;min-height:44px;font-size:19px;cursor:pointer}
+.identidad .btn-salir{
+  color:var(--peligro);font-size:20px;text-decoration:none;
+  padding:8px;border-radius:8px;margin-left:2px;
+  display:flex;align-items:center;justify-content:center;
+  min-width:38px;min-height:38px;transition:background .15s;
+}
+.identidad .btn-salir:hover{background:#FBEAEA}
+.modal-logout{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);
+  align-items:center;justify-content:center;z-index:5000;padding:20px;
+}
+.modal-logout.modal--abierto{display:flex}
+.modal-logout .caja{
+  background:#fff;border-radius:16px;padding:26px;
+  max-width:340px;width:100%;text-align:center;
+}
+.modal-logout .icono{
+  width:54px;height:54px;border-radius:50%;
+  background:#FBEAEA;color:var(--peligro);
+  display:flex;align-items:center;justify-content:center;
+  font-size:26px;margin:0 auto 14px;
+}
+.modal-logout .titulo{font-size:17px;color:var(--texto);margin-bottom:6px}
+.modal-logout .texto{font-size:13px;color:var(--texto-tenue);margin-bottom:20px}
+.modal-logout .acciones{display:flex;gap:10px}
+.modal-logout .btn{
+  flex:1;padding:11px;border:none;border-radius:10px;
+  font-size:13px;font-weight:600;cursor:pointer;
+  text-decoration:none;display:block;
+}
+.modal-logout .btn-cancelar{background:#f0f2f5;color:#555}
+.modal-logout .btn-confirmar{background:var(--peligro);color:#fff}
 @media (max-width:980px){
   .menu{transform:translateX(-100%);transition:transform .22s ease}
   .menu.desplegado{transform:translateX(0)}
@@ -284,17 +316,33 @@ tbody tr:focus-visible{outline:2px solid var(--primario);outline-offset:-2px}
       </div>
     </div>
     <div class="identidad">
-      <div class="avatar">AD</div>
+      <div class="avatar" id="avatarAdmin">--</div>
       <div>
-        <strong class="identidad-nombre">Administrador</strong>
-        <small>Sucursal Tijuana</small>
+        <strong class="identidad-nombre" id="nombreAdmin">{{ request.session.nombre_usuario|default:"Usuario" }}</strong>
+        <small>{{ request.session.rol|default:"Administrador" }}</small>
       </div>
+      <a href="#" class="btn-salir" title="Cerrar sesión"
+         onclick="return abrirModalLogout(event);">
+        <i class='bx bx-log-out'></i>
+      </a>
     </div>
   </header>
 
   <main class="contenido">
     {% block contenido %}{% endblock %}
   </main>
+</div>
+
+<div class="modal-logout" id="modalLogout">
+  <div class="caja">
+    <div class="icono"><i class='bx bx-log-out'></i></div>
+    <h3 class="titulo">Cerrar sesión</h3>
+    <p class="texto">¿Seguro que quieres salir del sistema?</p>
+    <div class="acciones">
+      <button type="button" class="btn btn-cancelar" onclick="cerrarModalLogout()">Cancelar</button>
+      <a href="{% url 'logout' %}" class="btn btn-confirmar">Sí, salir</a>
+    </div>
+  </div>
 </div>
 
 <div class="telon" id="telon" role="dialog" aria-modal="true" aria-labelledby="tituloModal">
@@ -466,6 +514,30 @@ var Panel = (function () {
     abrirModal: abrirModal, cerrarModal: cerrarModal
   };
 })();
+</script>
+
+<script>
+    (function () {
+        var nombre = document.getElementById("nombreAdmin").textContent.trim();
+        var iniciales = nombre.split(' ').map(function (p) { return p[0]; })
+            .slice(0, 2).join('').toUpperCase();
+        document.getElementById("avatarAdmin").textContent = iniciales || "AD";
+    })();
+
+    function abrirModalLogout(e){
+        e.preventDefault();
+        document.getElementById("modalLogout").classList.add("modal--abierto");
+        return false;
+    }
+    function cerrarModalLogout(){
+        document.getElementById("modalLogout").classList.remove("modal--abierto");
+    }
+    document.getElementById("modalLogout").addEventListener("click", function(e){
+        if (e.target === this){ cerrarModalLogout(); }
+    });
+    document.addEventListener("keydown", function(e){
+        if (e.key === "Escape"){ cerrarModalLogout(); }
+    });
 </script>
 
 {% block script %}{% endblock %}

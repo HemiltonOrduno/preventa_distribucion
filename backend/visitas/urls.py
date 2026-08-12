@@ -8,7 +8,7 @@ from .views import (
     pedido_detalle,
     ajustar_cantidad_pedido,
     cancelar_producto_pedido,
-    confirmar_pedido,           # <-- nuevo
+    confirmar_pedido,
     almacenista_pedidos_view,
     ruta_del_dia_api,
     mapa_ruta_del_dia_api,
@@ -16,6 +16,8 @@ from .views import (
     realizar_visita,
     levantar_pedido,
     visita_sin_pedido,
+    mis_pedidos_view,
+    mis_pedidos_api,
 )
 
 urlpatterns = [
@@ -38,4 +40,6 @@ urlpatterns = [
     path('api/visitas/<int:visita_id>/realizar/', realizar_visita, name='realizar_visita'),
     path('api/visitas/<int:visita_id>/pedido/', levantar_pedido, name='levantar_pedido_api'),
     path('api/visitas/<int:visita_id>/sin-pedido/', visita_sin_pedido, name='visita_sin_pedido_api'),
+    path('mis-pedidos/', mis_pedidos_view, name='mis_pedidos'),
+    path('api/mis-pedidos/', mis_pedidos_api, name='mis_pedidos_api'),
 ]

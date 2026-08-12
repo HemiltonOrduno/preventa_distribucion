@@ -454,9 +454,10 @@ def finalizar_ruta(request):
 @csrf_exempt
 def registrar_cobro(request):
     """
-    RF39: registra el cobro del pedido entregado. El monto no puede ser
-    menor a lo que falta por cobrar; si el cliente paga de más, se
-    registra solo lo adeudado y el excedente se reporta como cambio.
+    RF39: registra el cobro del pedido entregado. Del total se descuenta
+    lo que el cliente devolvió, porque esa mercancía ya no se le cobra
+    en este pedido. El monto no puede ser menor a lo que falta; si paga
+    de más, se registra solo lo adeudado y el excedente es el cambio.
     """
     if request.method != 'POST':
         return JsonResponse({"error": "Método no permitido"}, status=405)
@@ -481,19 +482,22 @@ def registrar_cobro(request):
         return JsonResponse({"error": "El monto no es válido"}, status=400)
 
     with connection.cursor() as cursor:
+        # El mismo cálculo que estado_cobro_pedido: total menos lo devuelto,
+        # menos lo que ya se haya cobrado
         cursor.execute("""
-            SELECT p.total, COALESCE(SUM(pg.monto), 0)
+            SELECT
+                p.total,
+                COALESCE((SELECT SUM(pg.monto) FROM pago pg WHERE pg.pedido = p.num), 0),
+                COALESCE((SELECT SUM(d.importe) FROM devolucion d WHERE d.pedido = p.num), 0)
             FROM pedido p
-            LEFT JOIN pago pg ON pg.pedido = p.num
             WHERE p.num = %s
-            GROUP BY p.num, p.total
         """, [pedido_id])
         row = cursor.fetchone()
         if not row:
             return JsonResponse({"error": "Pedido no encontrado"}, status=404)
 
-        total_pedido, ya_cobrado = float(row[0] or 0), float(row[1] or 0)
-        pendiente = round(total_pedido - ya_cobrado, 2)
+        total, ya_cobrado, devuelto = float(row[0] or 0), float(row[1] or 0), float(row[2] or 0)
+        pendiente = round(total - devuelto - ya_cobrado, 2)
 
         if pendiente <= 0:
             return JsonResponse({
@@ -507,9 +511,6 @@ def registrar_cobro(request):
             return JsonResponse({
                 "error": f"El monto es insuficiente. Falta cobrar ${pendiente:.2f}"
             }, status=400)
-
-        cursor.execute("SELECT COALESCE(MAX(codigo), 0) + 1 FROM pago")
-        nuevo_codigo = cursor.fetchone()[0]
 
         cursor.execute("""
             INSERT INTO pago (monto, fecha, tipo_pago, empleado, establecimiento, pedido)

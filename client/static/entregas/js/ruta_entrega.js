@@ -455,7 +455,6 @@ function cerrarModalParada(e) {
 // ===== MODAL COBRO =====
 function abrirCobro() {
     document.getElementById('modal-parada').classList.remove('visible');
-    document.getElementById('cobro-monto').value = parseFloat(paradaActual.subtotal || 0).toFixed(2);
     tipoPagoSeleccionado = 'TP001';
     document.querySelectorAll('.tipo-pago-btn').forEach(b => b.classList.remove('active'));
     document.getElementById('btn-efectivo').classList.add('active');
@@ -601,9 +600,10 @@ function guardarCobro() {
             mostrarToast(' Cobro registrado');
         }
 
-        // Regresa al detalle de la parada y desbloquea la confirmación
+        // Se reconsulta el estado real: eso deshabilita el botón de cobro
+        // y habilita la confirmación de entrega
         document.getElementById('modal-parada').classList.add('visible');
-        habilitarConfirmacion(true);
+        actualizarEstadoCobroModal(paradaActual.pedido_id);
     });
 }
 
@@ -741,7 +741,9 @@ function guardarDevolucion() {
         }
 
         document.getElementById('modal-parada').classList.add('visible');
-        actualizarEstadoCobroModal(paradaActual.pedido_id);
+        // Se recarga la parada completa para que el desglose de productos
+        // refleje lo que quedó después de la devolución
+        abrirModalParada(paradaActual);
     });
 }
 
@@ -852,7 +854,7 @@ function seleccionarTipoDevolucion(tipo, btn) {
     const confirmar = document.getElementById('btn-guardar-dev');
     confirmar.classList.remove('btn-confirmar-dev--sustitucion', 'btn-confirmar-dev--completa');
     confirmar.classList.add(TIPOS_DEVOLUCION[tipo].clase);
-    confirmar.innerText = TIPOS_DEVOLUCION[tipo].etiqueta;
+    confirmar.innerHTML = TIPOS_DEVOLUCION[tipo].etiqueta;
 
     // El producto de cambio solo aplica con sustitución: en la devolución
     // completa se cancela de la venta y no hay reposición

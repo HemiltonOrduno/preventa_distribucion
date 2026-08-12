@@ -10,6 +10,7 @@ from django.conf import settings
 OSRM_URL = settings.OSRM_URL
 
 
+
 @rol_requerido('Vendedor', 'Administrador')
 def ruta_del_dia_view(request):
     return render(request, 'visitas/ruta_del_dia.html')
@@ -708,3 +709,38 @@ def confirmar_pedido(request, pedido_id):
         "pedido_id": pedido_id,
         "movimiento_id": nuevo_mov
     }, json_dumps_params={'ensure_ascii': False})
+    
+def mis_pedidos_api(request):
+    """
+    Pedidos que el vendedor levantó hoy, para que pueda revisar lo que
+    lleva capturado sin salir de su ruta.
+    """
+    empleado_num = _empleado_de_sesion(request)
+    if not empleado_num:
+        return JsonResponse({"error": "Sesión no válida, inicia sesión de nuevo"}, status=401)
+
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT p.num AS pedido_id, p.fecha, p.total, p.observaciones,
+                   ep.nombre AS estado,
+                   e.nombre AS establecimiento,
+                   e.estColonia AS colonia
+            FROM pedido p
+            INNER JOIN visita v ON v.numero = p.visita
+            INNER JOIN establecimiento e ON e.numero = v.establecimiento
+            INNER JOIN edo_pedido ep ON ep.codigo = p.edo_pedido
+            WHERE v.empleado = %s AND DATE(p.fecha) = CURDATE()
+            ORDER BY p.num DESC
+        """, [empleado_num])
+        columns = [c[0] for c in cursor.description]
+        pedidos = [dict(zip(columns, r)) for r in cursor.fetchall()]
+
+    for p in pedidos:
+        p['total'] = float(p['total'] or 0)
+        p['fecha'] = p['fecha'].strftime('%H:%M') if p['fecha'] else None
+
+    return JsonResponse({"pedidos": pedidos}, json_dumps_params={'ensure_ascii': False})
+
+
+def mis_pedidos_view(request):
+    return render(request, 'visitas/mis_pedidos.html')
