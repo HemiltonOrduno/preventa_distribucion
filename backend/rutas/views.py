@@ -287,6 +287,7 @@ def rutas_activas(request):
                 erv.nombre AS estado,
                 z.nombre AS zona,
                 COALESCE(CONCAT(em.empNombre, ' ', em.empApellPat), 'Sin asignar') AS vendedor,
+                u.usuario AS vendedor_usuario,
                 (SELECT COUNT(*) FROM ruta_visita_orden rvo
                   WHERE rvo.ruta_visita = rv.numero) AS total_establecimientos,
                 (SELECT COUNT(DISTINCT v.establecimiento) FROM visita v
@@ -298,6 +299,7 @@ def rutas_activas(request):
             INNER JOIN zona z ON z.num = rv.zona
             INNER JOIN edo_ruta_visita erv ON erv.codigo = rvs.edo_ruta_visita
             LEFT JOIN empleado em ON em.num = rvs.empleado
+            LEFT JOIN usuario u ON u.empleado = em.num
             WHERE rvs.fecha = %s
               AND erv.nombre NOT IN ('Inactiva', 'Completada')
             ORDER BY rv.numero
@@ -306,22 +308,29 @@ def rutas_activas(request):
         rutas_visita = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
         # Rutas de entrega activas
+        # Rutas de entrega activas
         cursor.execute("""
-            SELECT 
+            SELECT
                 re.numero AS id,
                 re.nombre,
                 er.nombre AS estado,
                 een.nombre AS estado_entrega,
                 COALESCE(CONCAT(em.empNombre, ' ', em.empApellPat), 'Sin asignar') AS repartidor,
+                u.usuario AS repartidor_usuario,
                 ve.placas AS vehiculo,
                 COUNT(p.num) AS total_pedidos,
                 SUM(CASE WHEN ep.nombre = 'Entregado' THEN 1 ELSE 0 END) AS entregados,
-                COALESCE(SUM(p.total), 0) AS total,
+                COALESCE(SUM(p.total), 0) - COALESCE((
+                    SELECT SUM(d.importe) FROM devolucion d
+                    INNER JOIN pedido p2 ON p2.num = d.pedido
+                    WHERE p2.entrega = en2.numero
+                ), 0) AS total,
                 z.nombre AS zona,
                 re.entrega AS entrega_id
             FROM ruta_entrega re
             INNER JOIN edo_ruta_entrega er ON er.codigo = re.edo_ruta_entrega
             LEFT JOIN empleado em ON em.num = re.empleado
+            LEFT JOIN usuario u ON u.empleado = em.num
             INNER JOIN entrega en2 ON en2.numero = re.entrega
             INNER JOIN edo_entrega een ON een.codigo = en2.edo_entrega
             LEFT JOIN vehiculo ve ON ve.entrega = en2.numero
@@ -331,7 +340,9 @@ def rutas_activas(request):
             LEFT JOIN establecimiento e ON e.numero = v.establecimiento
             LEFT JOIN zona z ON z.num = e.zona
             WHERE er.nombre NOT IN ('Entregada')
-            GROUP BY re.numero, re.nombre, er.nombre, een.nombre, em.empNombre, em.empApellPat, ve.placas, z.nombre, re.entrega
+            GROUP BY re.numero, re.nombre, er.nombre, een.nombre,
+                     em.empNombre, em.empApellPat, u.usuario,
+                     ve.placas, z.nombre, re.entrega
         """)
         columns = [col[0] for col in cursor.description]
         rutas_entrega = [dict(zip(columns, row)) for row in cursor.fetchall()]
@@ -418,10 +429,12 @@ def rutas_visita_hoy(request):
         rutas_hoy = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
         # Vendedores activos, marcando los que ya llevan una ruta ese dia
+        # Vendedores activos, marcando los que ya llevan una ruta ese dia
         cursor.execute("""
             SELECT
                 em.num AS id,
                 CONCAT(em.empNombre, ' ', em.empApellPat) AS nombre,
+                u.usuario,
                 ede.nombre AS estado,
                 (SELECT COUNT(*) FROM ruta_visita_semana rvs
                   WHERE rvs.empleado = em.num
@@ -430,6 +443,7 @@ def rutas_visita_hoy(request):
             FROM empleado em
             INNER JOIN rol r ON r.codigo = em.rol
             INNER JOIN edo_empleado ede ON ede.codigo = em.edo_empleado
+            LEFT JOIN usuario u ON u.empleado = em.num
             WHERE r.nombre = 'Vendedor'
             AND ede.nombre = 'Activo'
             ORDER BY rutas_ese_dia ASC, em.empNombre
@@ -1174,12 +1188,14 @@ def repartidores_disponibles(request):
         cursor.execute("""
             SELECT em.num AS id,
                    CONCAT(em.empNombre, ' ', em.empApellPat) AS nombre,
+                   u.usuario,
                    (SELECT COUNT(*) FROM ruta_entrega re
                      WHERE re.empleado = em.num
                        AND re.edo_ruta_entrega IN ('ERET001','ERET002')) AS rutas_activas
             FROM empleado em
             INNER JOIN rol r ON r.codigo = em.rol
             INNER JOIN edo_empleado ee ON ee.codigo = em.edo_empleado
+            LEFT JOIN usuario u ON u.empleado = em.num
             WHERE r.nombre = 'Repartidor' AND ee.nombre = 'Activo'
             ORDER BY rutas_activas ASC, em.empNombre
         """)

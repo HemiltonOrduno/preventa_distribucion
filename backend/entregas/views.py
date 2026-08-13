@@ -264,7 +264,10 @@ def mi_ruta(request):
             SELECT e.numero AS establecimiento_id, e.nombre, e.latitud AS lat,
                    e.longitud AS lon, e.estCalle AS calle, e.estNumero AS num_ext,
                    e.estColonia AS colonia,
-                    p.num AS pedido_id, p.total AS subtotal,
+                    p.num AS pedido_id,
+                   p.total - COALESCE((
+                       SELECT SUM(d.importe) FROM devolucion d WHERE d.pedido = p.num
+                   ), 0) AS subtotal,
                    CONCAT(rep.repNombre, ' ', rep.repApellPat) AS representante,
                    rep.telefono,
                    CASE WHEN ep.nombre = 'Entregado' THEN 1 ELSE 0 END AS entregado,
@@ -676,7 +679,7 @@ def confirmar_entrega_establecimiento(request):
                     COALESCE(SUM(pg.monto), 0),
                     COALESCE((
                         SELECT SUM(d.importe) FROM devolucion d
-                        WHERE d.pedido = p.num AND d.motivo = 'Devolución completa sin reemplazo'
+                        WHERE d.pedido = p.num
                     ), 0)
                 FROM pedido p
                 LEFT JOIN pago pg ON pg.pedido = p.num

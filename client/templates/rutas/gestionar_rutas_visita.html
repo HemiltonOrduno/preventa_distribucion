@@ -224,7 +224,7 @@ function renderizarRutas(rutas) {
                 : r.estado;
             filaAsignacion = `
                 <div class="asignar-row" onclick="event.stopPropagation()">
-                    <select disabled><option>${r.vendedor_asignado || 'Vendedor'}</option></select>
+                    <select disabled><option>${r.vendedor || 'Sin asignar'}</option></select>
                     <button class="btn-asignar" disabled style="background:#ccc;color:#666;cursor:not-allowed;">${etiquetaBoton}</button>
                 </div>
             `;
@@ -233,7 +233,7 @@ function renderizarRutas(rutas) {
             `<option value="${v.id}"
                      ${v.id == r.vendedor_id ? 'selected' : ''}
                      ${(!v.disponible && v.id != r.vendedor_id) ? 'disabled' : ''}>
-                ${v.nombre}${v.disponible ? '' : ' — ya tiene ruta ese día'}
+                ${v.nombre}${v.usuario ? ` (${v.usuario})` : ''}${v.disponible ? '' : ' — ya tiene ruta ese día'}
              </option>`
         ).join('');
             filaAsignacion = `

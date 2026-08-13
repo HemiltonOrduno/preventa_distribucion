@@ -489,8 +489,8 @@ function mostrarDetalleRuta(tipo, ruta) {
         <div style="font-weight:bold;font-size:14px;margin-bottom:12px;">${ruta.nombre}</div>
         <div class="detalle-item"><span class="label">Estado</span><span class="valor"><span class="badge ${getBadgeClass(ruta.estado)}">${ruta.estado}</span></span></div>
         <div class="detalle-item"><span class="label">Zona</span><span class="valor">${ruta.zona}</span></div>
-        <div class="detalle-item"><span class="label">${tipo === 'visita' ? 'Vendedor' : 'Repartidor'}</span><span class="valor">${tipo === 'visita' ? ruta.vendedor : ruta.repartidor}</span></div>
-        ${tipo === 'entrega' && ruta.vehiculo ? `
+        <div class="detalle-item"><span class="label">${tipo === 'visita' ? 'Vendedor' : 'Repartidor'}</span><span class="valor">${tipo === 'visita' ? ruta.vendedor : ruta.repartidor}${(tipo === 'visita' ? ruta.vendedor_usuario : ruta.repartidor_usuario) ? ` (${tipo === 'visita' ? ruta.vendedor_usuario : ruta.repartidor_usuario})` : ''}</span></div>
+        ${tipo === 'entrega' ? `
         <div class="detalle-item"><span class="label">Vehículo</span><span class="valor">${ruta.vehiculo}</span></div>
         <div class="detalle-item"><span class="label">Total a cobrar</span><span class="valor">$${parseFloat(ruta.total || 0).toFixed(2)}</span></div>` : ''}
         <div class="detalle-item"><span class="label">${tipo === 'visita' ? 'Visitas' : 'Entregas'}</span><span class="valor">${completadas}/${total} (${progreso}%)</span></div>

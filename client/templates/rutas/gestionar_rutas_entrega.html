@@ -221,8 +221,9 @@ function abrirMapa(rutaId, entregaId, nombre, estado) {
             o.value = rep.id;
             o.disabled = !rep.disponible;
             o.innerText = rep.disponible
-                ? `${rep.nombre} — disponible`
-                : `${rep.nombre} — ocupado (${rep.rutas_activas} ruta activa)`;
+                o.innerText = rep.disponible
+                ? `${rep.nombre}${rep.usuario ? ` (${rep.usuario})` : ''} — disponible`
+                : `${rep.nombre}${rep.usuario ? ` (${rep.usuario})` : ''} — ocupado (${rep.rutas_activas} ruta activa)`;
             sel.appendChild(o);
         });
 
