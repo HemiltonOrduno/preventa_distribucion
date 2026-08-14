@@ -8,6 +8,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.db import connection
 from usuarios.permissions import rol_requerido
 from datetime import date, timedelta
+from django.db import connection, transaction
 
 # Coordenadas del almacén (Pepsico El Florido, Tijuana)
 ALMACEN = {
@@ -841,6 +842,12 @@ def _establecimientos_ocupados(cursor, dia, establecimientos, ruta_excluir=None)
 
 @csrf_exempt
 def crear_ruta_visita(request):
+    """
+    Crea una ruta de visita con sus paradas. El trigger
+    tg_establecimiento_una_sola_ruta valida que ningún establecimiento
+    pertenezca ya a otra ruta; los que se rechacen se reportan sin
+    tumbar la creación de la ruta.
+    """
     if request.method != 'POST':
         return JsonResponse({"error": "Método no permitido"}, status=405)
 
@@ -858,20 +865,9 @@ def crear_ruta_visita(request):
     if not nombre or not dia or not zona_id:
         return JsonResponse({"error": "Faltan datos requeridos"}, status=400)
 
-    with connection.cursor() as cursor:
-        # Un establecimiento no puede recibir visita en dias contiguos:
-        # se atiende una vez por semana y hay que dejar margen entre rutas
-        conflictos = _establecimientos_ocupados(cursor, dia, establecimientos)
-        if conflictos:
-            detalle = '; '.join(
-                f"{c['establecimiento']} ya está en '{c['ruta']}' ({c['dia']})"
-                for c in conflictos[:5]
-            )
-            return JsonResponse({
-                "error": f"Algunos establecimientos ya reciben visita en días cercanos: {detalle}",
-                "conflictos": conflictos
-            }, status=409)
+    rechazados = []
 
+    with connection.cursor() as cursor:
         # La ruta nace sin vendedor: el coordinador lo asigna cada semana
         # y ese registro vive en ruta_visita_semana
         cursor.execute("""
@@ -880,16 +876,42 @@ def crear_ruta_visita(request):
         """, [nombre, descripcion, dia, zona_id])
         nuevo_num = cursor.lastrowid
 
-        # Guardar orden en ruta_visita_orden
-        for i, est_id in enumerate(establecimientos):
-            cursor.execute("""
-                INSERT INTO ruta_visita_orden (ruta_visita, establecimiento, orden)
-                VALUES (%s, %s, %s)
-            """, [nuevo_num, est_id, i + 1])
+    # Cada parada se inserta por separado para que un establecimiento
+    # rechazado por el trigger no impida agregar los demás
+    for i, est_id in enumerate(establecimientos):
+        try:
+            with transaction.atomic():
+                with connection.cursor() as cursor:
+                    cursor.execute("""
+                        INSERT INTO ruta_visita_orden (ruta_visita, establecimiento, orden)
+                        VALUES (%s, %s, %s)
+                    """, [nuevo_num, est_id, i + 1])
+        except Exception as e:
+            rechazados.append({"establecimiento": est_id, "motivo": str(e)})
+            # El SIGNAL revierte el registro que hace el trigger, así que
+            # el rechazo se deja desde aquí
+            with connection.cursor() as cur2:
+                cur2.execute("""
+                    INSERT INTO bitacora_trigger (trigger_nombre, detalle, fecha)
+                    VALUES ('tg_establecimiento_una_sola_ruta', %s, NOW())
+                """, [f"Establecimiento {est_id} RECHAZADO en ruta {nuevo_num}: {str(e)[:120]}"])
+
+    
+
+
+    # Si ninguna parada pudo entrar, la ruta quedaria vacia y no sirve
+    if establecimientos and len(rechazados) == len(establecimientos):
+        with connection.cursor() as cursor:
+            cursor.execute("DELETE FROM ruta_visita WHERE numero = %s", [nuevo_num])
+        return JsonResponse({
+            "error": "Ningún establecimiento pudo agregarse: todos pertenecen ya a otra ruta",
+            "establecimientos_rechazados": rechazados
+        }, status=409)
 
     return JsonResponse({
         "mensaje": "Ruta creada correctamente",
-        "ruta_id": nuevo_num
+        "ruta_id": nuevo_num,
+        "establecimientos_rechazados": rechazados
     }, json_dumps_params={'ensure_ascii': False})
     
     

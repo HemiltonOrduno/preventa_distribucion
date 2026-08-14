@@ -648,7 +648,17 @@ function guardarRuta(nombre, dia, descripcion, zonaId, eraEdicion) {
     .then(data => {
         if (data.error) { alert('Error: ' + data.error); return; }
         cerrarEdicion();
-        mostrarToast(eraEdicion ? ' Ruta actualizada' : '✓ Ruta creada');
+
+        // El trigger pudo rechazar establecimientos que ya pertenecen a
+        // otra ruta: hay que avisarlo, no solo decir que se creó
+        const rechazados = data.establecimientos_rechazados || [];
+        if (rechazados.length > 0) {
+            alert(`La ruta se creó, pero ${rechazados.length} establecimiento(s) no se ` +
+                  `pudieron agregar porque ya pertenecen a otra ruta de visita.`);
+        } else {
+            mostrarToast(eraEdicion ? 'Ruta actualizada' : 'Ruta creada');
+        }
+
         cargarDatos();
     })
     .catch(() => alert('Error de conexión'));

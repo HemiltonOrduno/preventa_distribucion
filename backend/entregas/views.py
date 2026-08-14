@@ -207,6 +207,13 @@ def crear_entrega(request):
                     pedidos_incluidos.append(pedido_id)
                 except Exception as e:
                     pedidos_rechazados.append({"pedido_id": pedido_id, "motivo": str(e)})
+                    # El SIGNAL del trigger revierte su propio registro en la
+                    # bitacora, asi que el rechazo se deja desde aqui
+                    with connection.cursor() as cur2:
+                        cur2.execute("""
+                            INSERT INTO bitacora_trigger (trigger_nombre, detalle, fecha)
+                            VALUES ('tg_verificar_zona_capacidad', %s, NOW())
+                        """, [f"Pedido {pedido_id} RECHAZADO: {str(e)[:150]}"])
 
     except ValueError as e:
         return JsonResponse({"error": str(e)}, status=400)
@@ -980,6 +987,11 @@ def agregar_pedidos_entrega(request, entrega_id):
             incluidos.append(pedido_id)
         except Exception as e:
             rechazados.append({"pedido_id": pedido_id, "motivo": str(e)})
+            with connection.cursor() as cur2:
+                cur2.execute("""
+                    INSERT INTO bitacora_trigger (trigger_nombre, detalle, fecha)
+                    VALUES ('tg_verificar_zona_capacidad', %s, NOW())
+                """, [f"Pedido {pedido_id} RECHAZADO: {str(e)[:150]}"])
 
     return JsonResponse({
         "mensaje": f"{len(incluidos)} pedido(s) agregados",

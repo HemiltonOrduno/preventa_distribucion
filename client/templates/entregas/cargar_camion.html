@@ -303,7 +303,7 @@
 
         let msg = data.mensaje;
         if (data.pedidos_rechazados.length > 0) {
-            msg += `. Rechazados: ${data.pedidos_rechazados.map(r => '#' + r.pedido_id).join(', ')}`;
+            msg += `. Rechazados: ${data.pedidos_rechazados.map(r => `#${r.pedido_id}: ${r.motivo}`).join(' | ')}`;
         }
         mostrarToast(msg, data.pedidos_incluidos.length > 0 ? 'success' : 'error');
         refrescarTodo();

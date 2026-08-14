@@ -706,7 +706,6 @@ function guardarDevolucion() {
         return;
     }
     if (!cantidad || cantidad <= 0) { alert('Ingresa una cantidad válida'); return; }
-    if (maximo && cantidad > maximo) { alert(`No puedes devolver más de ${maximo} piezas`); return; }
     if (!motivo) { alert('Ingresa el motivo de la devolución'); return; }
 
     // Doble confirmación para la acción irreversible

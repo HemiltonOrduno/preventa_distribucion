@@ -4,7 +4,7 @@
 #################
 
 
-####Trigger 1: Verificar zona y capacidad
+####Trigger 1: Verificar zona y capacidad 
 
 DELIMITER $$
 CREATE OR REPLACE TRIGGER tg_verificar_zona_capacidad
@@ -68,6 +68,8 @@ BEGIN
 
         END IF;
 
+    ###Pa que quede validaddo en la bitacora como evidencia###
+
         INSERT INTO bitacora_trigger (trigger_nombre, detalle, fecha)
         VALUES ('tg_verificar_zona_capacidad',
                 CONCAT('Pedido ', NEW.num, ' aceptado en entrega ', NEW.entrega,
@@ -80,7 +82,31 @@ BEGIN
 END$$
 DELIMITER ;
 
+###TRIGGER 2: un establecimiento solo a una ruta asi solo es una visita a la semana por el negocio 
+DELIMITER $$
+CREATE OR REPLACE TRIGGER tg_establecimiento_una_sola_ruta
+BEFORE INSERT ON ruta_visita_orden
+FOR EACH ROW
+BEGIN
+    DECLARE v_existe INT;
 
+    SELECT COUNT(*) INTO v_existe
+    FROM ruta_visita_orden
+    WHERE establecimiento = NEW.establecimiento
+      AND ruta_visita <> NEW.ruta_visita;
+
+    IF v_existe > 0 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'El establecimiento ya pertenece a otra ruta de visita';
+    END IF;
+
+    INSERT INTO bitacora_trigger (trigger_nombre, detalle, fecha)
+    VALUES ('tg_establecimiento_una_sola_ruta',
+            CONCAT('Establecimiento ', NEW.establecimiento,
+                   ' aceptado en la ruta ', NEW.ruta_visita),
+            NOW());
+END$$
+DELIMITER ;
 
 
 ###TRIGGER 3: ACTUALIZAR STOCK####
@@ -108,7 +134,7 @@ BEGIN
         WHERE codigo = NEW.cod_producto;
     END IF;
 
-    -- Sera la evidencia para de que se ejecute el trigger --
+    -- EVIDENCIA PAL TRIGGER --
     INSERT INTO bitacora_trigger (trigger_nombre, detalle, fecha)
     VALUES ('tg_actualizar_stock',
             CONCAT(tipo, ': ', NEW.cantidad, ' pza(s) de ', NEW.cod_producto),
@@ -118,7 +144,10 @@ DELIMITER ;
 
 
 
-###TRIGGER 2, CAMPOS CALCULADOS ###
+##la vida no es tan buena
+
+
+###TRIGGER CAMPOS CALCULADOS ###
 
 DELIMITER $$
 CREATE OR REPLACE TRIGGER tg_campos_calculados_pedido
