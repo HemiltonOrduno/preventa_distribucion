@@ -12,7 +12,7 @@
     <div id="page-body">
         <div id="layout">
 
-            <!-- PANEL NORMAL: Lista de rutas -->
+
             <div id="panel-rutas">
                 <div id="panel-rutas-header">
                     <div style="font-size:13px;font-weight:bold;color:#333;">Rutas de visita</div>
@@ -30,7 +30,7 @@
                 <div id="lista-rutas">Cargando...</div>
             </div>
 
-            <!-- PANEL EDICION -->
+
             <div id="panel-edicion" style="display:none;flex-direction:column;">
                 <div id="panel-edicion-header">
                     <div id="edicion-titulo" style="font-size:13px;font-weight:bold;color:#1a237e;">Nueva ruta</div>
@@ -77,7 +77,7 @@
                 <div id="lista-paradas-modal" style="flex:1;overflow-y:auto;padding:8px;"></div>
             </div>
 
-            <!-- MAPA PRINCIPAL -->
+
             <div id="mapa-rutas"></div>
         </div>
         <div class="toast" id="toast"></div>
@@ -94,14 +94,13 @@ let vendedoresDisponibles = [];
 let zonas = [];
 let establecimientos = [];
 let diaHoy = '';
-let modoEdicion = null; // null = ver, 'crear' = nueva ruta, 'editar' = editar ruta existente
+let modoEdicion = null;
 let rutaEditandoId = null;
 let sortableParadas = null;
-let cargandoEdicion = false; // evita que se borren las paradas al precargar una ruta
+let cargandoEdicion = false;
 let diaFiltroActual = 'hoy';
 let rutaLayerEdicion = null;
 
-// Mapa principal
 let mapaRutas = null;
 let rutaLayerActual = null;
 let marcadoresRuta = [];
@@ -126,7 +125,7 @@ function inicializarMapaRutas() {
 
     agregarBotonCentrar(mapaRutas, [32.505, -117.010], 12);
 
-    // Marcador del almacén siempre visible
+
     const iconoAlmacen = L.divIcon({
         className: '',
         html: `<div style="background:#7b1fa2;color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.4);">🏭</div>`,
@@ -161,12 +160,9 @@ function cargarDatos() {
 
         const btnActivo = document.querySelector('.filtro-dia button.active')
             || document.querySelector('.filtro-dia button');
-        // Se conserva el dia que el coordinador tenia seleccionado, para que
-        // la lista no salte a "Hoy" despues de asignar o editar una ruta
         filtrarDia(diaFiltroActual, btnActivo);
 
-        // Si llegamos desde "Gestionar zonas" con una zona ya elegida, abre
-        // directamente el panel de nueva ruta con esa zona preseleccionada
+
         const params = new URLSearchParams(window.location.search);
         const zonaParam = params.get('zona');
         if (zonaParam) {
@@ -206,7 +202,7 @@ function renderizarRutas(rutas) {
         const total = r.total_establecimientos || 0;
         const completadas = r.completadas || 0;
         const progreso = total > 0 ? Math.round((completadas / total) * 100) : 0;
-        const bloqueada = r.estado !== 'Activa'; // Asignada, Iniciada, Pausada, Completada = ya no se toca
+        const bloqueada = r.estado !== 'Activa';
 
         const div = document.createElement('div');
         div.className = 'ruta-card';
@@ -316,12 +312,12 @@ function asignarVendedor(rutaId) {
     .then(({ status, data }) => {
         if (status !== 200) { alert('Error: ' + (data.error || 'no se pudo asignar')); cargarDatos(); return; }
         mostrarToast(` ${vendedorNombre} asignado`);
-        cargarDatos(); // recarga la lista para que la tarjeta muestre el nuevo estado
+        cargarDatos(); 
     })
     .catch(() => alert('Error de conexión'));
 }
 
-// ===== ICONOS =====
+
 function iconoEstNormal() {
     return L.divIcon({
         className: '',
@@ -338,7 +334,6 @@ function iconoEstNumerado(num) {
     });
 }
 
-// ===== MODO EDICION =====
 function abrirCrearRuta(zonaIdPreseleccionada) {
     modoEdicion = 'crear';
     rutaEditandoId = null;
@@ -400,7 +395,7 @@ function abrirEditarRuta(rutaId) {
             limpiarRutaVisualizada();
             limpiarMarcadoresEdicion();
 
-            // Bandera para que cargarEstablecimientosZona NO borre las paradas precargadas
+
             cargandoEdicion = true;
             cargarEstablecimientosZona();
             cargandoEdicion = false;
@@ -443,8 +438,7 @@ function cargarEstablecimientosZona() {
 
     limpiarMarcadoresEdicion();
 
-    // Solo se limpian las paradas cuando el cambio de zona lo hace el usuario,
-    // no cuando estamos precargando una ruta existente para editar.
+
     if (!cargandoEdicion) {
         paradasSeleccionadas = [];
         document.getElementById('lista-paradas-modal').innerHTML = '';
@@ -542,8 +536,7 @@ function guardarRutaDesdePanel() {
     if (!zonaId) { alert('Selecciona una zona'); return; }
     if (paradasSeleccionadas.length === 0) { alert('Selecciona al menos un establecimiento'); return; }
 
-    // Se respeta el orden en que el coordinador seleccionó las paradas,
-    // tanto al crear como al editar la ruta
+
     const eraEdicion = modoEdicion === 'editar';
     guardarRuta(nombre, dia, descripcion, zonaId, eraEdicion);
 }
@@ -579,8 +572,6 @@ function ordenarConOSRM(callback) {
             return oa - ob;
         });
 
-        // Se dibuja el recorrido propuesto para que el coordinador lo vea
-        // antes de guardar la ruta
         if (rutaLayerEdicion) {
             mapaRutas.removeLayer(rutaLayerEdicion);
             rutaLayerEdicion = null;
@@ -600,12 +591,7 @@ function ordenarConOSRM(callback) {
     });
 }
 
-/* El coordinador puede pedir que el sistema proponga el recorrido mas
-   corto en lugar de ordenar las paradas a mano. Sigue pudiendo
-   ajustarlo despues arrastrando la lista. */
-/* Arma la ruta sola: toma todos los establecimientos de la zona y los
-   deja en el orden de recorrido mas corto. El coordinador puede quitar
-   los que no apliquen o reacomodarlos arrastrando antes de guardar. */
+
 function rutaAutomatica() {
     const zonaId = parseInt(document.getElementById('ruta-zona').value);
     if (!zonaId) { alert('Selecciona primero una zona'); return; }
@@ -649,8 +635,7 @@ function guardarRuta(nombre, dia, descripcion, zonaId, eraEdicion) {
         if (data.error) { alert('Error: ' + data.error); return; }
         cerrarEdicion();
 
-        // El trigger pudo rechazar establecimientos que ya pertenecen a
-        // otra ruta: hay que avisarlo, no solo decir que se creó
+
         const rechazados = data.establecimientos_rechazados || [];
         if (rechazados.length > 0) {
             alert(`La ruta se creó, pero ${rechazados.length} establecimiento(s) no se ` +

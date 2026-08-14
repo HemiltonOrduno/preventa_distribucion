@@ -8,7 +8,7 @@
 {% block content %}
 <div class="ruta-layout" id="ruta-layout">
 
-    <!-- PANEL IZQUIERDO: Lista de paradas -->
+
     <div class="ruta-panel">
         <div class="ruta-panel__header">
             <div class="ruta-panel__titulo"><i class='bx bx-map-alt'></i> Ruta del día</div>
@@ -35,13 +35,13 @@
         </div>
     </div>
 
-    <!-- MAPA -->
+
     <div class="ruta-mapa">
         <div id="map"></div>
     </div>
 </div>
 
-<!-- MODAL: Detalle de establecimiento -->
+
 <div class="modal-overlay" id="modal-parada" onclick="cerrarModalParada(event)">
     <div class="modal">
         <div class="modal-handle"></div>
@@ -70,7 +70,6 @@
     </div>
 </div>
 
-<!-- MODAL: Cobro -->
 <div class="modal-overlay" id="modal-cobro" onclick="cerrarModalCobro(event)">
     <div class="modal">
         <div class="modal-handle"></div>
@@ -124,7 +123,6 @@
     </div>
 </div>
 
-<!-- MODAL: Devolución (RNF-27: codificación visual por color en acciones críticas) -->
 <div class="modal-overlay" id="modal-devolucion" onclick="cerrarModalDevolucion(event)">
     <div class="modal">
         <div class="modal-handle"></div>

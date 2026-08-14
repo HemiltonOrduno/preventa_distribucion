@@ -83,8 +83,6 @@ DATABASES = {
         'PORT': config('DB_PORT'),
         'CONN_MAX_AGE': 600,
         'OPTIONS': {
-            # La base está en la nube y corre en UTC: se fija la zona de
-            # Tijuana para que CURDATE() coincida con el día local
             'init_command': "SET time_zone = '-07:00'",
         },
     }
@@ -133,12 +131,10 @@ STATIC_ROOT = os.path.join(ROOT_DIR, 'staticfiles')
 STATICFILES_DIRS = [
     os.path.join(ROOT_DIR, 'client', 'static'),
 ]
-# Sin manifiesto: los CSS de terceros (Leaflet, Boxicons) referencian
-# imágenes y fuentes que no se descargaron, y el modo con manifiesto
-# falla al no encontrarlas
+
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 
-# Railway asigna el dominio en tiempo de ejecución
+
 CSRF_TRUSTED_ORIGINS = [
     'https://*.up.railway.app',
 ]

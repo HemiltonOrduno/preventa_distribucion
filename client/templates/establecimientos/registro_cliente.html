@@ -96,7 +96,6 @@
 
     function validarRFC(valor) {
         const rfc = valor.trim().toUpperCase();
-        // Persona física: 4 letras + 6 dígitos (fecha) + 3 homoclave
         const patron = /^[A-ZÑ&]{4}\d{6}[A-Z0-9]{3}$/;
         return patron.test(rfc);
     }

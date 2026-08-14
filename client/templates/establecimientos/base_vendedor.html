@@ -13,8 +13,6 @@
     {% block extra_styles %}{% endblock %}
 
     <script>
-        /* Aplica el modo alto contraste ANTES de pintar la pagina, para que
-           no haya parpadeo si el usuario ya lo tenia activado (RFN-19) */
         (function(){
             try{
                 if (localStorage.getItem('altoContraste') === '1'){
@@ -46,7 +44,7 @@
 </head>
 <body>
 
-<!-- MENU SUPERIOR: solo visible en escritorio -->
+
 <nav class="top-nav">
     <div class="top-nav__brand">
         <i class='bx bx-package'></i> INPREDISROUTE
@@ -73,9 +71,7 @@
     <div class="top-nav__avatar" onclick="togglePerfil(event)"><i class='bx bx-user'></i></div>
 </nav>
 
-<!-- PANEL DE PERFIL: va FUERA de los dos <nav> porque en movil el menu
-     superior esta en display:none y arrastraria el panel con el.
-     Su posicion la calcula posicionarPerfil() segun el icono que se clickeo. -->
+
 <div class="perfil" id="menuPerfil">
     <div class="perfil__avatar"><i class='bx bx-user'></i></div>
     <div class="perfil__datos">
@@ -89,7 +85,6 @@
     </a>
 </div>
 
-<!-- MODAL DE CONFIRMACION DE CIERRE DE SESION -->
 <div class="modal" id="modalLogout">
     <div class="modal__caja">
         <div class="modal__icono"><i class='bx bx-log-out'></i></div>
@@ -105,8 +100,7 @@
     </div>
 </div>
 
-<!-- BOTON FLOTANTE DE ALTO CONTRASTE: solo visible en movil (RFN-19).
-     En escritorio ya existe el boton equivalente dentro del top-nav. -->
+
 <button class="btn-contraste-fab" onclick="toggleAltoContraste()"
         title="Modo alto contraste" aria-label="Activar modo de alto contraste"
         aria-pressed="false">
@@ -117,7 +111,7 @@
     {% block content %}{% endblock %}
 </div>
 
-<!-- MENU INFERIOR: solo visible en móvil -->
+
 <nav class="bottom-nav">
     <a href="{% url 'ruta_del_dia' %}" class="bottom-nav__item {% block nav_ruta_m %}{% endblock %}">
         <i class='bx bx-map-alt'></i>

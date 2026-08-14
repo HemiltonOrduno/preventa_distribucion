@@ -140,8 +140,6 @@ class HistorialPedidosAPIView(ListAPIView):
                 'La fecha inicial no puede ser posterior a la fecha final.'
             )
 
-        # pedido.fecha es DATETIME: se acota por instante inicial y final
-        # del dia para incluir lo capturado despues de medianoche.
         if inicio:
             consulta = consulta.filter(fecha__gte=_inicio_del_dia(inicio))
         if fin:
@@ -151,7 +149,7 @@ class HistorialPedidosAPIView(ListAPIView):
         if vendedor:
             consulta = consulta.filter(visita__empleado_id=vendedor)
 
-        # Los catalogos del esquema usan llave VARCHAR (ej. 'EPD004').
+
         estado = _leer_texto(self.request, 'estado')
         if estado:
             consulta = consulta.filter(edo_pedido_id=estado)
@@ -221,8 +219,6 @@ class CatalogosFiltrosAPIView(APIView):
     permission_classes = [EsAdministrador]
 
     def get(self, request):
-        # Solo empleados que efectivamente levantaron visitas: evita listar
-        # a todo el personal en el selector de vendedor.
         con_visitas = Visita.objects.values_list('empleado_id', flat=True).distinct()
         empleados = (
             Empleado.objects
@@ -276,8 +272,6 @@ class CatalogosFiltrosAPIView(APIView):
             for t in TipoPago.objects.order_by('codigo')
         ]
 
-        # Los motivos son texto libre en DEVOLUCION: se ofrecen los que
-        # existen realmente en vez de un catalogo fijo.
         motivos = [
             {'id': m, 'nombre': m}
             for m in Devolucion.objects
@@ -343,9 +337,6 @@ class CatalogosFiltrosAPIView(APIView):
         })
 
 
-# ---------------------------------------------------------------------------
-# RF45 - Historial de entregas
-# ---------------------------------------------------------------------------
 
 def _entregas_anotadas():
     """Entregas con sus conteos y monto resueltos por subconsulta.
@@ -409,9 +400,6 @@ class HistorialEntregasAPIView(ListAPIView):
                 "El parametro 'campo_fecha' solo acepta 'creacion' o 'entrega'."
             )
         columna = 'fecha_creacion' if campo == 'creacion' else 'fecha_entrega'
-        # fecha_creacion es DATE y fecha_entrega es DATETIME. Para la
-        # primera basta comparar fechas; para la segunda hacen falta los
-        # limites del dia.
         es_datetime = columna == 'fecha_entrega'
 
         inicio = _leer_fecha(self.request, 'fecha_inicio')
@@ -500,9 +488,6 @@ class EntregaDetalleAPIView(RetrieveAPIView):
         )
 
 
-# ---------------------------------------------------------------------------
-# RF46 - Historial de cobros
-# ---------------------------------------------------------------------------
 
 class HistorialCobrosAPIView(ListAPIView):
     """RF46 - Historial de cobros con filtro por fecha y por usuario.
@@ -526,7 +511,6 @@ class HistorialCobrosAPIView(ListAPIView):
             raise ErrorFiltro(
                 'La fecha inicial no puede ser posterior a la fecha final.'
             )
-        # pago.fecha es DATETIME.
         if inicio:
             consulta = consulta.filter(fecha__gte=_inicio_del_dia(inicio))
         if fin:
@@ -569,7 +553,6 @@ class HistorialCobrosAPIView(ListAPIView):
             cobros=Count('codigo'), monto=Sum('monto'),
         )
 
-        # Desglose por forma de pago (RF55).
         desglose = []
         agrupado = (
             consulta
@@ -617,9 +600,6 @@ class HistorialCobrosAPIView(ListAPIView):
         return respuesta
 
 
-# ---------------------------------------------------------------------------
-# RF47 - Historial de devoluciones
-# ---------------------------------------------------------------------------
 
 def _devoluciones_anotadas():
     """Devoluciones con unidades, valor y numero de productos.
@@ -678,7 +658,7 @@ class HistorialDevolucionesAPIView(ListAPIView):
             raise ErrorFiltro(
                 'La fecha inicial no puede ser posterior a la fecha final.'
             )
-        # devolucion.fecha es DATE, no DATETIME.
+
         if inicio:
             consulta = consulta.filter(fecha__gte=inicio)
         if fin:
@@ -710,7 +690,7 @@ class HistorialDevolucionesAPIView(ListAPIView):
             .aggregate(unidades=Sum('cantidad'), valor=Sum('subtotal'))
         )
 
-        # Motivo mas frecuente del periodo.
+
         top = (
             plano
             .exclude(motivo__isnull=True)
@@ -760,9 +740,6 @@ class DevolucionDetalleAPIView(RetrieveAPIView):
         )
 
 
-# ---------------------------------------------------------------------------
-# RF48 - Historial de movimientos de inventario
-# ---------------------------------------------------------------------------
 
 def _movimientos_anotados():
     """Movimientos con unidades, valor y numero de productos distintos."""
@@ -816,7 +793,6 @@ class HistorialMovimientosAPIView(ListAPIView):
             raise ErrorFiltro(
                 'La fecha inicial no puede ser posterior a la fecha final.'
             )
-        # movimientos.fecha es DATETIME.
         if inicio:
             consulta = consulta.filter(fecha__gte=_inicio_del_dia(inicio))
         if fin:
@@ -842,7 +818,6 @@ class HistorialMovimientosAPIView(ListAPIView):
 
         producto = _leer_texto(self.request, 'producto')
         if producto:
-            # distinct() porque un movimiento puede tener varios renglones.
             consulta = consulta.filter(
                 detalles__cod_producto_id=producto
             ).distinct()
@@ -905,10 +880,6 @@ class MovimientoDetalleAPIView(RetrieveAPIView):
         return _movimientos_anotados().prefetch_related('detalles__cod_producto')
 
 
-# ---------------------------------------------------------------------------
-# RF49 - Estado actual de pedidos activos
-# ---------------------------------------------------------------------------
-
 class PedidosActivosAPIView(ListAPIView):
     """RF49 - Monitor de pedidos que siguen en curso.
 
@@ -953,8 +924,6 @@ class PedidosActivosAPIView(ListAPIView):
         return consulta
 
     def get_queryset(self):
-        # Ascendente a proposito: lo mas viejo primero, que es lo que
-        # requiere atencion en un monitor de operacion.
         return self._filtrar(
             Pedido.objects
             .select_related(
@@ -974,8 +943,6 @@ class PedidosActivosAPIView(ListAPIView):
         plano = self._filtrar(Pedido.objects.all())
         corte = date.today() - timedelta(days=DIAS_PEDIDO_REZAGADO)
 
-        # Conteo por estado, incluyendo los que quedaron en cero para que
-        # el tablero no cambie de forma entre consultas.
         conteos = dict(
             plano.values_list('edo_pedido_id')
                  .annotate(n=Count('num'))
@@ -1010,9 +977,6 @@ class PedidosActivosAPIView(ListAPIView):
                 if mas_viejo else 0
             ),
             'por_estado': por_estado,
-            # Marca de hora del servidor. datetime.now() (naive, hora
-            # local) sirve en ambas configuraciones de USE_TZ; el frontend
-            # solo la muestra, no opera con ella.
             'actualizado': datetime.now().isoformat(timespec='seconds'),
         }
 
@@ -1032,9 +996,6 @@ class PedidosActivosAPIView(ListAPIView):
         return respuesta
 
 
-# ---------------------------------------------------------------------------
-# RF50 - Reporte de volumen de pedidos por periodo
-# ---------------------------------------------------------------------------
 
 AGRUPACIONES = {
     'dia': (TruncDate, '%d %b'),
@@ -1166,9 +1127,6 @@ class VolumenPedidosAPIView(APIView):
         })
 
 
-# ---------------------------------------------------------------------------
-# RF51 - Reporte de ventas por vendedor
-# ---------------------------------------------------------------------------
 
 class VentasPorVendedorAPIView(APIView):
     """RF51 - Ventas agrupadas por vendedor.
@@ -1242,8 +1200,7 @@ class VentasPorVendedorAPIView(APIView):
             )
         )
 
-        # Las visitas se cuentan aparte: unirlas en la misma consulta
-        # multiplicaria filas contra PEDIDO e inflaria los totales.
+
         conteo_visitas = dict(
             visitas.values_list('empleado_id')
                    .annotate(n=Count('numero'))
@@ -1275,7 +1232,6 @@ class VentasPorVendedorAPIView(APIView):
                 'cancelados': fila['cancelados'],
                 'establecimientos': fila['establecimientos'],
                 'visitas': hechas,
-                # Que porcentaje de las visitas termino en pedido.
                 'efectividad': (
                     round(colocados / hechas * 100, 1) if hechas else None
                 ),
@@ -1314,10 +1270,6 @@ class VentasPorVendedorAPIView(APIView):
             },
         })
 
-
-# ---------------------------------------------------------------------------
-# RF52 - Reporte de ventas por cliente
-# ---------------------------------------------------------------------------
 
 class VentasPorClienteAPIView(APIView):
     """RF52 - Ventas agrupadas por establecimiento.
@@ -1415,7 +1367,6 @@ class VentasPorClienteAPIView(APIView):
                 'sin_compras': False,
             })
 
-        # Cartera dormida: establecimientos activos que no compraron.
         if request.query_params.get('sin_compras') in ('1', 'true', 'si'):
             dormidos = Establecimiento.objects.exclude(pk__in=con_compras)
             if zona:
@@ -1442,7 +1393,6 @@ class VentasPorClienteAPIView(APIView):
         def ordenar(fila):
             valor = fila[campo]
             if valor is None:
-                # Los que no compraron van siempre al final.
                 return Decimal('-1') if campo != 'nombre' else 'zzz'
             return valor
 
@@ -1472,9 +1422,6 @@ class VentasPorClienteAPIView(APIView):
         })
 
 
-# ---------------------------------------------------------------------------
-# RF53 - Reporte de desempeno por repartidor
-# ---------------------------------------------------------------------------
 
 def _sin_zona(momento):
     """Devuelve el datetime como naive, venga o no con zona horaria."""
@@ -1548,7 +1495,6 @@ class DesempenoRepartidorAPIView(APIView):
                 if columna == 'fecha_entrega' else fin
             })
 
-        # 1) Conteo de entregas y completadas por repartidor.
         base = dict()
         for fila in (
             entregas.values('empleado_id').annotate(
@@ -1563,7 +1509,6 @@ class DesempenoRepartidorAPIView(APIView):
                 'completadas': fila['completadas'],
             }
 
-        # 2) Pedidos y monto distribuido.
         pedidos = {
             fila['entrega__empleado_id']: (fila['n'], fila['m'])
             for fila in (
@@ -1574,7 +1519,6 @@ class DesempenoRepartidorAPIView(APIView):
             )
         }
 
-        # 3) Paradas confirmadas.
         paradas = dict(
             EntregaEstablecimiento.objects
             .filter(entrega__in=entregas)
@@ -1582,8 +1526,7 @@ class DesempenoRepartidorAPIView(APIView):
             .annotate(n=Count('establecimiento'))
             .values_list('entrega__empleado_id', 'n')
         )
-
-        # 4) Devoluciones generadas en esas entregas.
+        
         devoluciones = dict(
             Devolucion.objects
             .filter(entrega__in=entregas)
@@ -1592,7 +1535,7 @@ class DesempenoRepartidorAPIView(APIView):
             .values_list('entrega__empleado_id', 'n')
         )
 
-        # 5) Tiempos: solo entregas ya concluidas.
+
         tiempos = {}
         for identificador, creacion, entregada in (
             entregas
@@ -1603,7 +1546,6 @@ class DesempenoRepartidorAPIView(APIView):
             cierre = _sin_zona(entregada)
             horas = (cierre - arranque).total_seconds() / 3600
             if horas < 0:
-                # Dato inconsistente: la entrega quedo antes de crearse.
                 continue
             tiempos.setdefault(identificador, []).append(horas)
 
@@ -1648,7 +1590,6 @@ class DesempenoRepartidorAPIView(APIView):
         def ordenar(fila):
             valor = fila[campo_orden]
             if valor is None:
-                # Sin tiempo medido, siempre al final.
                 return float('inf') if not descendente else -1
             return valor
 
@@ -1678,9 +1619,6 @@ class DesempenoRepartidorAPIView(APIView):
         })
 
 
-# ---------------------------------------------------------------------------
-# RF54 - Reporte de productos mas vendidos
-# ---------------------------------------------------------------------------
 
 class ProductosMasVendidosAPIView(APIView):
     """RF54 - Ranking de productos por unidades y por monto.
@@ -1787,7 +1725,6 @@ class ProductosMasVendidosAPIView(APIView):
             )
         )
 
-        # Stock actual para senalar riesgo de faltante en los mas vendidos.
         existencias = dict(
             Producto.objects.values_list('codigo', 'stock')
         )
@@ -1818,7 +1755,6 @@ class ProductosMasVendidosAPIView(APIView):
                 round(float(fila['importe']) / float(total_importe) * 100, 1)
                 if total_importe else 0
             )
-            # Cuantos periodos de venta cubre el stock que queda.
             fila['cobertura'] = (
                 round(fila['stock'] / fila['unidades'], 1)
                 if fila['unidades'] else None
@@ -1852,9 +1788,6 @@ class ProductosMasVendidosAPIView(APIView):
         })
 
 
-# ---------------------------------------------------------------------------
-# RF55 - Reporte de cobranza
-# ---------------------------------------------------------------------------
 
 class ReporteCobranzaAPIView(APIView):
     """RF55 - Cobranza diferenciando efectivo y tarjeta.
@@ -1905,7 +1838,6 @@ class ReporteCobranzaAPIView(APIView):
         if zona:
             cobros = cobros.filter(establecimiento__zona_id=zona)
 
-        # --- Serie temporal con el corte por forma de pago ---
         truncador = AGRUPACIONES[agrupacion][0]
         periodos = [
             {
@@ -1930,7 +1862,6 @@ class ReporteCobranzaAPIView(APIView):
             )
         ]
 
-        # --- Totales por forma de pago ---
         totales = cobros.aggregate(cobros=Count('codigo'), monto=Sum('monto'))
         monto_total = totales['monto'] or Decimal('0.00')
 
@@ -1954,7 +1885,6 @@ class ReporteCobranzaAPIView(APIView):
                 ),
             })
 
-        # --- Desglose por persona que cobro ---
         agrupado = list(
             cobros
             .values('empleado_id')
@@ -1988,11 +1918,6 @@ class ReporteCobranzaAPIView(APIView):
             for fila in agrupado
         ]
 
-        # --- Conciliacion: facturado contra cobrado ---
-        # Se toma la cohorte de pedidos ENTREGADOS del rango y se compara
-        # contra los pagos ligados a esos pedidos, sin importar cuando se
-        # cobraron. Comparar dos rangos de fechas distintos daria un numero
-        # enganoso, porque un pago puede corresponder a un pedido anterior.
         entregados = Pedido.objects.filter(edo_pedido_id=PEDIDO_ENTREGADO)
         if inicio:
             entregados = entregados.filter(fecha__gte=_inicio_del_dia(inicio))

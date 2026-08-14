@@ -112,7 +112,6 @@ def crear_entrega(request):
         return JsonResponse({"error": "Se requiere vehiculo y pedidos"}, status=400)
 
     with connection.cursor() as cursor:
-        # Zona y peso de los pedidos que se quieren cargar
         marcas = ','.join(['%s'] * len(pedidos_ids))
         cursor.execute(f"""
             SELECT e.zona,
@@ -137,8 +136,6 @@ def crear_entrega(request):
         zona_pedidos = filas[0][0]
         peso_pedidos = float(filas[0][1] or 0)
 
-        # Si ya hay un camión en carga de esa misma zona con espacio
-        # suficiente, hay que terminar de llenarlo antes de abrir otro
         cursor.execute("""
             SELECT en.numero, veh.placas, mdl.capacidad,
                    COALESCE(SUM(dp.cantidad * pr.peso) / 1000, 0) AS cargado,
@@ -159,8 +156,7 @@ def crear_entrega(request):
             if zona != zona_pedidos:
                 continue
             restante = float(capacidad or 0) - float(cargado)
-            # Solo se exige llenar el otro camión si de verdad cabe lo que
-            # se quiere cargar; si no cabe, se permite abrir uno nuevo
+
             if restante >= peso_pedidos:
                 return JsonResponse({
                     "error": f"El camión {placas} (entrega #{num}) sigue en carga y le "
@@ -207,8 +203,6 @@ def crear_entrega(request):
                     pedidos_incluidos.append(pedido_id)
                 except Exception as e:
                     pedidos_rechazados.append({"pedido_id": pedido_id, "motivo": str(e)})
-                    # El SIGNAL del trigger revierte su propio registro en la
-                    # bitacora, asi que el rechazo se deja desde aqui
                     with connection.cursor() as cur2:
                         cur2.execute("""
                             INSERT INTO bitacora_trigger (trigger_nombre, detalle, fecha)
@@ -220,8 +214,7 @@ def crear_entrega(request):
     except Exception as e:
         return JsonResponse({"error": f"No se pudo crear la entrega: {str(e)}"}, status=400)
 
-    # Si ningún pedido pudo entrar (zona distinta o capacidad excedida),
-    # no se deja la entrega abierta ni el vehículo ocupado
+
     if not pedidos_incluidos:
         with connection.cursor() as cursor:
             cursor.execute("UPDATE vehiculo SET entrega = NULL WHERE entrega = %s", [nueva_entrega])
@@ -270,7 +263,6 @@ def mi_ruta(request):
 
         ruta_id, entrega_id, estado = row
 
-        # Obtener paradas con orden
         cursor.execute("""
             SELECT e.numero AS establecimiento_id, e.nombre, e.latitud AS lat,
                    e.longitud AS lon, e.estCalle AS calle, e.estNumero AS num_ext,
@@ -305,11 +297,11 @@ def mi_ruta(request):
         e['entregado'] = bool(e['entregado'])
         e['tipo'] = 'establecimiento'
 
-    # Agregar almacén al inicio
+
     paradas = [{"tipo": "almacen", "lat": 32.4700, "lon": -116.9400,
                 "nombre": "Almacén Sabritas - El Florido", "orden": 0}] + establecimientos
 
-    # Calcular ruta con OSRM
+
     import requests as req
     coords = [(p['lon'], p['lat']) for p in paradas if p['lat'] and p['lon']]
     coords_str = ";".join(f"{lon},{lat}" for lon, lat in coords)
@@ -497,8 +489,7 @@ def registrar_cobro(request):
         return JsonResponse({"error": "El monto no es válido"}, status=400)
 
     with connection.cursor() as cursor:
-        # El mismo cálculo que estado_cobro_pedido: total menos lo devuelto,
-        # menos lo que ya se haya cobrado
+
         cursor.execute("""
             SELECT
                 p.total,
@@ -582,8 +573,7 @@ def registrar_devolucion(request):
     except (TypeError, ValueError):
         return JsonResponse({"error": "La cantidad no es válida"}, status=400)
 
-    # En la sustitución el cliente recibe otro producto, así que hay que
-    # saber cuál para poder reponerlo después
+
     if motivo != 'Devolución completa sin reemplazo' and not cod_producto_cambio:
         return JsonResponse({
             "error": "Indica el producto que el cliente recibe a cambio"
@@ -631,18 +621,14 @@ def confirmar_entrega_establecimiento(request):
     establecimiento_id = body.get('establecimiento_id')
     entrega_id = body.get('entrega_id')
 
-    # RF36: la confirmación de entrega debe indicar fecha y hora.
-    # El repartidor las ve y las envía desde el modal; si por algún motivo
-    # no llegan, se usa el momento actual del servidor como respaldo.
+
     ahora = datetime.now()
     fecha_entrega = body.get('fecha_entrega') or ahora.strftime('%Y-%m-%d')
     hora_entrega = body.get('hora_entrega') or ahora.strftime('%H:%M:%S')
 
     with transaction.atomic():
         with connection.cursor() as cursor:
-            # RF36: no se puede confirmar la entrega sin pago registrado,
-            # pero si el pedido quedó en $0 por una devolución completa,
-            # no hay nada que cobrar y se deja pasar.
+
             cursor.execute("""
                 SELECT
                     p.total,
@@ -833,7 +819,7 @@ def _calcular_orden_entrega(ruta_entrega_id, entrega_id):
 
     orden_ids = None
 
-    # OSRM /trip/: primer punto fijo (almacén), regreso libre
+
     if len(ests) >= 2:
         puntos = [(ALMACEN["lon"], ALMACEN["lat"])] + [(e["lon"], e["lat"]) for e in ests]
         coords_str = ";".join(f"{lon},{lat}" for lon, lat in puntos)
@@ -845,7 +831,7 @@ def _calcular_orden_entrega(ruta_entrega_id, entrega_id):
             )
             data = r.json()
             if data.get("code") == "Ok":
-                # waypoint_index dice en qué posición del recorrido quedó cada punto
+
                 wps = data["waypoints"]
                 sin_almacen = [(wps[i + 1]["waypoint_index"], e) for i, e in enumerate(ests)]
                 sin_almacen.sort(key=lambda x: x[0])
@@ -853,7 +839,7 @@ def _calcular_orden_entrega(ruta_entrega_id, entrega_id):
         except Exception:
             pass
 
-    # Respaldo: por distancia al almacén, del más cercano al más lejano
+
     if orden_ids is None:
         ests.sort(key=lambda e: (e["lat"] - ALMACEN["lat"]) ** 2 + (e["lon"] - ALMACEN["lon"]) ** 2)
         orden_ids = [e["id"] for e in ests]

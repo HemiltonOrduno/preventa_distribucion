@@ -20,8 +20,6 @@
 
 {% block extra_scripts %}
 <script>
-    /* Las observaciones las escribe el vendedor, asi que se escapan
-       antes de insertarlas en el HTML. */
     function escapar(texto) {
         const div = document.createElement('div');
         div.textContent = texto;

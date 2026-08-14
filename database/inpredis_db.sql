@@ -144,8 +144,6 @@ CREATE TABLE EMP_VEHICULO(
 -- ZONAS Y ESTABLECIMIENTOS
 -- -------------------------------------------------------------
 
--- Los límites de latitud y longitud permiten asignar automáticamente
--- la zona de un establecimiento a partir de su ubicación (RF03)
 CREATE TABLE ZONA(
     num INT PRIMARY KEY AUTO_INCREMENT,
     nombre VARCHAR(20) UNIQUE NOT NULL,
@@ -218,8 +216,7 @@ CREATE TABLE EDO_RUTA_VISITA(
     descripcion VARCHAR(100)
 );
 
--- 'dia' fija el día de la semana en que se recorre la ruta.
--- 'empleado' es NULL mientras el coordinador no asigne vendedor (RF31)
+
 CREATE TABLE RUTA_VISITA(
     numero INT PRIMARY KEY AUTO_INCREMENT,
     nombre VARCHAR(20) NOT NULL,
@@ -233,7 +230,7 @@ CREATE TABLE RUTA_VISITA(
     FOREIGN KEY (edo_ruta_visita) REFERENCES EDO_RUTA_VISITA(codigo)
 );
 
--- Orden en que el vendedor debe recorrer los establecimientos
+
 CREATE TABLE RUTA_VISITA_ORDEN(
     ruta_visita INT NOT NULL,
     establecimiento INT NOT NULL,
@@ -310,8 +307,7 @@ CREATE TABLE DETALLE_PEDIDO(
     FOREIGN KEY (cod_producto) REFERENCES PRODUCTO(codigo)
 );
 
--- Histórico de los productos que el almacenista canceló por falta de
--- stock, con la fecha estimada en que volverán a estar disponibles (RF20-21)
+
 CREATE TABLE PRODUCTO_CANCELADO_PEDIDO(
     num_pedido INT NOT NULL,
     cod_producto VARCHAR(10) NOT NULL,
@@ -334,8 +330,6 @@ CREATE TABLE EDO_RUTA_ENTREGA(
     descripcion VARCHAR(100)
 );
 
--- 'empleado' es NULL mientras el coordinador no asigne repartidor, o
--- cuando la ruta se deja disponible para que cualquiera la tome (RF33)
 CREATE TABLE RUTA_ENTREGA(
     numero INT PRIMARY KEY AUTO_INCREMENT,
     nombre VARCHAR(40) NOT NULL,
@@ -348,8 +342,7 @@ CREATE TABLE RUTA_ENTREGA(
     FOREIGN KEY (edo_ruta_entrega) REFERENCES EDO_RUTA_ENTREGA(codigo)
 );
 
--- Orden de las paradas: lo propone OSRM al crear la entrega y el
--- coordinador puede reordenarlo antes de liberar la ruta
+
 CREATE TABLE RUTA_ENTREGA_ORDEN(
     ruta_entrega INT NOT NULL,
     establecimiento INT NOT NULL,
@@ -393,8 +386,6 @@ CREATE TABLE PAGO(
     FOREIGN KEY (pedido) REFERENCES PEDIDO(num)
 );
 
--- 'cod_producto', 'pedido' e 'importe' identifican qué se devolvió y
--- cuánto representa, para poder descontarlo de la venta (RF38)
 CREATE TABLE DEVOLUCION(
     codigo INT PRIMARY KEY AUTO_INCREMENT,
     fecha DATE NOT NULL,
@@ -477,7 +468,6 @@ CREATE TABLE RUTA_VISITA_SEMANA(
 
 INSERT INTO ruta_visita_semana (ruta_visita, fecha, empleado, edo_ruta_visita)
 SELECT rv.numero,
-       -- fecha del dia de la semana que le toca, dentro de la semana actual
        DATE_ADD(
            DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY),
            INTERVAL CASE rv.dia
@@ -504,15 +494,15 @@ ALTER TABLE ruta_visita DROP FOREIGN KEY ruta_visita_ibfk_3;
 ALTER TABLE ruta_visita DROP COLUMN empleado;
 ALTER TABLE ruta_visita DROP COLUMN edo_ruta_visita;
 
--- Producto que el cliente pide a cambio del devuelto
+-- solo corranlos despeus explico
 ALTER TABLE devolucion ADD COLUMN cod_producto_cambio VARCHAR(10) NULL;
 ALTER TABLE devolucion ADD FOREIGN KEY (cod_producto_cambio) REFERENCES producto(codigo);
 
--- Marca el pedido que nace de una devolución, para darle prioridad
+
 ALTER TABLE pedido ADD COLUMN devolucion_origen INT NULL;
 ALTER TABLE pedido ADD FOREIGN KEY (devolucion_origen) REFERENCES devolucion(codigo);
 
-----Esta sera para poder mostrar que si se ejecutan los triggers ----
+----Bitacora de ejecucion de procedimientos almacenados. parchesito por que nose de que otra manera reflejar los triggers
 CREATE TABLE BITACORA_TRIGGER(
     numero INT PRIMARY KEY AUTO_INCREMENT,
     trigger_nombre VARCHAR(60) NOT NULL,
@@ -520,8 +510,7 @@ CREATE TABLE BITACORA_TRIGGER(
     fecha DATETIME NOT NULL
 );
 
--- Bitacora de ejecucion de procedimientos almacenados. Permite verificar
--- que la logica de negocio en base de datos se esta usando de verdad.
+-- Bitacora de ejecucion de procedimientos almacenados. parchesito por que nose de que otra manera reflejar los procedimientos
 CREATE TABLE BITACORA_PROCEDIMIENTO(
     numero INT PRIMARY KEY AUTO_INCREMENT,
     procedimiento VARCHAR(60) NOT NULL,

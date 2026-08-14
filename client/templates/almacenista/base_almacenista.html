@@ -210,7 +210,6 @@
 </style>
 
 <script>
-    // Avisa al almacenista que hay mercancía devuelta esperando entrada
     function revisarDevolucionesPendientes() {
         fetch('/api/inventario/devoluciones-pendientes/')
             .then(r => r.json())

@@ -2,12 +2,12 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.db import connection, transaction
 import json
-from django.shortcuts import render  # agrégalo al import existente
+from django.shortcuts import render
 from usuarios.permissions import rol_requerido
 from django.core.cache import cache
 
-TIPOS_SALIDA = ('TM002', 'TM003')  # Salida por pedido, Salida por merma
-TIPO_ENTRADA_DEVOLUCION = 'TM004'  # Entrada por devolución — origen = Devolución (RF40)
+TIPOS_SALIDA = ('TM002', 'TM003')
+TIPO_ENTRADA_DEVOLUCION = 'TM004'
 
 @rol_requerido('Almacenista', 'Administrador')
 @csrf_exempt
@@ -45,7 +45,7 @@ def registrar_movimiento(request):
     except Exception:
         return JsonResponse({"error": "JSON inválido"}, status=400)
 
-    # El movimiento se registra a nombre de quien tiene la sesión abierta
+
     empleado = request.session.get('empleado_num')
     if not empleado:
         return JsonResponse({"error": "Sesión no válida, inicia sesión de nuevo"}, status=401)
@@ -62,7 +62,6 @@ def registrar_movimiento(request):
 
     with transaction.atomic():
         with connection.cursor() as cursor:
-            # El trigger solo resta stock, no valida que no quede negativo
             if tipo_movimiento in TIPOS_SALIDA:
                 for linea in detalle:
                     cursor.execute("SELECT stock FROM producto WHERE codigo = %s", [linea["producto"]])
@@ -75,7 +74,6 @@ def registrar_movimiento(request):
                         }, status=400)
 
             if tipo_movimiento == TIPO_ENTRADA_DEVOLUCION:
-                # Una devolución solo puede convertirse en entrada una vez
                 cursor.execute("""
                     SELECT cod_producto, cod_producto_cambio, cantidad, pedido
                     FROM devolucion WHERE codigo = %s
@@ -90,8 +88,6 @@ def registrar_movimiento(request):
                         "error": f"La devolución {devolucion} ya fue registrada como entrada de inventario"
                     }, status=400)
 
-            # El movimiento se crea para cualquier tipo; la devolución solo
-            # se asocia cuando el origen es precisamente una devolución
             cursor.execute("""
                 INSERT INTO movimientos (observaciones, fecha, tipo_movimiento, devolucion, empleado)
                 VALUES (%s, NOW(), %s, %s, %s)
@@ -100,8 +96,7 @@ def registrar_movimiento(request):
             nuevo_codigo = cursor.lastrowid
 
             for linea in detalle:
-                # El precio sale del catálogo, no de lo que mande el cliente:
-                # el almacenista registra movimientos, no fija precios
+
                 cursor.execute("SELECT precio FROM producto WHERE codigo = %s", [linea["producto"]])
                 precio_row = cursor.fetchone()
                 precio = float(precio_row[0]) if precio_row and precio_row[0] else 0
@@ -111,14 +106,13 @@ def registrar_movimiento(request):
                     INSERT INTO detalle_movimiento (cod_movimientos, cod_producto, cantidad, precioUnitario, subtotal)
                     VALUES (%s, %s, %s, %s, %s)
                 """, [nuevo_codigo, linea["producto"], linea["cantidad"], precio, subtotal])
-                # ↑ Este INSERT es el que dispara tg_actualizar_stock.
 
-            # Cierre del ciclo de devolución
+
+
             if tipo_movimiento == TIPO_ENTRADA_DEVOLUCION:
                 cod_devuelto, cod_cambio, cant_dev, pedido_origen = dev
 
-                # Si el producto viene dañado sale de inmediato por merma;
-                # si está en buen estado se queda en el inventario
+
                 if estado_devolucion == 'danado':
                     cursor.execute("SELECT precio FROM producto WHERE codigo = %s", [cod_devuelto])
                     fila = cursor.fetchone()
@@ -135,8 +129,7 @@ def registrar_movimiento(request):
                         VALUES (%s, %s, %s, %s, %s)
                     """, [mov_merma, cod_devuelto, cant_dev, precio_dev, cant_dev * precio_dev])
 
-                # Si el cliente pidió otro producto a cambio, se genera el
-                # pedido de reposición sobre la misma visita del original
+
                 if cod_cambio and pedido_origen:
                     cursor.execute("SELECT visita FROM pedido WHERE num = %s", [pedido_origen])
                     fila = cursor.fetchone()
@@ -160,7 +153,7 @@ def registrar_movimiento(request):
                             INSERT INTO detalle_pedido (num_pedido, cod_producto, cantidad, precioUnitario, importe)
                             VALUES (%s, %s, %s, %s, %s)
                         """, [pedido_reposicion, cod_cambio, cant_dev, precio_cambio, importe])
-                        # El trigger recalcula subtotal, iva y total del pedido
+
 
     cache.delete('catalogo_stock')
 
@@ -252,7 +245,7 @@ def catalogo_stock(request):
         if p.get('imagen'):
             if p['imagen'].startswith('/img/'):
                 p['imagen'] = '/static' + p['imagen']
-        p['stock_bajo'] = p['stock'] < 200  # umbral de alerta visual
+        p['stock_bajo'] = p['stock'] < 200
 
     return JsonResponse({"productos": productos, "cache": False}, json_dumps_params={'ensure_ascii': False})
 

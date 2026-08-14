@@ -75,7 +75,6 @@
 {% block content %}
 <div class="carga-layout">
 
-    <!-- IZQUIERDA: crear entrega nueva y pedidos disponibles -->
     <div class="carga-izq">
         <div class="card">
             <p style="font-size:13px; color:#666; margin-bottom:10px;">
@@ -101,7 +100,6 @@
         </div>
     </div>
 
-    <!-- DERECHA: camiones que se están llenando -->
     <div class="carga-der">
         <div style="font-size:13px; font-weight:bold; color:#1b5e20; margin-bottom:10px;">
             <i class='bx bx-package'></i> Camiones en carga
@@ -161,9 +159,6 @@
         document.getElementById('folio-entrega').textContent = `#${data.proximo_numero}`;
     }
 
-    /* Dibuja un camion con la caja rellenandose segun el porcentaje de
-       carga (pct), usando clip-path para que el relleno no se salga
-       de los bordes redondeados de la caja. */
     function svgCamion(pct, color, id) {
         const alturaCaja = 45;
         const relleno = Math.max(0, Math.min(100, pct)) / 100 * alturaCaja;
@@ -187,8 +182,6 @@
         `;
     }
 
-    /* RF22 + RF25: camiones que siguen abiertos, con la capacidad que les
-       queda, para que el almacenista siga agregando pedidos antes de mandarlos */
     async function cargarCamionesEnCarga() {
         const cont = document.getElementById('camiones-en-carga');
         const res = await fetch('/api/entregas/entregas-en-carga/');
@@ -283,7 +276,6 @@
         }
     }
 
-    /* RF24: sigue llenando un camión que ya estaba abierto */
     async function agregarAEntrega(entregaId) {
         const pedidos = Array.from(document.querySelectorAll('.pedido-check:checked')).map(c => parseInt(c.value));
 
@@ -309,7 +301,6 @@
         refrescarTodo();
     }
 
-    /* RF26: se da por terminada la carga y la entrega pasa al coordinador */
     async function confirmarCarga(entregaId, totalPedidos) {
         if (!confirm(`¿Registrar la entrega #${entregaId} con ${totalPedidos} pedido(s)?\n\nUna vez registrada ya no se le pueden agregar más pedidos y pasará al coordinador para generar su ruta.`)) return;
 

@@ -10,7 +10,7 @@ from usuarios.permissions import rol_requerido
 from datetime import date, timedelta
 from django.db import connection, transaction
 
-# Coordenadas del almacén (Pepsico El Florido, Tijuana)
+
 ALMACEN = {
     "lon": -116.9400,
     "lat": 32.4700,
@@ -219,7 +219,6 @@ def calcular_ruta_entrega_coordinador(request, entrega_id):
 
     try:
         if tiene_orden:
-            # El coordinador ya fijó el orden: se traza tal cual
             response = requests.get(
                 f"{OSRM_URL}/route/v1/driving/{coords_str}",
                 params={"geometries": "geojson", "overview": "full"},
@@ -231,7 +230,6 @@ def calcular_ruta_entrega_coordinador(request, entrega_id):
             trip = data["routes"][0]
             orden_final = list(range(len(coordenadas)))
         else:
-            # Sin orden guardado, OSRM propone el recorrido más corto
             response = requests.get(
                 f"{OSRM_URL}/trip/v1/driving/{coords_str}",
                 params={
@@ -282,9 +280,6 @@ def rutas_activas(request):
     Regresa todas las rutas de visita y entrega activas del día.
     """
     with connection.cursor() as cursor:
-        # Rutas de visita activas
-# Rutas de visita en curso: las que ya tienen ejecucion registrada
-        # para hoy y todavia no se completan
         cursor.execute("""
             SELECT 
                 rv.numero AS id,
@@ -312,8 +307,6 @@ def rutas_activas(request):
         columns = [col[0] for col in cursor.description]
         rutas_visita = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
-        # Rutas de entrega activas
-        # Rutas de entrega activas
         cursor.execute("""
             SELECT
                 re.numero AS id,
@@ -351,7 +344,6 @@ def rutas_activas(request):
         """)
         columns = [col[0] for col in cursor.description]
         rutas_entrega = [dict(zip(columns, row)) for row in cursor.fetchall()]
-    # Convertir Decimal a float para JSON
     for r in rutas_entrega:
         if r.get('total'):
             r['total'] = float(r['total'])
@@ -412,7 +404,6 @@ def rutas_visita_hoy(request):
     dia_hoy = dias[date.today().weekday()]
 
     with connection.cursor() as cursor:
-        # Rutas del dia de hoy, con la ejecucion de hoy si ya se asigno
         cursor.execute("""
             SELECT
                 rv.numero AS id,
@@ -433,8 +424,6 @@ def rutas_visita_hoy(request):
         columns = [col[0] for col in cursor.description]
         rutas_hoy = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
-        # Vendedores activos, marcando los que ya llevan una ruta ese dia
-        # Vendedores activos, marcando los que ya llevan una ruta ese dia
         cursor.execute("""
             SELECT
                 em.num AS id,
@@ -499,8 +488,6 @@ def asignar_vendedor_ruta(request, ruta_id):
         except Exception as e:
             mensaje = str(e)
 
-            # El SIGNAL revierte lo que el procedimiento haya escrito, así
-            # que el rechazo se registra desde aquí
             with connection.cursor() as cur2:
                 cur2.execute("""
                     INSERT INTO bitacora_procedimiento
@@ -556,7 +543,6 @@ def calcular_ruta_visita_coordinador(request, ruta_id):
 
     try:
         if tiene_orden:
-            # Respetar el orden definido por el coordinador
             url = f"{OSRM_URL}/route/v1/driving/{coords_str}"
             response = requests.get(url, params={
                 "geometries": "geojson", "overview": "full"
@@ -573,7 +559,6 @@ def calcular_ruta_visita_coordinador(request, ruta_id):
                     est = establecimientos[i - 1]
                     paradas.append({"lon": lon, "lat": lat, "nombre": est["nombre"], "tipo": "establecimiento", "orden": i, "establecimiento_id": est["id"], "colonia": est["colonia"]})
         else:
-            # Sin orden guardado, OSRM optimiza
             url = f"{OSRM_URL}/trip/v1/driving/{coords_str}"
             response = requests.get(url, params={
                 "roundtrip": "false", "source": "first", "destination": "last",
@@ -674,10 +659,9 @@ def guardar_orden_ruta_entrega(request, ruta_id):
         return JsonResponse({"error": "No se proporcionaron paradas"}, status=400)
 
     with connection.cursor() as cursor:
-        # Eliminar orden anterior
+
         cursor.execute("DELETE FROM ruta_entrega_orden WHERE ruta_entrega = %s", [ruta_id])
 
-        # Insertar nuevo orden
         for p in paradas:
             if p.get('tipo') == 'establecimiento':
                 cursor.execute("""
@@ -711,7 +695,6 @@ def zonas(request):
         for campo in ['lat_min', 'lat_max', 'lon_min', 'lon_max']:
             if r[campo] is not None:
                 r[campo] = float(r[campo])
-        # El contorno se guarda como JSON: se devuelve ya convertido
         if r.get('poligono'):
             r['poligono'] = json.loads(r['poligono'])
 
@@ -868,16 +851,11 @@ def crear_ruta_visita(request):
     rechazados = []
 
     with connection.cursor() as cursor:
-        # La ruta nace sin vendedor: el coordinador lo asigna cada semana
-        # y ese registro vive en ruta_visita_semana
         cursor.execute("""
             INSERT INTO ruta_visita (nombre, descripcion, dia, zona)
             VALUES (%s, %s, %s, %s)
         """, [nombre, descripcion, dia, zona_id])
         nuevo_num = cursor.lastrowid
-
-    # Cada parada se inserta por separado para que un establecimiento
-    # rechazado por el trigger no impida agregar los demás
     for i, est_id in enumerate(establecimientos):
         try:
             with transaction.atomic():
@@ -888,8 +866,6 @@ def crear_ruta_visita(request):
                     """, [nuevo_num, est_id, i + 1])
         except Exception as e:
             rechazados.append({"establecimiento": est_id, "motivo": str(e)})
-            # El SIGNAL revierte el registro que hace el trigger, así que
-            # el rechazo se deja desde aquí
             with connection.cursor() as cur2:
                 cur2.execute("""
                     INSERT INTO bitacora_trigger (trigger_nombre, detalle, fecha)
@@ -899,7 +875,6 @@ def crear_ruta_visita(request):
     
 
 
-    # Si ninguna parada pudo entrar, la ruta quedaria vacia y no sirve
     if establecimientos and len(rechazados) == len(establecimientos):
         with connection.cursor() as cursor:
             cursor.execute("DELETE FROM ruta_visita WHERE numero = %s", [nuevo_num])
@@ -944,7 +919,6 @@ def ruta_visita_datos(request, ruta_id):
             return JsonResponse({"error": "Ruta no encontrada"}, status=404)
         ruta = dict(zip(columns, fila))
 
-        # Obtener establecimientos en orden
         cursor.execute("""
             SELECT e.numero AS id, e.nombre, e.latitud, e.longitud,
                    e.estColonia AS colonia, rvo.orden
@@ -994,7 +968,6 @@ def editar_ruta_visita(request, ruta_id):
             WHERE numero=%s
         """, [nombre, dia, descripcion, zona_id, ruta_id])
 
-        # Actualizar orden
         cursor.execute("DELETE FROM ruta_visita_orden WHERE ruta_visita = %s", [ruta_id])
         for i, est_id in enumerate(establecimientos):
             cursor.execute("""
@@ -1103,7 +1076,6 @@ def historial_rutas(request):
             columns = [c[0] for c in cursor.description]
             rutas_entrega = [dict(zip(columns, r)) for r in cursor.fetchall()]
 
-        # Responsables para el filtro (siempre la lista completa)
         cursor.execute("""
             SELECT em.num AS id,
                    CONCAT(em.empNombre, ' ', em.empApellPat) AS nombre,
@@ -1271,8 +1243,6 @@ def aprobar_ruta_entrega(request, ruta_id):
         if edo_actual != 'EEN001':
             return JsonResponse({"error": "Esta ruta ya fue liberada"}, status=409)
 
-        # Un repartidor solo puede llevar una ruta a la vez: una entrega
-        # equivale a un camión y no puede manejar dos al mismo tiempo
         if repartidor_id:
             cursor.execute("""
                 SELECT COUNT(*) FROM ruta_entrega
@@ -1357,7 +1327,6 @@ def guardar_poligono_zona(request, zona_id):
     except Exception:
         return JsonResponse({"error": "JSON inválido"}, status=400)
 
-    # Un contorno vacío borra el dibujo y devuelve la zona a su rectángulo
     valor = json.dumps(puntos) if puntos and len(puntos) >= 3 else None
 
     with connection.cursor() as cursor:

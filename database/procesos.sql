@@ -2,9 +2,9 @@
 #####PROCEDIMIENTOS ALMACENADOS####
 
 ###PROCEDIMIENTO 1: ASIGNAR VENDEDOR A RUTA DE VISITA###
--- El coordinador asigna un vendedor a la ruta de un dia. Un vendedor
--- no puede cubrir dos rutas la misma fecha, y una ruta ya asignada no
--- se reasigna.
+-- El coordinador asigna un vendedor a la ruta de un dia.
+-- no se puede asignar a un vendidor a mas de una ruta al dia
+
 
 ###DROP PROCEDURE IF EXISTS procoord_asignar_vendedor_ruta;
 
@@ -42,8 +42,7 @@ BEGIN
     INSERT INTO ruta_visita_semana (ruta_visita, fecha, empleado, edo_ruta_visita)
     VALUES (p_ruta_visita, p_fecha, p_empleado, 'ERV006');
 
-    -- Deja rastro de la ejecucion para poder verificar que el
-    -- procedimiento corre desde la aplicacion
+    -- esta mera va a ser la que va reflejar la proceso en la bitacora
     INSERT INTO bitacora_procedimiento (procedimiento, detalle, resultado, fecha)
     VALUES ('sp_asignar_vendedor_ruta',
             CONCAT('Ruta ', p_ruta_visita, ' asignada al empleado ',
@@ -56,8 +55,7 @@ DELIMITER ;
 
 ###PROCEDIMIENTO 2: CONSULTAR STOCK DE UN PEDIDO###
 -- Devuelve los productos de un pedido con la cantidad solicitada y la
--- existencia actual, marcando si alcanza. Lo usa el almacenista al
--- validar el pedido antes de confirmarlo.
+-- existencia actual, marcando si alcanza.
 
 DELIMITER $$
 CREATE PROCEDURE sp_consultar_stock_pedido(
@@ -168,7 +166,6 @@ BEGIN
         SET MESSAGE_TEXT = 'El peso debe ser mayor a cero';
     END IF;
 
-    -- edite esto, para validar nombre y peso por que pueden existir el mismo nombre mas no el mismo peso y el nombre
     SELECT COUNT(*) INTO v_repetido
     FROM producto
     WHERE nombre = CONVERT(p_nombre USING utf8mb4) COLLATE utf8mb4_0900_ai_ci
@@ -206,8 +203,7 @@ DELIMITER ;
 -- que el producto pertenezca al pedido y que no se devuelva mas de lo
 -- entregado. Si el pedido ya estaba cobrado, se genera el reembolso
 -- como un pago negativo para que la cobranza cuadre.
--- Los CONVERT en las comparaciones evitan el choque de collation entre
--- los parametros del procedimiento y las columnas de las tablas.
+
 
 DELIMITER $$
 CREATE PROCEDURE sp_registrar_devolucion(

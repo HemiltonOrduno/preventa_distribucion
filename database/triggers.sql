@@ -147,7 +147,7 @@ DELIMITER ;
 ##la vida no es tan buena
 
 
-###TRIGGER CAMPOS CALCULADOS ###
+###TRIGGER que ya no se implementaron ###
 
 DELIMITER $$
 CREATE OR REPLACE TRIGGER tg_campos_calculados_pedido
@@ -171,17 +171,12 @@ CREATE OR REPLACE TRIGGER tg_recalcular_importe_detalle
 BEFORE UPDATE ON detalle_pedido
 FOR EACH ROW
 BEGIN
-    -- Por qué: el importe de cada línea (cantidad * precio) se guarda
-    -- como columna física, no se calcula al leer. Si el almacenista
-    -- ajusta la cantidad (RF19) con un UPDATE directo, el importe se
-    -- quedaría desactualizado a menos que alguien lo recalcule a mano.
-    -- Este trigger lo hace automáticamente ANTES de guardar el UPDATE,
-    -- así ninguna vista futura puede "olvidarse" de hacerlo.
+
     SET NEW.importe = NEW.cantidad * NEW.precioUnitario;
 END$$
 DELIMITER ;
 
--- Triggers correridos y actualizados
+
 DELIMITER $$
 CREATE OR REPLACE TRIGGER tg_campos_calculados_pedido_update
 AFTER UPDATE ON detalle_pedido
@@ -190,10 +185,7 @@ BEGIN
     DECLARE nuevo_total DECIMAL(10,2);
 
     IF NEW.importe <> OLD.importe THEN
-        -- Calculamos el total nuevo UNA sola vez, en una variable,
-        -- y esa misma variable se usa en las tres asignaciones de abajo.
-        -- Así evitamos que la 2da/3ra línea del SET vean un "total"
-        -- que la 1ra línea ya modificó (el bug de arriba).
+
         SET nuevo_total = (SELECT total FROM pedido WHERE num = NEW.num_pedido) - OLD.importe + NEW.importe;
 
         UPDATE pedido

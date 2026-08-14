@@ -114,7 +114,7 @@
 
 {% block extra_scripts %}
 <script>
-    // Un producto nuevo no puede entrar al catálogo ya caducado
+
     const manana = new Date();
     manana.setDate(manana.getDate() + 1);
     document.getElementById('fecha_caducidad').min = manana.toISOString().split('T')[0];
@@ -130,8 +130,7 @@
         }
     });
 
-    /* La vista previa usa los mismos rangos de stock que el catálogo,
-       para que el almacenista sepa con qué badge va a nacer el producto */
+
     function actualizarPrevia() {
         const nombre = document.getElementById('nombre').value;
         const desc = document.getElementById('descripcion').value;
@@ -177,7 +176,7 @@
             return;
         }
 
-        // Un producto nuevo no puede entrar al catálogo ya caducado
+
         if (new Date(fecha_caducidad) <= new Date()) {
             mostrarToast('La fecha de caducidad debe ser posterior a hoy', 'error');
             return;

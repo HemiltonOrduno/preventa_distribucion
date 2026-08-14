@@ -161,7 +161,7 @@ function renderizarZonas() {
         lista.appendChild(div);
     });
 }
-let modoDibujo = null;        // id de la zona que se esta trazando
+let modoDibujo = null;
 let puntosDibujo = [];
 let capaDibujo = null;
 let marcadoresDibujo = [];
@@ -175,8 +175,7 @@ function dibujarZonasEnMapa() {
 
         const color = COLORES[idx % COLORES.length];
 
-        // Si el coordinador trazó un contorno se usa ese; si no, el
-        // rectángulo que definen los límites numéricos de la zona
+
         const capa = (z.poligono && z.poligono.length >= 3)
             ? L.polygon(z.poligono, {
                 color: color, weight: 2,
@@ -198,10 +197,7 @@ function dibujarZonasEnMapa() {
     });
 }
 
-/* El coordinador puede trazar el contorno real de una zona haciendo clic
-   sobre el mapa, para que el dibujo siga la costa o la frontera en lugar
-   de ser un rectángulo. Es solo visual: a qué zona pertenece cada
-   establecimiento lo siguen decidiendo los límites numéricos. */
+
 function iniciarDibujo(zonaId, zonaNombre) {
     modoDibujo = zonaId;
     puntosDibujo = [];
@@ -286,7 +282,7 @@ function guardarDibujo() {
     .catch(() => alert('Error de conexión'));
 }
 
-/* Devuelve la zona a su forma rectangular */
+
 function borrarDibujo(zonaId) {
     if (!confirm('¿Devolver esta zona a su forma rectangular?')) return;
 
@@ -320,13 +316,11 @@ function verEstablecimientos(zonaId, zonaNombre, event) {
     event.stopPropagation();
     zonaParaCrearRuta = zonaId;
 
-    // Limpiar marcadores anteriores
     Object.values(marcadoresEst).forEach(m => mapa.removeLayer(m));
     marcadoresEst = {};
 
     const estsZona = establecimientos.filter(e => e.zona_id === zonaId);
 
-    // Mostrar panel derecho
     const panel = document.getElementById('panel-establecimientos');
     panel.style.display = 'flex';
     document.getElementById('panel-est-titulo').innerText = `${zonaNombre} (${estsZona.length})`;
@@ -340,7 +334,6 @@ function verEstablecimientos(zonaId, zonaNombre, event) {
     }
 
     estsZona.forEach(e => {
-        // Marcador en mapa — resalta con borde rojo si no tiene ruta
         if (e.latitud && e.longitud) {
             const emoji = idsSinRuta.has(e.id)
                 ? `<div style="font-size:22px;filter:drop-shadow(0 0 4px #c62828) drop-shadow(0 2px 3px rgba(0,0,0,0.4));">🏪</div>`
@@ -356,7 +349,6 @@ function verEstablecimientos(zonaId, zonaNombre, event) {
             marcadoresEst[e.id] = m;
         }
 
-        // Item en lista — en rojo si no pertenece a ninguna ruta de visita
         const sinRuta = idsSinRuta.has(e.id);
         const div = document.createElement('div');
         div.className = 'est-item';
@@ -380,7 +372,7 @@ function verEstablecimientos(zonaId, zonaNombre, event) {
         body.appendChild(div);
     });
 
-    // Forzar resize del mapa
+
     setTimeout(() => mapa.invalidateSize(), 100);
 }
 

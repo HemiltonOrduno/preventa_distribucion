@@ -90,8 +90,7 @@ def crear_establecimiento(request):
 
     with transaction.atomic():
         with connection.cursor() as cursor:
-            # RF03: la zona se asigna automáticamente según en qué rango
-            # de lat/lon cae el establecimiento
+
             cursor.execute("""
                 SELECT num FROM zona
                 WHERE %s BETWEEN lat_min AND lat_max

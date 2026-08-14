@@ -52,7 +52,7 @@ def registrar_producto(request):
                 """, [f"{nombre}: {mensaje[:130]}"])
             return JsonResponse({"error": mensaje}, status=400)
 
-    # La imagen se nombra con el código que generó el procedimiento
+
     ruta_imagen = None
     if archivo_imagen:
         carpeta_destino = os.path.join(settings.MEDIA_ROOT, 'productos')
@@ -94,7 +94,7 @@ def listar_productos(request):
         p['precio'] = float(p['precio']) if p['precio'] is not None else None
         p['fecha_caducidad'] = str(p['fecha_caducidad'])
         if p.get('imagen') and p['imagen'].startswith('/img/'):
-            p['imagen'] = '/static' + p['imagen']  # las 16 imágenes viejas, sin prefijo
+            p['imagen'] = '/static' + p['imagen']  
 
     return JsonResponse({"productos": productos}, json_dumps_params={'ensure_ascii': False})
 

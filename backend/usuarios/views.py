@@ -32,9 +32,6 @@ def panel_placeholder(request, nombre_rol):
 
 
 class LoginView(APIView):
-    # El proyecto tiene IsAuthenticated como permiso global (config/settings.py),
-    # pero el login es el único endpoint al que se debe poder entrar SIN estar
-    # logueado todavía, por eso se sobreescribe aquí, no en settings.py.
     permission_classes = [AllowAny]
     authentication_classes = []
 
@@ -58,8 +55,7 @@ class LoginView(APIView):
         try:
             contrasena_valida = check_password(contrasena_input, usuario.contrasena)
         except ValueError:
-            # Pasa cuando el hash guardado en la BD no tiene un formato reconocido
-            # (por ejemplo, si la base de datos no está actualizada con el fix de contraseñas)
+
             return Response({'detail': 'Usuario o contraseña incorrectos'}, status=status.HTTP_401_UNAUTHORIZED)
 
         if not contrasena_valida:
@@ -68,8 +64,6 @@ class LoginView(APIView):
         request.session['usuario_num'] = usuario.num
         request.session['empleado_num'] = usuario.empleado.num
         request.session['rol'] = usuario.empleado.rol.nombre
-        # Se guarda el nombre para mostrarlo en el panel de perfil de cada
-        # modulo, sin volver a consultar la base en cada pantalla.
         request.session['nombre_usuario'] = (
             f"{usuario.empleado.nombre_de_pila} {usuario.empleado.apellido_paterno}"
         )

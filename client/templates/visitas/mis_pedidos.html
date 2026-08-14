@@ -22,8 +22,6 @@
 
 {% block extra_scripts %}
 <script>
-    /* Muestra lo que el vendedor lleva levantado en el dia, para que
-       pueda revisarlo sin volver a cada establecimiento */
     fetch('/api/visitas/api/mis-pedidos/')
         .then(r => r.json())
         .then(d => {

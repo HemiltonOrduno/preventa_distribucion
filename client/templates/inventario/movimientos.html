@@ -377,7 +377,7 @@
             </div>
         `;
 
-        // Si ya hay líneas de producto en el formulario esperando catálogo, las llenamos
+
         document.querySelectorAll('.prod-codigo').forEach(select => {
             if (select.options.length <= 1) {
                 const valorActual = select.value;
@@ -389,7 +389,7 @@
     }
 
     // Cargamos primero el catálogo, y hasta que esté listo agregamos la primera línea del formulario
-    onCambioTipoMovimiento(); // sincroniza el bloque Origen con el <select> tipo-movimiento al cargar
+    onCambioTipoMovimiento();
     cargarCatalogoStock().then(() => agregarLinea());
 </script>
 {% endblock %}
