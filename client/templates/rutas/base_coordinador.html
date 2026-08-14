@@ -176,6 +176,21 @@
         .modal__btn--cancelar { background: #f0f2f5; color: #555; }
         .modal__btn--confirmar { background: #c62828; color: #fff; }
 
+        .badge-sin-ruta {
+            display: none;
+            background: #c62828;
+            color: #fff;
+            border-radius: 50%;
+            min-width: 18px;
+            height: 18px;
+            font-size: 11px;
+            font-weight: bold;
+            line-height: 18px;
+            text-align: center;
+            margin-left: 4px;
+            padding: 0 4px;
+        }
+
         @media screen and (max-width: 900px) {
             .top-nav__brand span { display: none; }
             .top-nav__link span { display: none; }
@@ -200,6 +215,7 @@
         </a>
         <a href="/api/rutas/gestionar-zonas/" class="top-nav__link {% block nav_zonas %}{% endblock %}">
             <i class='bx bx-map-pin'></i> <span>Zonas</span>
+            <span class="badge-sin-ruta" id="badge-sin-ruta"></span>
         </a>
         <a href="/api/rutas/gestionar-establecimientos/" class="top-nav__link {% block nav_establecimientos %}{% endblock %}">
             <i class='bx bx-store'></i> <span>Establecimientos</span>
@@ -346,6 +362,18 @@ function agregarBotonCentrar(mapa, centro, zoom) {
 </script>
 
 <script>
+
+/* Avisa al coordinador que hay establecimientos sin ruta asignada:
+       mientras no esten en una, nadie los visita */
+    fetch('/api/rutas/establecimientos-sin-ruta/')
+        .then(r => r.json())
+        .then(d => {
+            const badge = document.getElementById('badge-sin-ruta');
+            if (!badge || !d.total) return;
+            badge.innerText = d.total;
+            badge.style.display = 'inline-block';
+        })
+        .catch(() => {});
 
 // Los limites se amplian para que el coordinador pueda moverse con holgura;
 // la viscosidad baja permite arrastrar sin que el mapa rebote

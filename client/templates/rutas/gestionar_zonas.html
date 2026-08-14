@@ -66,6 +66,8 @@ let capasZonas = {};
 let marcadoresEst = {};
 let zonaSeleccionada = null;
 let zonaParaCrearRuta = null;
+let idsSinRuta = new Set();
+
 
 window.addEventListener('load', () => {
     inicializarMapa();
@@ -89,10 +91,12 @@ function inicializarMapa() {
 function cargarDatos() {
     Promise.all([
         fetch('/api/rutas/zonas/').then(r => r.json()),
-        fetch('/api/rutas/establecimientos/').then(r => r.json())
-    ]).then(([zonasData, estData]) => {
+        fetch('/api/rutas/establecimientos/').then(r => r.json()),
+        fetch('/api/rutas/establecimientos-sin-ruta/').then(r => r.json())
+    ]).then(([zonasData, estData, sinRutaData]) => {
         zonas = zonasData.zonas;
         establecimientos = estData.establecimientos;
+        idsSinRuta = new Set((sinRutaData.establecimientos || []).map(e => e.id));
         renderizarZonas();
         dibujarZonasEnMapa();
     });
@@ -336,11 +340,14 @@ function verEstablecimientos(zonaId, zonaNombre, event) {
     }
 
     estsZona.forEach(e => {
-        // Marcador en mapa
+        // Marcador en mapa — resalta con borde rojo si no tiene ruta
         if (e.latitud && e.longitud) {
+            const emoji = idsSinRuta.has(e.id)
+                ? `<div style="font-size:22px;filter:drop-shadow(0 0 4px #c62828) drop-shadow(0 2px 3px rgba(0,0,0,0.4));">🏪</div>`
+                : `<div style="font-size:22px;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.4));">🏪</div>`;
             const icono = L.divIcon({
                 className: '',
-                html: `<div style="font-size:22px;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.4));">🏪</div>`,
+                html: emoji,
                 iconAnchor: [11, 22]
             });
             const m = L.marker([e.latitud, e.longitud], { icon: icono })
@@ -349,13 +356,18 @@ function verEstablecimientos(zonaId, zonaNombre, event) {
             marcadoresEst[e.id] = m;
         }
 
-        // Item en lista
+        // Item en lista — en rojo si no pertenece a ninguna ruta de visita
+        const sinRuta = idsSinRuta.has(e.id);
         const div = document.createElement('div');
         div.className = 'est-item';
+        if (sinRuta) {
+            div.style.background = '#fdecea';
+            div.style.borderLeft = '3px solid #c62828';
+        }
         div.innerHTML = `
-            <div class="est-icono"><i class='bx bx-store'></i></div>
+            <div class="est-icono" style="${sinRuta ? 'color:#c62828;' : ''}"><i class='bx bx-store'></i></div>
             <div>
-                <div class="est-nombre">${e.nombre}</div>
+                <div class="est-nombre">${e.nombre}${sinRuta ? ' <span style="color:#c62828;font-size:10px;font-weight:700;">· SIN RUTA</span>' : ''}</div>
                 <div class="est-colonia">${e.colonia} · ${e.telefono}</div>
             </div>
         `;

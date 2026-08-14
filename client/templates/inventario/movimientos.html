@@ -215,7 +215,7 @@
         div.style = 'display:flex; gap:8px; margin-bottom:8px;';
 
         const opciones = catalogoProductos.map(p =>
-            `<option value="${p.codigo}" ${p.codigo === codigoPreseleccionado ? 'selected' : ''}>${p.codigo} — ${p.nombre}</option>`
+            `<option value="${p.codigo}" ${p.codigo === codigoPreseleccionado ? 'selected' : ''}>${p.codigo} — ${p.nombre}${p.peso ? ' (' + p.peso.toFixed(0) + ' g)' : ''}</option>`
         ).join('');
 
         div.innerHTML = `
@@ -366,7 +366,7 @@
                             <img src="${p.imagen}" alt="${p.nombre}">
                             <div class="tarjeta-info">
                                 <div class="tarjeta-nombre">${p.nombre}</div>
-                                <div class="tarjeta-precio">$${p.precio.toFixed(2)}</div>
+                                <div class="tarjeta-precio">${p.peso ? p.peso.toFixed(0) + ' g · ' : ''}$${p.precio.toFixed(2)}</div>
                                 <div class="tarjeta-stock" style="color:${badge.color}; background:${badge.fondo};">
                                     ${badge.texto}
                                 </div>
@@ -382,7 +382,7 @@
             if (select.options.length <= 1) {
                 const valorActual = select.value;
                 select.innerHTML = '<option value="">Selecciona un producto...</option>' +
-                    catalogoProductos.map(p => `<option value="${p.codigo}">${p.codigo} — ${p.nombre}</option>`).join('');
+                    catalogoProductos.map(p => `<option value="${p.codigo}">${p.codigo} — ${p.nombre}${p.peso ? ' (' + p.peso.toFixed(0) + ' g)' : ''}</option>`).join('');
                 select.value = valorActual;
             }
         });

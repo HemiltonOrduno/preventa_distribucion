@@ -33,5 +33,6 @@ urlpatterns = [
     path('ruta-entrega/<int:ruta_id>/aprobar/', views.aprobar_ruta_entrega, name='aprobar_ruta_entrega'),
     path('trazar-ruta-orden/', views.trazar_ruta_orden, name='trazar_ruta_orden'),
     path('zonas/<int:zona_id>/poligono/', views.guardar_poligono_zona, name='guardar_poligono_zona'),
+    path('establecimientos-sin-ruta/', views.establecimientos_sin_ruta, name='establecimientos_sin_ruta'),
     
 ]

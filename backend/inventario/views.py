@@ -234,28 +234,25 @@ def catalogo_stock(request):
     cambios de stock recientes, pero evita repetir la consulta a MySQL
     si el almacenista refresca la pantalla varias veces seguidas.
     """
-    datos_cacheados = cache.get('catalogo_stock')
-    if datos_cacheados is not None:
-        return JsonResponse({"productos": datos_cacheados, "cache": True}, json_dumps_params={'ensure_ascii': False})
+
 
     with connection.cursor() as cursor:
         cursor.execute("""
-            SELECT codigo, nombre, imagen, stock, precio
+            SELECT codigo, nombre, imagen, stock, precio, peso
             FROM producto
             WHERE fecha_caducidad >= CURDATE()
-            ORDER BY nombre
+            ORDER BY nombre, peso
         """)
         columns = [col[0] for col in cursor.description]
         productos = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
     for p in productos:
         p['precio'] = float(p['precio']) if p['precio'] is not None else None
+        p['peso'] = float(p['peso']) if p['peso'] is not None else None
         if p.get('imagen'):
             if p['imagen'].startswith('/img/'):
                 p['imagen'] = '/static' + p['imagen']
         p['stock_bajo'] = p['stock'] < 200  # umbral de alerta visual
-
-    cache.set('catalogo_stock', productos, timeout=30)
 
     return JsonResponse({"productos": productos, "cache": False}, json_dumps_params={'ensure_ascii': False})
 

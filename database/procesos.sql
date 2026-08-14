@@ -134,10 +134,9 @@ DELIMITER ;
 
 
 ###PROCEDIMIENTO 4: REGISTRAR PRODUCTO NUEVO###
--- El almacenista da de alta un producto. El procedimiento genera el
--- codigo consecutivo, valida que la fecha de caducidad sea futura y
--- que el precio y el peso sean validos. La imagen la guarda la
--- aplicacion porque es un archivo del sistema, no de la base.
+-- Dar de alta un producto
+-- validar la fecha de caducidad
+-- precio y peso validos
 
 DELIMITER $$
 CREATE PROCEDURE sp_registrar_producto(
@@ -169,16 +168,18 @@ BEGIN
         SET MESSAGE_TEXT = 'El peso debe ser mayor a cero';
     END IF;
 
+    -- edite esto, para validar nombre y peso por que pueden existir el mismo nombre mas no el mismo peso y el nombre
     SELECT COUNT(*) INTO v_repetido
     FROM producto
-    WHERE nombre = CONVERT(p_nombre USING utf8mb4) COLLATE utf8mb4_0900_ai_ci;
+    WHERE nombre = CONVERT(p_nombre USING utf8mb4) COLLATE utf8mb4_0900_ai_ci
+      AND peso = p_peso;
 
     IF v_repetido > 0 THEN
         SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'Ya existe un producto con ese nombre';
+        SET MESSAGE_TEXT = 'Ya existe un producto con ese nombre y presentacion';
     END IF;
 
-    -- El codigo se genera consecutivo a partir del ultimo registrado
+
     SELECT COALESCE(MAX(CAST(SUBSTRING(codigo, 2) AS UNSIGNED)), 0) + 1
       INTO v_siguiente
     FROM producto;
@@ -192,7 +193,8 @@ BEGIN
 
     INSERT INTO bitacora_procedimiento (procedimiento, detalle, resultado, fecha)
     VALUES ('sp_registrar_producto',
-            CONCAT('Producto ', p_codigo, ' registrado: ', p_nombre),
+            CONCAT('Producto ', p_codigo, ' registrado: ', p_nombre,
+                   ' (', p_peso, ' g)'),
             'OK', NOW());
 END$$
 DELIMITER ;

@@ -1383,3 +1383,38 @@ def _fecha_de_ruta(dia):
     if fecha < hoy:
         fecha += timedelta(days=7)
     return fecha
+
+
+def establecimientos_sin_ruta(request):
+    """
+    Establecimientos que ya existen pero no pertenecen a ninguna ruta de
+    visita. Sin ruta nadie los visita, asi que el coordinador necesita
+    verlos para asignarlos.
+    """
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT e.numero AS id, e.nombre, e.zona,
+                   z.nombre AS zona_nombre,
+                   e.estColonia AS colonia,
+                   e.latitud, e.longitud,
+                   e.fecha_registro
+            FROM establecimiento e
+            INNER JOIN zona z ON z.num = e.zona
+            WHERE NOT EXISTS (
+                SELECT 1 FROM ruta_visita_orden rvo
+                WHERE rvo.establecimiento = e.numero
+            )
+            ORDER BY e.zona, e.numero
+        """)
+        columns = [c[0] for c in cursor.description]
+        establecimientos = [dict(zip(columns, r)) for r in cursor.fetchall()]
+
+    for e in establecimientos:
+        e['latitud'] = float(e['latitud']) if e['latitud'] else None
+        e['longitud'] = float(e['longitud']) if e['longitud'] else None
+        e['fecha_registro'] = e['fecha_registro'].isoformat() if e['fecha_registro'] else None
+
+    return JsonResponse({
+        "total": len(establecimientos),
+        "establecimientos": establecimientos
+    }, json_dumps_params={'ensure_ascii': False})
