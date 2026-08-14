@@ -12,8 +12,11 @@ from datetime import date as _date
 def registrar_producto(request):
     """
     RF27: registra un nuevo producto, incluyendo la imagen real subida
-    por el almacenista (request.FILES), en vez de una ruta de texto
-    escrita a mano.
+    por el almacenista (request.FILES).
+
+    Las validaciones y la generación del código las hace el
+    procedimiento sp_registrar_producto. La imagen se guarda después,
+    porque el archivo se nombra con el código que devuelve la base.
     """
     if request.method != 'POST':
         return JsonResponse({"error": "Método no permitido"}, status=405)
@@ -31,41 +34,42 @@ def registrar_producto(request):
             "error": "Se requiere nombre, precio, fecha_caducidad y peso"
         }, status=400)
 
-    # Un producto no puede registrarse ya caducado
-    try:
-        caduca = _date.fromisoformat(fecha_caducidad)
-    except (TypeError, ValueError):
-        return JsonResponse({"error": "La fecha de caducidad no es válida"}, status=400)
-
-    if caduca <= _date.today():
-        return JsonResponse({
-            "error": "La fecha de caducidad debe ser posterior a hoy"
-        }, status=400)
-
     with connection.cursor() as cursor:
-        cursor.execute("""
-            SELECT COALESCE(MAX(CAST(SUBSTRING(codigo, 2) AS UNSIGNED)), 0) + 1
-            FROM producto
-        """)
-        siguiente_numero = int(cursor.fetchone()[0])
-        nuevo_codigo = f"P{siguiente_numero:03d}"
+        try:
+            cursor.callproc('sp_registrar_producto', [
+                nombre, descripcion, None, precio,
+                fecha_caducidad, stock or 0, peso, ''
+            ])
+            cursor.execute("SELECT @_sp_registrar_producto_7")
+            nuevo_codigo = cursor.fetchone()[0]
+        except Exception as e:
+            mensaje = str(e)
+            with connection.cursor() as cur2:
+                cur2.execute("""
+                    INSERT INTO bitacora_procedimiento
+                        (procedimiento, detalle, resultado, fecha)
+                    VALUES ('sp_registrar_producto', %s, 'RECHAZADO', NOW())
+                """, [f"{nombre}: {mensaje[:130]}"])
+            return JsonResponse({"error": mensaje}, status=400)
 
-        ruta_imagen = None
-        if archivo_imagen:
-            carpeta_destino = os.path.join(settings.MEDIA_ROOT, 'productos')
-            os.makedirs(carpeta_destino, exist_ok=True)
-            extension = os.path.splitext(archivo_imagen.name)[1]
-            nombre_archivo = f"{nuevo_codigo}{extension}"
-            ruta_completa = os.path.join(carpeta_destino, nombre_archivo)
-            with open(ruta_completa, 'wb+') as destino:
-                for chunk in archivo_imagen.chunks():
-                    destino.write(chunk)
-            ruta_imagen = f"/media/productos/{nombre_archivo}"
+    # La imagen se nombra con el código que generó el procedimiento
+    ruta_imagen = None
+    if archivo_imagen:
+        carpeta_destino = os.path.join(settings.MEDIA_ROOT, 'productos')
+        os.makedirs(carpeta_destino, exist_ok=True)
+        extension = os.path.splitext(archivo_imagen.name)[1]
+        nombre_archivo = f"{nuevo_codigo}{extension}"
+        ruta_completa = os.path.join(carpeta_destino, nombre_archivo)
 
-        cursor.execute("""
-            INSERT INTO producto (codigo, nombre, descripcion, imagen, precio, fecha_caducidad, stock, peso)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        """, [nuevo_codigo, nombre, descripcion, ruta_imagen, precio, fecha_caducidad, stock, peso])
+        with open(ruta_completa, 'wb+') as destino:
+            for chunk in archivo_imagen.chunks():
+                destino.write(chunk)
+
+        ruta_imagen = f"/media/productos/{nombre_archivo}"
+
+        with connection.cursor() as cursor:
+            cursor.execute("UPDATE producto SET imagen = %s WHERE codigo = %s",
+                           [ruta_imagen, nuevo_codigo])
 
     return JsonResponse({
         "mensaje": "Producto registrado correctamente",

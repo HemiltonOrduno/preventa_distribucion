@@ -511,3 +511,21 @@ ALTER TABLE devolucion ADD FOREIGN KEY (cod_producto_cambio) REFERENCES producto
 -- Marca el pedido que nace de una devolución, para darle prioridad
 ALTER TABLE pedido ADD COLUMN devolucion_origen INT NULL;
 ALTER TABLE pedido ADD FOREIGN KEY (devolucion_origen) REFERENCES devolucion(codigo);
+
+----Esta sera para poder mostrar que si se ejecutan los triggers ----
+CREATE TABLE BITACORA_TRIGGER(
+    numero INT PRIMARY KEY AUTO_INCREMENT,
+    trigger_nombre VARCHAR(60) NOT NULL,
+    detalle VARCHAR(200),
+    fecha DATETIME NOT NULL
+);
+
+-- Bitacora de ejecucion de procedimientos almacenados. Permite verificar
+-- que la logica de negocio en base de datos se esta usando de verdad.
+CREATE TABLE BITACORA_PROCEDIMIENTO(
+    numero INT PRIMARY KEY AUTO_INCREMENT,
+    procedimiento VARCHAR(60) NOT NULL,
+    detalle VARCHAR(200),
+    resultado VARCHAR(20) NOT NULL,
+    fecha DATETIME NOT NULL
+);

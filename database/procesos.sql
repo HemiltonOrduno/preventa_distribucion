@@ -1,396 +1,290 @@
--- ==========================================
--- PROCEDIMIENTOS ALMACENADOS
--- ==========================================
 
--- 1. Registrar visita
+#####PROCEDIMIENTOS ALMACENADOS####
+
+###PROCEDIMIENTO 1: ASIGNAR VENDEDOR A RUTA DE VISITA###
+-- El coordinador asigna un vendedor a la ruta de un dia. Un vendedor
+-- no puede cubrir dos rutas la misma fecha, y una ruta ya asignada no
+-- se reasigna.
+
+###DROP PROCEDURE IF EXISTS procoord_asignar_vendedor_ruta;
+
 DELIMITER $$
-CREATE PROCEDURE proalmc_registrar_visita(
-    IN p_observaciones VARCHAR(200),
-    IN p_fecha DATETIME,
+CREATE PROCEDURE sp_asignar_vendedor_ruta(
     IN p_ruta_visita INT,
-    IN p_establecimiento INT,
     IN p_empleado INT,
-    IN p_edo_visita VARCHAR(10)
+    IN p_fecha DATE
 )
 BEGIN
-    INSERT INTO visita (observaciones, fecha, ruta_visita, establecimiento, empleado, edo_visita)
-    VALUES (p_observaciones, p_fecha, p_ruta_visita, p_establecimiento, p_empleado, p_edo_visita);
+    DECLARE v_ocupado INT;
+    DECLARE v_existe INT;
 
-    SELECT LAST_INSERT_ID() AS visita_id;
-END$$
-DELIMITER ;
+    SELECT COUNT(*) INTO v_ocupado
+    FROM ruta_visita_semana
+    WHERE empleado = p_empleado
+      AND fecha = p_fecha
+      AND ruta_visita <> p_ruta_visita
+      AND edo_ruta_visita IN ('ERV006', 'ERV003');
 
--- 2. Registrar pedido
-DELIMITER $$
-CREATE OR REPLACE PROCEDURE proalmc_registrar_pedido(
-    IN p_observaciones VARCHAR(200),
-    IN p_fecha DATETIME,
-    IN p_visita INT,
-    IN p_edo_pedido VARCHAR(10),
-    IN p_detalle JSON
-)
-BEGIN
-    DECLARE v_pedido_id INT;
-    DECLARE v_producto VARCHAR(10);
-    DECLARE v_cantidad INT;
-    DECLARE v_precio DECIMAL(10,2);
-    DECLARE v_importe DECIMAL(10,2);
-    DECLARE i INT DEFAULT 0;
-    DECLARE n INT;
-
-    DECLARE EXIT HANDLER FOR SQLEXCEPTION
-    BEGIN
-        ROLLBACK;
+    IF v_ocupado > 0 THEN
         SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'Error al registrar el pedido, se realizó rollback';
-    END;
+        SET MESSAGE_TEXT = 'El vendedor ya tiene una ruta asignada esa fecha';
+    END IF;
 
-    START TRANSACTION;
+    SELECT COUNT(*) INTO v_existe
+    FROM ruta_visita_semana
+    WHERE ruta_visita = p_ruta_visita AND fecha = p_fecha;
 
-        INSERT INTO pedido (observaciones, fecha, subtotal, iva, total, visita, entrega, edo_pedido)
-        VALUES (p_observaciones, p_fecha, 0, 0, 0, p_visita, NULL, p_edo_pedido);
+    IF v_existe > 0 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'La ruta ya fue asignada para esa fecha';
+    END IF;
 
-        SET v_pedido_id = LAST_INSERT_ID();
-        SET n = JSON_LENGTH(p_detalle);
+    INSERT INTO ruta_visita_semana (ruta_visita, fecha, empleado, edo_ruta_visita)
+    VALUES (p_ruta_visita, p_fecha, p_empleado, 'ERV006');
 
-        WHILE i < n DO
-            SET v_producto = JSON_UNQUOTE(JSON_EXTRACT(p_detalle, CONCAT('$[', i, '].producto')));
-            SET v_cantidad = JSON_EXTRACT(p_detalle, CONCAT('$[', i, '].cantidad'));
-            SET v_precio = JSON_EXTRACT(p_detalle, CONCAT('$[', i, '].precio_unitario'));
-            SET v_importe = ROUND(v_cantidad * v_precio, 2);
+    -- Deja rastro de la ejecucion para poder verificar que el
+    -- procedimiento corre desde la aplicacion
+    INSERT INTO bitacora_procedimiento (procedimiento, detalle, resultado, fecha)
+    VALUES ('sp_asignar_vendedor_ruta',
+            CONCAT('Ruta ', p_ruta_visita, ' asignada al empleado ',
+                   p_empleado, ' para el ', p_fecha),
+            'OK', NOW());
+END$$
 
-            INSERT INTO detalle_pedido (num_pedido, cod_producto, cantidad, precioUnitario, importe)
-            VALUES (v_pedido_id, v_producto, v_cantidad, v_precio, v_importe);
-
-            SET i = i + 1;
-        END WHILE;
-
-        UPDATE visita SET edo_visita = 'EVI004' WHERE numero = p_visita;
-
-    COMMIT;
-
-    SELECT v_pedido_id AS pedido_id;
 END$$
 DELIMITER ;
 
+###PROCEDIMIENTO 2: CONSULTAR STOCK DE UN PEDIDO###
+-- Devuelve los productos de un pedido con la cantidad solicitada y la
+-- existencia actual, marcando si alcanza. Lo usa el almacenista al
+-- validar el pedido antes de confirmarlo.
 
--- 3. Consultar stock del pedido con advertencias
 DELIMITER $$
-CREATE OR REPLACE PROCEDURE proalmc_consultar_stock_pedido(
-    IN p_pedido_id INT
+CREATE PROCEDURE sp_consultar_stock_pedido(
+    IN p_pedido INT
 )
 BEGIN
     SELECT
-        pr.codigo AS producto_id,
+        dp.cod_producto,
         pr.nombre AS producto_nombre,
-        dp.cantidad AS cantidad_pedida,
-        pr.stock AS stock_actual,
-        COALESCE(SUM(dp2.cantidad), 0) AS cantidad_comprometida,
-        (pr.stock - COALESCE(SUM(dp2.cantidad), 0)) AS stock_disponible,
-        CASE
-            WHEN (pr.stock - COALESCE(SUM(dp2.cantidad), 0)) <= 0 THEN 'SIN STOCK'
-            WHEN (pr.stock - COALESCE(SUM(dp2.cantidad), 0)) < dp.cantidad THEN 'STOCK INSUFICIENTE'
-            ELSE 'OK'
-        END AS advertencia
+        pr.imagen,
+        dp.cantidad,
+        dp.precioUnitario AS precio_unitario,
+        dp.importe,
+        pr.stock AS stock_disponible,
+        CASE WHEN pr.stock >= dp.cantidad THEN 'SUFICIENTE'
+             ELSE 'INSUFICIENTE' END AS cobertura
     FROM detalle_pedido dp
     INNER JOIN producto pr ON pr.codigo = dp.cod_producto
-    LEFT JOIN detalle_pedido dp2 ON dp2.cod_producto = dp.cod_producto
-        INNER JOIN pedido p2 ON p2.num = dp2.num_pedido
-            AND p2.entrega IS NOT NULL
-            AND p2.edo_pedido NOT IN ('EPD005', 'EPD006')
-            AND p2.num <> p_pedido_id
-    WHERE dp.num_pedido = p_pedido_id
-    GROUP BY pr.codigo, pr.nombre, dp.cantidad, pr.stock;
+    WHERE dp.num_pedido = p_pedido;
+
+    INSERT INTO bitacora_procedimiento (procedimiento, detalle, resultado, fecha)
+    VALUES ('sp_consultar_stock_pedido',
+            CONCAT('Consulta de stock del pedido ', p_pedido),
+            'OK', NOW());
 END$$
 DELIMITER ;
 
--- 4. Crear entrega
+
+###PROCEDIMIENTO 3: INICIAR RUTA DE ENTREGA###
+-- El repartidor sale del almacen: la entrega pasa a En proceso, el
+-- vehiculo queda en ruta y la ruta de entrega en camino. Los tres
+-- cambios van juntos porque representan una sola operacion.
+
 DELIMITER $$
-CREATE OR REPLACE PROCEDURE proalmc_crear_entrega(
-    IN p_empleado INT,
-    IN p_vehiculo INT
-)
-BEGIN
-    DECLARE v_edo_vehiculo VARCHAR(10);
-    DECLARE v_entrega_id INT;
-
-    SELECT edo_vehiculo INTO v_edo_vehiculo
-    FROM vehiculo WHERE numero = p_vehiculo;
-
-    IF v_edo_vehiculo <> 'EV001' THEN
-        SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'El vehículo no está disponible para carga';
-    END IF;
-
-    START TRANSACTION;
-
-        INSERT INTO entrega (fecha_creacion, fecha_entrega, empleado, edo_entrega)
-        VALUES (CURDATE(), NULL, p_empleado, 'EEN001');
-
-        SET v_entrega_id = LAST_INSERT_ID();
-
-    COMMIT;
-
-    SELECT v_entrega_id AS entrega_id;
-END$$
-DELIMITER ;
-
--- 5. Agregar pedido a entrega
-DELIMITER $$
-CREATE OR REPLACE PROCEDURE proalmc_agregar_pedido_entrega(
-    IN p_pedido_id INT,
-    IN p_entrega_id INT
-)
-BEGIN
-    DECLARE v_edo_pedido VARCHAR(10);
-
-    SELECT edo_pedido INTO v_edo_pedido
-    FROM pedido WHERE num = p_pedido_id;
-
-    IF v_edo_pedido <> 'EPD003' THEN
-        SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'El pedido debe estar en estado Registrado para ser asignado a una entrega';
-    END IF;
-
-    START TRANSACTION;
-
-        UPDATE pedido
-        SET entrega = p_entrega_id,
-            edo_pedido = 'EPD004'
-        WHERE num = p_pedido_id;
-
-    COMMIT;
-
-    SELECT 'Pedido agregado correctamente a la entrega' AS mensaje;
-END$$
-DELIMITER ;
-
--- 6. Cerrar entrega
-DELIMITER $$
-CREATE OR REPLACE PROCEDURE proalmc_cerrar_entrega(
-    IN p_entrega_id INT,
-    IN p_empleado INT,
-    IN p_vehiculo INT
-)
-BEGIN
-    DECLARE v_edo_entrega VARCHAR(10);
-    DECLARE v_edo_vehiculo VARCHAR(10);
-
-    SELECT edo_entrega INTO v_edo_entrega
-    FROM entrega WHERE numero = p_entrega_id;
-
-    SELECT edo_vehiculo INTO v_edo_vehiculo
-    FROM vehiculo WHERE numero = p_vehiculo;
-
-    IF v_edo_entrega <> 'EEN002' THEN
-        SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'La entrega debe estar En proceso para poder cerrarla';
-    END IF;
-
-    IF v_edo_vehiculo <> 'EV001' THEN
-        SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'El vehículo debe estar Disponible para poder cargarlo';
-    END IF;
-
-    START TRANSACTION;
-
-        UPDATE entrega
-        SET edo_entrega = 'EEN003'
-        WHERE numero = p_entrega_id;
-
-        INSERT INTO emp_vehiculo (empleado, vehiculo, fecha_cargo)
-        VALUES (p_empleado, p_vehiculo, CURDATE());
-
-    COMMIT;
-
-    SELECT 'Entrega cerrada y lista para salir' AS mensaje;
-END$$
-DELIMITER ;
-
--- 7. Iniciar ruta de entrega
-DELIMITER $$
-CREATE OR REPLACE PROCEDURE proalmc_iniciar_ruta_entrega(
-    IN p_entrega_id INT,
-    IN p_vehiculo INT
-)
-BEGIN
-    DECLARE v_edo_entrega VARCHAR(10);
-
-    SELECT edo_entrega INTO v_edo_entrega
-    FROM entrega WHERE numero = p_entrega_id;
-
-    IF v_edo_entrega <> 'EEN003' THEN
-        SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'La entrega debe estar Cargada para poder iniciar la ruta';
-    END IF;
-
-    START TRANSACTION;
-
-        UPDATE entrega
-        SET edo_entrega = 'EEN002'
-        WHERE numero = p_entrega_id;
-
-        UPDATE vehiculo
-        SET edo_vehiculo = 'EV002'
-        WHERE numero = p_vehiculo;
-
-        UPDATE ruta_entrega
-        SET edo_ruta_entrega = 'ERET002'
-        WHERE entrega = p_entrega_id;
-
-    COMMIT;
-
-    SELECT 'Ruta de entrega iniciada' AS mensaje;
-END$$
-DELIMITER ;
-
--- 8. Finalizar ruta de entrega
-DELIMITER $$
-CREATE OR REPLACE PROCEDURE proalmc_finalizar_ruta_entrega(
-    IN p_entrega_id INT,
-    IN p_vehiculo INT
-)
-BEGIN
-    DECLARE v_edo_entrega VARCHAR(10);
-
-    SELECT edo_entrega INTO v_edo_entrega
-    FROM entrega WHERE numero = p_entrega_id;
-
-    IF v_edo_entrega <> 'EEN002' THEN
-        SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'La entrega debe estar En camino para poder finalizarla';
-    END IF;
-
-    START TRANSACTION;
-
-        UPDATE entrega
-        SET edo_entrega = 'EEN004',
-            fecha_entrega = NOW()
-        WHERE numero = p_entrega_id;
-
-        UPDATE vehiculo
-        SET edo_vehiculo = 'EV001',
-            entrega = NULL
-        WHERE numero = p_vehiculo;
-
-        UPDATE ruta_entrega
-        SET edo_ruta_entrega = 'ERET003'
-        WHERE entrega = p_entrega_id;
-
-    COMMIT;
-
-    SELECT 'Ruta de entrega finalizada, vehículo disponible' AS mensaje;
-END$$
-DELIMITER ;
-
--- 9. Registrar movimiento de inventario
-DELIMITER $$
-CREATE OR REPLACE PROCEDURE proalmc_registrar_movimiento(
-    IN p_observaciones VARCHAR(150),
-    IN p_tipo_movimiento VARCHAR(10),
-    IN p_devolucion INT,
-    IN p_empleado INT,
-    IN p_detalle JSON
-)
-BEGIN
-    DECLARE v_movimiento_id INT;
-    DECLARE v_producto VARCHAR(10);
-    DECLARE v_cantidad INT;
-    DECLARE v_precio DECIMAL(10,2);
-    DECLARE v_subtotal DECIMAL(10,2);
-    DECLARE i INT DEFAULT 0;
-    DECLARE n INT;
-
-    DECLARE EXIT HANDLER FOR SQLEXCEPTION
-    BEGIN
-        ROLLBACK;
-        SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'Error al registrar el movimiento, se realizó rollback';
-    END;
-
-    START TRANSACTION;
-
-        INSERT INTO movimientos (observaciones, fecha, tipo_movimiento, devolucion, empleado)
-        VALUES (p_observaciones, NOW(), p_tipo_movimiento, p_devolucion, p_empleado);
-
-        SET v_movimiento_id = LAST_INSERT_ID();
-        SET n = JSON_LENGTH(p_detalle);
-
-        WHILE i < n DO
-            SET v_producto = JSON_UNQUOTE(JSON_EXTRACT(p_detalle, CONCAT('$[', i, '].producto')));
-            SET v_cantidad = JSON_EXTRACT(p_detalle, CONCAT('$[', i, '].cantidad'));
-            SET v_precio = JSON_EXTRACT(p_detalle, CONCAT('$[', i, '].precio_unitario'));
-            SET v_subtotal = ROUND(v_cantidad * v_precio, 2);
-
-            INSERT INTO detalle_movimiento (cod_movimientos, cod_producto, cantidad, precioUnitario, subtotal)
-            VALUES (v_movimiento_id, v_producto, v_cantidad, v_precio, v_subtotal);
-
-            SET i = i + 1;
-        END WHILE;
-
-    COMMIT;
-
-    SELECT v_movimiento_id AS movimiento_id;
-END$$
-DELIMITER ;
-
--- 10. Registrar devolución (repartidor en campo)
-DELIMITER $$
-CREATE OR REPLACE PROCEDURE proalmc_registrar_devolucion(
-    IN p_cantidad INT,
-    IN p_motivo VARCHAR(40),
-    IN p_descripcion VARCHAR(150),
+CREATE PROCEDURE sp_iniciar_ruta_entrega(
     IN p_entrega INT
 )
 BEGIN
-    DECLARE v_devolucion_id INT;
+    DECLARE v_vehiculo INT;
+    DECLARE v_estado VARCHAR(10);
 
-    INSERT INTO devolucion (fecha, cantidad, motivo, descripcion, entrega)
-    VALUES (CURDATE(), p_cantidad, p_motivo, p_descripcion, p_entrega);
+    SELECT edo_entrega INTO v_estado
+    FROM entrega WHERE numero = p_entrega;
 
-    SET v_devolucion_id = LAST_INSERT_ID();
+    IF v_estado IS NULL THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'La entrega no existe';
+    END IF;
 
-    SELECT v_devolucion_id AS devolucion_id,
-           'Devolución registrada, pendiente de aceptación por almacenista' AS mensaje;
+    IF v_estado = 'EEN002' THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Esta ruta ya fue iniciada';
+    END IF;
+
+    SELECT numero INTO v_vehiculo
+    FROM vehiculo WHERE entrega = p_entrega LIMIT 1;
+
+    UPDATE entrega SET edo_entrega = 'EEN002' WHERE numero = p_entrega;
+
+    IF v_vehiculo IS NOT NULL THEN
+        UPDATE vehiculo SET edo_vehiculo = 'EV002' WHERE numero = v_vehiculo;
+    END IF;
+
+    UPDATE ruta_entrega SET edo_ruta_entrega = 'ERET002'
+    WHERE entrega = p_entrega;
+
+    INSERT INTO bitacora_procedimiento (procedimiento, detalle, resultado, fecha)
+    VALUES ('sp_iniciar_ruta_entrega',
+            CONCAT('Entrega ', p_entrega, ' iniciada, vehiculo ',
+                   COALESCE(v_vehiculo, 0)),
+            'OK', NOW());
 END$$
 DELIMITER ;
 
--- 11. Aceptar devolución (almacenista confirma entrada al almacén)
+
+###PROCEDIMIENTO 4: REGISTRAR PRODUCTO NUEVO###
+-- El almacenista da de alta un producto. El procedimiento genera el
+-- codigo consecutivo, valida que la fecha de caducidad sea futura y
+-- que el precio y el peso sean validos. La imagen la guarda la
+-- aplicacion porque es un archivo del sistema, no de la base.
+
 DELIMITER $$
-CREATE OR REPLACE PROCEDURE proalmc_aceptar_devolucion(
-    IN p_devolucion_id INT,
-    IN p_empleado INT,
-    IN p_producto VARCHAR(10),
-    IN p_cantidad INT,
-    IN p_precio DECIMAL(10,2)
+CREATE PROCEDURE sp_registrar_producto(
+    IN p_nombre VARCHAR(60),
+    IN p_descripcion VARCHAR(100),
+    IN p_imagen VARCHAR(255),
+    IN p_precio DECIMAL(10,2),
+    IN p_fecha_caducidad DATE,
+    IN p_stock INT,
+    IN p_peso DECIMAL(5,2),
+    OUT p_codigo VARCHAR(10)
 )
 BEGIN
-    DECLARE v_subtotal DECIMAL(10,2);
-    DECLARE v_movimiento_id INT;
+    DECLARE v_siguiente INT;
+    DECLARE v_repetido INT;
 
-    DECLARE EXIT HANDLER FOR SQLEXCEPTION
-    BEGIN
-        ROLLBACK;
+    IF p_fecha_caducidad <= CURDATE() THEN
         SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'Error al aceptar la devolución, se realizó rollback';
-    END;
+        SET MESSAGE_TEXT = 'La fecha de caducidad debe ser posterior a hoy';
+    END IF;
 
-    START TRANSACTION;
+    IF p_precio <= 0 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'El precio debe ser mayor a cero';
+    END IF;
 
-        SET v_subtotal = ROUND(p_cantidad * p_precio, 2);
+    IF p_peso <= 0 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'El peso debe ser mayor a cero';
+    END IF;
 
-        INSERT INTO movimientos (observaciones, fecha, tipo_movimiento, devolucion, empleado)
-        VALUES ('Entrada por devolución aceptada por almacenista', NOW(), 'TM004', p_devolucion_id, p_empleado);
+    SELECT COUNT(*) INTO v_repetido
+    FROM producto
+    WHERE nombre = CONVERT(p_nombre USING utf8mb4) COLLATE utf8mb4_0900_ai_ci;
 
-        SET v_movimiento_id = LAST_INSERT_ID();
+    IF v_repetido > 0 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Ya existe un producto con ese nombre';
+    END IF;
 
-        INSERT INTO detalle_movimiento (cod_movimientos, cod_producto, cantidad, precioUnitario, subtotal)
-        VALUES (v_movimiento_id, p_producto, p_cantidad, p_precio, v_subtotal);
+    -- El codigo se genera consecutivo a partir del ultimo registrado
+    SELECT COALESCE(MAX(CAST(SUBSTRING(codigo, 2) AS UNSIGNED)), 0) + 1
+      INTO v_siguiente
+    FROM producto;
 
-    COMMIT;
+    SET p_codigo = CONCAT('P', LPAD(v_siguiente, 3, '0'));
 
-    SELECT v_movimiento_id AS movimiento_id,
-           'Devolución aceptada, stock actualizado' AS mensaje;
+    INSERT INTO producto (codigo, nombre, descripcion, imagen, precio,
+                          fecha_caducidad, stock, peso)
+    VALUES (p_codigo, p_nombre, p_descripcion, p_imagen, p_precio,
+            p_fecha_caducidad, p_stock, p_peso);
+
+    INSERT INTO bitacora_procedimiento (procedimiento, detalle, resultado, fecha)
+    VALUES ('sp_registrar_producto',
+            CONCAT('Producto ', p_codigo, ' registrado: ', p_nombre),
+            'OK', NOW());
 END$$
 DELIMITER ;
 
+
+
+###PROCEDIMIENTO 5: REGISTRAR DEVOLUCION EN LA ENTREGA###
+-- El repartidor registra la devolucion durante la entrega. Se valida
+-- que el producto pertenezca al pedido y que no se devuelva mas de lo
+-- entregado. Si el pedido ya estaba cobrado, se genera el reembolso
+-- como un pago negativo para que la cobranza cuadre.
+-- Los CONVERT en las comparaciones evitan el choque de collation entre
+-- los parametros del procedimiento y las columnas de las tablas.
+
+DELIMITER $$
+CREATE PROCEDURE sp_registrar_devolucion(
+    IN p_entrega INT,
+    IN p_pedido INT,
+    IN p_cod_producto VARCHAR(10),
+    IN p_cantidad INT,
+    IN p_motivo VARCHAR(40),
+    IN p_descripcion VARCHAR(150),
+    IN p_cod_cambio VARCHAR(10),
+    IN p_empleado INT,
+    OUT p_devolucion INT,
+    OUT p_importe DECIMAL(10,2),
+    OUT p_reembolso DECIMAL(10,2)
+)
+BEGIN
+    DECLARE v_cantidad_pedida INT;
+    DECLARE v_precio DECIMAL(10,2);
+    DECLARE v_ya_devuelto INT;
+    DECLARE v_establecimiento INT;
+    DECLARE v_ya_cobrado DECIMAL(10,2);
+
+    IF p_cantidad <= 0 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'La cantidad debe ser mayor a cero';
+    END IF;
+
+    SELECT dp.cantidad, dp.precioUnitario
+      INTO v_cantidad_pedida, v_precio
+    FROM detalle_pedido dp
+    WHERE dp.num_pedido = p_pedido
+      AND dp.cod_producto = CONVERT(p_cod_producto USING utf8mb4) COLLATE utf8mb4_0900_ai_ci;
+
+    IF v_cantidad_pedida IS NULL THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Ese producto no pertenece al pedido';
+    END IF;
+
+    SELECT COALESCE(SUM(cantidad), 0) INTO v_ya_devuelto
+    FROM devolucion
+    WHERE pedido = p_pedido
+      AND cod_producto = CONVERT(p_cod_producto USING utf8mb4) COLLATE utf8mb4_0900_ai_ci;
+
+    IF (p_cantidad + v_ya_devuelto) > v_cantidad_pedida THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'No puedes devolver mas piezas de las entregadas';
+    END IF;
+
+    SET p_importe = ROUND(p_cantidad * v_precio, 2);
+
+    INSERT INTO devolucion (fecha, cantidad, motivo, descripcion, entrega,
+                            cod_producto, pedido, importe, cod_producto_cambio)
+    VALUES (CURDATE(), p_cantidad, p_motivo, p_descripcion, p_entrega,
+            p_cod_producto, p_pedido, p_importe, p_cod_cambio);
+
+    SET p_devolucion = LAST_INSERT_ID();
+
+    -- El establecimiento se deriva del pedido
+    SELECT v.establecimiento INTO v_establecimiento
+    FROM pedido p
+    INNER JOIN visita v ON v.numero = p.visita
+    WHERE p.num = p_pedido;
+
+    SELECT COALESCE(SUM(monto), 0) INTO v_ya_cobrado
+    FROM pago WHERE pedido = p_pedido;
+
+    SET p_reembolso = 0;
+
+    IF v_ya_cobrado > 0 THEN
+        SET p_reembolso = p_importe;
+        INSERT INTO pago (monto, fecha, tipo_pago, empleado, establecimiento, pedido)
+        VALUES (-p_reembolso, NOW(), 'TP001', p_empleado, v_establecimiento, p_pedido);
+    END IF;
+
+    INSERT INTO bitacora_procedimiento (procedimiento, detalle, resultado, fecha)
+    VALUES ('sp_registrar_devolucion',
+            CONCAT('Devolucion ', p_devolucion, ': ', p_cantidad, ' pza(s) de ',
+                   p_cod_producto, ' del pedido ', p_pedido,
+                   ', reembolso ', p_reembolso),
+            'OK', NOW());
+END$$
+DELIMITER ;

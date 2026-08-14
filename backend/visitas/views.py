@@ -1,5 +1,6 @@
 import json
 from django.shortcuts import render
+from django.core.cache import cache
 from django.http import JsonResponse
 from django.db import connection, transaction
 from django.views.decorators.csrf import csrf_exempt
@@ -408,6 +409,9 @@ def pedidos_pendientes(request):
 def pedido_detalle(request, pedido_id):
     """
     RF17: Detalle de un pedido, incluyendo productos y cantidades.
+    El listado de productos con su existencia lo devuelve el
+    procedimiento almacenado sp_consultar_stock_pedido, que además
+    calcula si el stock alcanza para cada renglón.
     RNF-14: se incluye la imagen de cada producto para que el almacenista
     lo identifique visualmente antes de ajustar o cancelar.
     """
@@ -428,31 +432,24 @@ def pedido_detalle(request, pedido_id):
         row = cursor.fetchone()
         if not row:
             return JsonResponse({"error": "Pedido no encontrado"}, status=404)
+
         pedido = dict(zip(columns, row))
         for campo in ('subtotal', 'iva', 'total'):
             if pedido.get(campo) is not None:
                 pedido[campo] = float(pedido[campo])
 
-        cursor.execute("""
-            SELECT
-                dp.cod_producto,
-                pr.nombre AS producto_nombre,
-                pr.imagen,
-                dp.cantidad,
-                dp.precioUnitario AS precio_unitario,
-                dp.importe,
-                pr.stock AS stock_disponible
-            FROM detalle_pedido dp
-            INNER JOIN producto pr ON pr.codigo = dp.cod_producto
-            WHERE dp.num_pedido = %s
-        """, [pedido_id])
+    # El procedimiento se llama con su propio cursor porque devuelve un
+    # conjunto de resultados que hay que leer antes de seguir
+    with connection.cursor() as cursor:
+        cursor.callproc('sp_consultar_stock_pedido', [pedido_id])
         columns = [col[0] for col in cursor.description]
         detalle = [dict(zip(columns, row)) for row in cursor.fetchall()]
-        for d in detalle:
-            d['precio_unitario'] = float(d['precio_unitario'])
-            d['importe'] = float(d['importe'])
-            if d.get('imagen') and d['imagen'].startswith('/img/'):
-                d['imagen'] = '/static' + d['imagen']
+
+    for d in detalle:
+        d['precio_unitario'] = float(d['precio_unitario'])
+        d['importe'] = float(d['importe'])
+        if d.get('imagen') and d['imagen'].startswith('/img/'):
+            d['imagen'] = '/static' + d['imagen']
 
     pedido['detalle'] = detalle
     return JsonResponse(pedido, json_dumps_params={'ensure_ascii': False})
@@ -703,6 +700,10 @@ def confirmar_pedido(request, pedido_id):
                         (cod_movimientos, cod_producto, cantidad, precioUnitario, subtotal)
                     VALUES (%s, %s, %s, %s, %s)
                 """, [nuevo_mov, cod, cantidad, precio, cantidad * precio])
+
+    # El stock cambió por el movimiento de salida: se limpia el caché
+    # para que el catálogo del almacenista lo refleje de inmediato
+    cache.delete('catalogo_stock')
 
     return JsonResponse({
         "mensaje": "Pedido confirmado, registrado y stock descontado",

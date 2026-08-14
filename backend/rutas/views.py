@@ -150,7 +150,9 @@ def obtener_establecimientos_entrega(request, entrega_id):
                 e.longitud,
                 e.estColonia AS colonia,
                 p.num AS pedido_id,
-                p.total AS subtotal,
+                p.total - COALESCE((
+                    SELECT SUM(d.importe) FROM devolucion d WHERE d.pedido = p.num
+                ), 0) AS subtotal,
                 z.nombre AS zona
             FROM entrega en2
             INNER JOIN pedido p ON p.entrega = en2.numero
@@ -186,7 +188,9 @@ def calcular_ruta_entrega_coordinador(request, entrega_id):
                 e.numero AS id, e.nombre, e.latitud AS lat, e.longitud AS lon,
                 e.estColonia AS colonia,
                 GROUP_CONCAT(p.num ORDER BY p.num) AS pedidos,
-                SUM(p.total) AS subtotal,
+                SUM(p.total) - COALESCE(SUM((
+                    SELECT SUM(d.importe) FROM devolucion d WHERE d.pedido = p.num
+                )), 0) AS subtotal,
                 MIN(reo.orden) AS orden
             FROM entrega en2
             INNER JOIN pedido p ON p.entrega = en2.numero
@@ -463,9 +467,10 @@ def rutas_visita_hoy(request):
 @csrf_exempt
 def asignar_vendedor_ruta(request, ruta_id):
     """
-    Asigna un vendedor a una ruta de visita y la marca como Asignada.
-    Solo se puede asignar si la ruta está Activa (no si ya fue asignada),
-    y si el vendedor no tiene ya otra ruta ese mismo día.
+    Asigna un vendedor a la ruta de visita del día. Las validaciones y el
+    registro los hace el procedimiento almacenado sp_asignar_vendedor_ruta:
+    un vendedor no puede cubrir dos rutas la misma fecha, y una ruta ya
+    asignada no se reasigna.
     """
     if request.method != 'POST':
         return JsonResponse({"error": "Método no permitido"}, status=405)
@@ -487,35 +492,24 @@ def asignar_vendedor_ruta(request, ruta_id):
 
         fecha = _fecha_de_ruta(row[0])
 
-        # Un vendedor no puede cubrir dos rutas la misma fecha
-        cursor.execute("""
-            SELECT rv.nombre FROM ruta_visita_semana rvs
-            INNER JOIN ruta_visita rv ON rv.numero = rvs.ruta_visita
-            WHERE rvs.empleado = %s AND rvs.fecha = %s
-              AND rvs.ruta_visita <> %s
-              AND rvs.edo_ruta_visita IN ('ERV006', 'ERV003')
-            LIMIT 1
-        """, [vendedor_id, fecha, ruta_id])
-        ocupada = cursor.fetchone()
-        if ocupada:
-            return JsonResponse({
-                "error": f"Ese vendedor ya tiene asignada la ruta '{ocupada[0]}' ese día"
-            }, status=409)
+        try:
+            cursor.callproc('sp_asignar_vendedor_ruta',
+                            [ruta_id, vendedor_id, fecha])
+        except Exception as e:
+            mensaje = str(e)
 
-        # Se registra la ejecución de esa fecha; si ya existía, se
-        # rechaza para no reasignar una ruta que ya está en curso
-        cursor.execute("""
-            SELECT edo_ruta_visita FROM ruta_visita_semana
-            WHERE ruta_visita = %s AND fecha = %s
-        """, [ruta_id, fecha])
-        existente = cursor.fetchone()
-        if existente:
-            return JsonResponse({"error": "La ruta ya fue asignada para esa fecha"}, status=409)
+            # El SIGNAL revierte lo que el procedimiento haya escrito, así
+            # que el rechazo se registra desde aquí
+            with connection.cursor() as cur2:
+                cur2.execute("""
+                    INSERT INTO bitacora_procedimiento
+                        (procedimiento, detalle, resultado, fecha)
+                    VALUES ('sp_asignar_vendedor_ruta', %s, 'RECHAZADO', NOW())
+                """, [f"Ruta {ruta_id}, empleado {vendedor_id}: {mensaje[:120]}"])
 
-        cursor.execute("""
-            INSERT INTO ruta_visita_semana (ruta_visita, fecha, empleado, edo_ruta_visita)
-            VALUES (%s, %s, %s, 'ERV006')
-        """, [ruta_id, fecha, vendedor_id])
+            if 'ya tiene una ruta asignada' in mensaje or 'ya fue asignada' in mensaje:
+                return JsonResponse({"error": mensaje}, status=409)
+            return JsonResponse({"error": f"No se pudo asignar: {mensaje}"}, status=400)
 
     return JsonResponse({
         "mensaje": "Vendedor asignado correctamente",
@@ -1058,7 +1052,9 @@ def historial_rutas(request):
                        veh.placas,
                        COUNT(DISTINCT p.num) AS total_paradas,
                        SUM(CASE WHEN ep.nombre = 'Entregado' THEN 1 ELSE 0 END) AS completadas,
-                       COALESCE(SUM(p.total), 0) AS monto
+                       COALESCE(SUM(p.total), 0) - COALESCE(SUM((
+                           SELECT SUM(d.importe) FROM devolucion d WHERE d.pedido = p.num
+                       )), 0) AS monto
                 FROM ruta_entrega re
                 INNER JOIN edo_ruta_entrega ere ON ere.codigo = re.edo_ruta_entrega
                 INNER JOIN entrega en ON en.numero = re.entrega
@@ -1122,7 +1118,10 @@ def paradas_ruta_visita(request, ruta_id):
                    e.estColonia AS colonia,
                    COALESCE(ev.nombre, 'Pendiente') AS estado_visita,
                    v.fecha, v.observaciones,
-                   p.num AS pedido_id, p.total
+                   p.num AS pedido_id,
+                   p.total - COALESCE((
+                       SELECT SUM(d.importe) FROM devolucion d WHERE d.pedido = p.num
+                   ), 0) AS total
             FROM ruta_visita_orden rvo
             INNER JOIN establecimiento e ON e.numero = rvo.establecimiento
             LEFT JOIN visita v ON v.ruta_visita = rvo.ruta_visita
@@ -1149,7 +1148,10 @@ def paradas_ruta_entrega(request, ruta_id):
             SELECT COALESCE(reo.orden, 999) AS orden,
                    e.numero AS establecimiento_id, e.nombre,
                    e.estColonia AS colonia,
-                   p.num AS pedido_id, p.total AS subtotal,
+                   p.num AS pedido_id,
+                   p.total - COALESCE((
+                       SELECT SUM(d.importe) FROM devolucion d WHERE d.pedido = p.num
+                   ), 0) AS total
                    ep.nombre AS estado_pedido,
                    ee.fecha_entrega, ee.hora_entrega
             FROM ruta_entrega re

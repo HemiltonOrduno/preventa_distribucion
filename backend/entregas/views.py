@@ -80,8 +80,6 @@ def pedidos_validados_por_zona(request):
 
 @rol_requerido('Almacenista', 'Administrador')
 @csrf_exempt
-@rol_requerido('Almacenista', 'Administrador')
-@csrf_exempt
 def crear_entrega(request):
     """
     RF24-26: agrupa pedidos validados de una misma zona, los asigna a un
@@ -114,13 +112,16 @@ def crear_entrega(request):
         return JsonResponse({"error": "Se requiere vehiculo y pedidos"}, status=400)
 
     with connection.cursor() as cursor:
-        # Zona de los pedidos que se quieren cargar
+        # Zona y peso de los pedidos que se quieren cargar
         marcas = ','.join(['%s'] * len(pedidos_ids))
         cursor.execute(f"""
-            SELECT e.zona
+            SELECT e.zona,
+                   COALESCE(SUM(dp.cantidad * pr.peso), 0) / 1000 AS peso
             FROM pedido p
             INNER JOIN visita v ON v.numero = p.visita
             INNER JOIN establecimiento e ON e.numero = v.establecimiento
+            LEFT JOIN detalle_pedido dp ON dp.num_pedido = p.num
+            LEFT JOIN producto pr ON pr.codigo = dp.cod_producto
             WHERE p.num IN ({marcas})
             GROUP BY e.zona
         """, pedidos_ids)
@@ -134,9 +135,10 @@ def crear_entrega(request):
             }, status=400)
 
         zona_pedidos = filas[0][0]
+        peso_pedidos = float(filas[0][1] or 0)
 
-        # Si ya hay un camión en carga de esa misma zona con espacio, hay
-        # que terminar de llenarlo antes de abrir otro
+        # Si ya hay un camión en carga de esa misma zona con espacio
+        # suficiente, hay que terminar de llenarlo antes de abrir otro
         cursor.execute("""
             SELECT en.numero, veh.placas, mdl.capacidad,
                    COALESCE(SUM(dp.cantidad * pr.peso) / 1000, 0) AS cargado,
@@ -157,11 +159,13 @@ def crear_entrega(request):
             if zona != zona_pedidos:
                 continue
             restante = float(capacidad or 0) - float(cargado)
-            if restante > 0:
+            # Solo se exige llenar el otro camión si de verdad cabe lo que
+            # se quiere cargar; si no cabe, se permite abrir uno nuevo
+            if restante >= peso_pedidos:
                 return JsonResponse({
                     "error": f"El camión {placas} (entrega #{num}) sigue en carga y le "
-                             f"quedan {restante:.1f} kg de esa zona. Termina de llenarlo "
-                             f"antes de abrir otro.",
+                             f"quedan {restante:.1f} kg, suficiente para estos pedidos "
+                             f"({peso_pedidos:.1f} kg). Termina de llenarlo antes de abrir otro.",
                     "entrega_sugerida": num
                 }, status=409)
 
@@ -387,6 +391,11 @@ def detalle_pedido(request, pedido_id):
 
 @csrf_exempt
 def iniciar_ruta(request):
+    """
+    El repartidor sale del almacén. El cambio de estados lo hace el
+    procedimiento sp_iniciar_ruta_entrega, que valida que la entrega
+    exista y que no se haya iniciado antes.
+    """
     if request.method != 'POST':
         return JsonResponse({"error": "Método no permitido"}, status=405)
 
@@ -396,25 +405,21 @@ def iniciar_ruta(request):
     except Exception:
         return JsonResponse({"error": "JSON inválido"}, status=400)
 
+    if not entrega_id:
+        return JsonResponse({"error": "Se requiere entrega_id"}, status=400)
+
     with connection.cursor() as cursor:
-        # Obtener vehículo de la entrega
-        cursor.execute("SELECT numero FROM vehiculo WHERE entrega = %s LIMIT 1", [entrega_id])
-        row = cursor.fetchone()
-        vehiculo_id = row[0] if row else None
-
-        cursor.execute("""
-            UPDATE entrega SET edo_entrega = 'EEN002' WHERE numero = %s
-        """, [entrega_id])
-
-        if vehiculo_id:
-            cursor.execute("""
-                UPDATE vehiculo SET edo_vehiculo = 'EV002' WHERE numero = %s
-            """, [vehiculo_id])
-
-        cursor.execute("""
-            UPDATE ruta_entrega SET edo_ruta_entrega = 'ERET002'
-            WHERE entrega = %s
-        """, [entrega_id])
+        try:
+            cursor.callproc('sp_iniciar_ruta_entrega', [entrega_id])
+        except Exception as e:
+            mensaje = str(e)
+            with connection.cursor() as cur2:
+                cur2.execute("""
+                    INSERT INTO bitacora_procedimiento
+                        (procedimiento, detalle, resultado, fecha)
+                    VALUES ('sp_iniciar_ruta_entrega', %s, 'RECHAZADO', NOW())
+                """, [f"Entrega {entrega_id}: {mensaje[:120]}"])
+            return JsonResponse({"error": mensaje}, status=400)
 
     return JsonResponse({"mensaje": "Ruta iniciada correctamente"})
 
@@ -534,11 +539,11 @@ def registrar_devolucion(request):
     """
     RF38: registra la devolución de producto en la entrega.
 
-    Con sustitución -> el cliente pide otro producto a cambio. Se guarda
-    cuál, para que el almacenista genere después el pedido de reposición.
-    Completa sin reemplazo -> el producto se cancela de la venta.
+    Toda la lógica la hace el procedimiento sp_registrar_devolucion:
+    valida que el producto pertenezca al pedido, que no se devuelva más
+    de lo entregado, guarda el producto que el cliente recibe a cambio
+    y genera el reembolso si el pedido ya estaba cobrado.
 
-    En ambos casos, si el pedido ya estaba cobrado se genera el reembolso.
     La entrada al almacén la registra el almacenista cuando recibe la
     mercancía, no aquí.
     """
@@ -570,9 +575,6 @@ def registrar_devolucion(request):
     except (TypeError, ValueError):
         return JsonResponse({"error": "La cantidad no es válida"}, status=400)
 
-    if cantidad <= 0:
-        return JsonResponse({"error": "La cantidad debe ser mayor a cero"}, status=400)
-
     # En la sustitución el cliente recibe otro producto, así que hay que
     # saber cuál para poder reponerlo después
     if motivo != 'Devolución completa sin reemplazo' and not cod_producto_cambio:
@@ -580,71 +582,32 @@ def registrar_devolucion(request):
             "error": "Indica el producto que el cliente recibe a cambio"
         }, status=400)
 
-    with transaction.atomic():
-        with connection.cursor() as cursor:
-            # No se puede devolver más de lo que se entregó
-            cursor.execute("""
-                SELECT dp.cantidad, dp.precioUnitario
-                FROM detalle_pedido dp
-                WHERE dp.num_pedido = %s AND dp.cod_producto = %s
-            """, [pedido_id, cod_producto])
-            row = cursor.fetchone()
-            if not row:
-                return JsonResponse({"error": "Ese producto no pertenece al pedido"}, status=400)
-
-            cantidad_pedida, precio_unitario = row[0], float(row[1])
-
-            cursor.execute("""
-                SELECT COALESCE(SUM(cantidad), 0) FROM devolucion
-                WHERE pedido = %s AND cod_producto = %s
-            """, [pedido_id, cod_producto])
-            ya_devuelto = cursor.fetchone()[0]
-
-            if cantidad + ya_devuelto > cantidad_pedida:
-                disponible = cantidad_pedida - ya_devuelto
-                return JsonResponse({
-                    "error": f"Solo puedes devolver {disponible} pieza(s) de este producto"
-                }, status=400)
-
-            importe_devuelto = round(cantidad * precio_unitario, 2)
-
-            cursor.execute("""
-                INSERT INTO devolucion (fecha, cantidad, motivo, descripcion, entrega,
-                                        cod_producto, pedido, importe, cod_producto_cambio)
-                VALUES (CURDATE(), %s, %s, %s, %s, %s, %s, %s, %s)
-            """, [cantidad, motivo, descripcion, entrega_id, cod_producto,
-                  pedido_id, importe_devuelto, cod_producto_cambio])
-            nuevo_codigo = cursor.lastrowid
-
-            # El establecimiento se deriva del pedido, no viene en el body
-            cursor.execute("""
-                SELECT v.establecimiento FROM pedido p
-                INNER JOIN visita v ON v.numero = p.visita
-                WHERE p.num = %s
-            """, [pedido_id])
-            establecimiento_id = cursor.fetchone()[0]
-
-            # Si el pedido ya estaba cobrado, la devolución genera un
-            # reembolso: se registra como un pago negativo para que la
-            # cobranza cuadre con lo realmente recibido
-            cursor.execute("""
-                SELECT COALESCE(SUM(monto), 0) FROM pago WHERE pedido = %s
-            """, [pedido_id])
-            ya_cobrado = float(cursor.fetchone()[0] or 0)
-
-            reembolso = 0
-            if ya_cobrado > 0:
-                reembolso = importe_devuelto
-                cursor.execute("""
-                    INSERT INTO pago (monto, fecha, tipo_pago, empleado, establecimiento, pedido)
-                    VALUES (%s, NOW(), %s, %s, %s, %s)
-                """, [-reembolso, 'TP001', empleado_num, establecimiento_id, pedido_id])
+    with connection.cursor() as cursor:
+        try:
+            cursor.callproc('sp_registrar_devolucion', [
+                entrega_id, pedido_id, cod_producto, cantidad,
+                motivo, descripcion, cod_producto_cambio, empleado_num,
+                0, 0, 0
+            ])
+            cursor.execute("SELECT @_sp_registrar_devolucion_8, "
+                           "@_sp_registrar_devolucion_9, "
+                           "@_sp_registrar_devolucion_10")
+            nuevo_codigo, importe_devuelto, reembolso = cursor.fetchone()
+        except Exception as e:
+            mensaje = str(e)
+            with connection.cursor() as cur2:
+                cur2.execute("""
+                    INSERT INTO bitacora_procedimiento
+                        (procedimiento, detalle, resultado, fecha)
+                    VALUES ('sp_registrar_devolucion', %s, 'RECHAZADO', NOW())
+                """, [f"Pedido {pedido_id}, producto {cod_producto}: {mensaje[:110]}"])
+            return JsonResponse({"error": mensaje}, status=400)
 
     return JsonResponse({
         "mensaje": "Devolución registrada correctamente",
         "devolucion_id": nuevo_codigo,
-        "importe_devuelto": importe_devuelto,
-        "reembolso": reembolso
+        "importe_devuelto": float(importe_devuelto or 0),
+        "reembolso": float(reembolso or 0)
     }, json_dumps_params={'ensure_ascii': False})
 
 @csrf_exempt

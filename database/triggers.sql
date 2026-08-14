@@ -68,24 +68,19 @@ BEGIN
 
         END IF;
 
+        INSERT INTO bitacora_trigger (trigger_nombre, detalle, fecha)
+        VALUES ('tg_verificar_zona_capacidad',
+                CONCAT('Pedido ', NEW.num, ' aceptado en entrega ', NEW.entrega,
+                       ' (zona ', zona_nuevo_pedido, ', peso ',
+                       ROUND(peso_actual + peso_nuevo_pedido, 2), ' kg de ',
+                       capacidad_vehiculo, ' kg)'),
+                NOW());
+
     END IF;
 END$$
 DELIMITER ;
 
-###TRIGGER 2, CAMPOS CALCULADOS ###
 
-DELIMITER $$
-CREATE OR REPLACE TRIGGER tg_campos_calculados_pedido
-AFTER INSERT ON detalle_pedido
-FOR EACH ROW
-BEGIN
-    UPDATE pedido
-    SET total = (total + NEW.importe),
-        subtotal = ((total + NEW.importe) / 1.16),
-        iva = (((total + NEW.importe) / 1.16) * 0.16)
-    WHERE num = NEW.num_pedido;
-END$$
-DELIMITER ;
 
 
 ###TRIGGER 3: ACTUALIZAR STOCK####
@@ -112,8 +107,33 @@ BEGIN
         SET stock = stock - NEW.cantidad
         WHERE codigo = NEW.cod_producto;
     END IF;
+
+    -- Sera la evidencia para de que se ejecute el trigger --
+    INSERT INTO bitacora_trigger (trigger_nombre, detalle, fecha)
+    VALUES ('tg_actualizar_stock',
+            CONCAT(tipo, ': ', NEW.cantidad, ' pza(s) de ', NEW.cod_producto),
+            NOW());
 END$$
 DELIMITER ;
+
+
+
+###TRIGGER 2, CAMPOS CALCULADOS ###
+
+DELIMITER $$
+CREATE OR REPLACE TRIGGER tg_campos_calculados_pedido
+AFTER INSERT ON detalle_pedido
+FOR EACH ROW
+BEGIN
+    UPDATE pedido
+    SET total = (total + NEW.importe),
+        subtotal = ((total + NEW.importe) / 1.16),
+        iva = (((total + NEW.importe) / 1.16) * 0.16)
+    WHERE num = NEW.num_pedido;
+END$$
+DELIMITER ;
+
+
 
 -- NUEVOS TRIGGERS 
 
