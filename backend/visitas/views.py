@@ -372,31 +372,32 @@ def visita_sin_pedido(request, visita_id):
 def pedidos_pendientes(request):
     """
     RF16: Lista los pedidos pendientes de validación por el almacenista.
+
+    Se apoya en la vista vta_pedidos_pendientes_almacenista, que ya
+    resuelve el recorrido de pedido a visita, establecimiento y zona, y
+    filtra por el estado pendiente. Los pedidos que nacen de una
+    devolución se muestran primero porque tienen prioridad de surtido.
     """
     with connection.cursor() as cursor:
         cursor.execute("""
-            SELECT
-                p.num AS pedido_id,
-                p.fecha,
-                p.subtotal,
-                p.iva,
-                p.total,
-                p.observaciones,
-                ep.nombre AS estado,
-                e.numero AS establecimiento_id,
-                e.nombre AS establecimiento_nombre,
-                z.nombre AS zona_nombre,
-                p.devolucion_origen
-            FROM pedido p
-            INNER JOIN edo_pedido ep ON ep.codigo = p.edo_pedido
-            INNER JOIN visita v ON v.numero = p.visita
-            INNER JOIN establecimiento e ON e.numero = v.establecimiento
-            INNER JOIN zona z ON z.num = e.zona
-            WHERE p.edo_pedido = 'EPD001'
-            ORDER BY p.devolucion_origen IS NULL, p.fecha ASC
+            SELECT pedido_id, fecha, subtotal, iva, total, observaciones,
+                   estado_pedido AS estado,
+                   establecimiento_id,
+                   establecimiento_nombre,
+                   zona AS zona_nombre,
+                   devolucion_origen
+            FROM vta_pedidos_pendientes_almacenista
+            ORDER BY devolucion_origen IS NULL, fecha ASC
         """)
         columns = [col[0] for col in cursor.description]
         pedidos = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+    for p in pedidos:
+        for campo in ('subtotal', 'iva', 'total'):
+            if p.get(campo) is not None:
+                p[campo] = float(p[campo])
+
+    return JsonResponse({"pedidos": pedidos}, json_dumps_params={'ensure_ascii': False})
 
     for p in pedidos:
         for campo in ('subtotal', 'iva', 'total'):

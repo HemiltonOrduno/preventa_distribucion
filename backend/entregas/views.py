@@ -12,26 +12,22 @@ import json
 @rol_requerido('Almacenista', 'Administrador')
 def vehiculos_disponibles(request):
     """
-    RF22: consulta los vehículos disponibles y su capacidad de carga
-    (obtenida a través de VEHICULO -> MODELO -> capacidad). Excluye
-    vehículos que ya tienen una entrega activa asignada, aunque su
-    estado siga marcado como 'Disponible' (el estado solo cambia a
-    'En ruta' hasta que el repartidor da clic en Iniciar ruta).
+    RF22: consulta los vehículos disponibles y su capacidad de carga.
+
+    Se apoya en la vista vta_vehiculos_disponibles, que resuelve el
+    recorrido de vehículo a modelo, marca y tipo, y filtra por estado
+    Disponible. Aquí se excluyen además los que ya tienen una entrega
+    asignada, porque el estado solo cambia a 'En ruta' cuando el
+    repartidor inicia la ruta, no cuando se le carga mercancía.
     """
     with connection.cursor() as cursor:
         cursor.execute("""
-            SELECT
-                v.numero AS vehiculo_id,
-                v.placas,
-                m.nombre AS modelo_nombre,
-                m.capacidad,
-                ev.nombre AS estado
-            FROM vehiculo v
-            INNER JOIN modelo m ON m.numero = v.modelo
-            INNER JOIN edo_vehiculo ev ON ev.codigo = v.edo_vehiculo
-            WHERE v.edo_vehiculo = 'EV001'
-              AND m.capacidad > 0
-              AND v.entrega IS NULL
+            SELECT vehiculo_id, placas,
+                   modelo AS modelo_nombre,
+                   capacidad, estado
+            FROM vta_vehiculos_disponibles
+            WHERE capacidad > 0
+              AND entrega IS NULL
         """)
         columns = [col[0] for col in cursor.description]
         vehiculos = [dict(zip(columns, row)) for row in cursor.fetchall()]

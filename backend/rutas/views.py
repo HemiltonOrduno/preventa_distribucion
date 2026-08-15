@@ -1356,24 +1356,19 @@ def _fecha_de_ruta(dia):
 
 def establecimientos_sin_ruta(request):
     """
-    Establecimientos que ya existen pero no pertenecen a ninguna ruta de
-    visita. Sin ruta nadie los visita, asi que el coordinador necesita
-    verlos para asignarlos.
+    Establecimientos sin ruta
     """
     with connection.cursor() as cursor:
         cursor.execute("""
-            SELECT e.numero AS id, e.nombre, e.zona,
-                   z.nombre AS zona_nombre,
-                   e.estColonia AS colonia,
-                   e.latitud, e.longitud,
-                   e.fecha_registro
-            FROM establecimiento e
-            INNER JOIN zona z ON z.num = e.zona
-            WHERE NOT EXISTS (
-                SELECT 1 FROM ruta_visita_orden rvo
-                WHERE rvo.establecimiento = e.numero
-            )
-            ORDER BY e.zona, e.numero
+            SELECT establecimiento_id AS id,
+                   establecimiento_nombre AS nombre,
+                   zona_id AS zona,
+                   zona_nombre,
+                   colonia,
+                   representante,
+                   latitud, longitud, fecha_registro
+            FROM vta_establecimientos_sin_ruta
+            ORDER BY zona_id, establecimiento_id
         """)
         columns = [c[0] for c in cursor.description]
         establecimientos = [dict(zip(columns, r)) for r in cursor.fetchall()]
@@ -1387,3 +1382,5 @@ def establecimientos_sin_ruta(request):
         "total": len(establecimientos),
         "establecimientos": establecimientos
     }, json_dumps_params={'ensure_ascii': False})
+    
+    

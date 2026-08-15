@@ -218,22 +218,19 @@ def almacenista_movimientos_view(request):
 @rol_requerido('Almacenista', 'Administrador', 'Repartidor')
 def catalogo_stock(request):
     """
-    RF18 + RNF-04: consulta el stock de TODO el catálogo, con caché
-    para cumplir el tiempo de respuesta exigido por RNF-04 sin golpear
-    la base de datos en cada consulta.
+    RF43: catálogo de productos con su existencia actual.
 
-    Usamos cache.get/set (memoria caché, tal como pide RNF-04) con un
-    TTL corto de 30 segundos: suficientemente rápido para reflejar
-    cambios de stock recientes, pero evita repetir la consulta a MySQL
-    si el almacenista refresca la pantalla varias veces seguidas.
+    La consulta se apoya en la vista vta_stock_productos, que además de
+    los datos del producto calcula el nivel de stock y el estado de
+    caducidad. Al vivir esos criterios en la vista, cualquier pantalla
+    que los necesite obtiene la misma clasificación.
     """
-
-
     with connection.cursor() as cursor:
         cursor.execute("""
-            SELECT codigo, nombre, imagen, stock, precio, peso
-            FROM producto
-            WHERE fecha_caducidad >= CURDATE()
+            SELECT producto_id AS codigo, nombre, imagen, stock, precio, peso,
+                   nivel_stock, estado_caducidad
+            FROM vta_stock_productos
+            WHERE estado_caducidad <> 'Caducado'
             ORDER BY nombre, peso
         """)
         columns = [col[0] for col in cursor.description]

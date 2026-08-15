@@ -82,7 +82,7 @@ BEGIN
 END$$
 DELIMITER ;
 
-###TRIGGER 2: un establecimiento solo a una ruta asi solo es una visita a la semana por el negocio 
+###TRIGGER 2: un establecimiento solo a una ruta asi solo es una visita a la semana por el negocio
 DELIMITER $$
 CREATE OR REPLACE TRIGGER tg_establecimiento_una_sola_ruta
 BEFORE INSERT ON ruta_visita_orden
