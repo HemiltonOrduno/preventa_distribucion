@@ -82,19 +82,21 @@ def registrar_producto(request):
 def listar_productos(request):
     with connection.cursor() as cursor:
         cursor.execute("""
-            SELECT codigo, nombre, precio, stock, fecha_caducidad, imagen
-            FROM producto
-            WHERE fecha_caducidad >= CURDATE()
-            ORDER BY codigo
+            SELECT producto_id AS codigo, nombre, marca, peso, precio, stock,
+                   fecha_caducidad, imagen, nivel_stock
+            FROM vta_stock_productos
+            WHERE estado_caducidad <> 'Caducado'
+            ORDER BY marca, nombre, peso
         """)
         columns = [col[0] for col in cursor.description]
         productos = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
     for p in productos:
         p['precio'] = float(p['precio']) if p['precio'] is not None else None
+        p['peso'] = float(p['peso']) if p['peso'] is not None else None
         p['fecha_caducidad'] = str(p['fecha_caducidad'])
         if p.get('imagen') and p['imagen'].startswith('/img/'):
-            p['imagen'] = '/static' + p['imagen']  
+            p['imagen'] = '/static' + p['imagen']
 
     return JsonResponse({"productos": productos}, json_dumps_params={'ensure_ascii': False})
 

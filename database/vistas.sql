@@ -56,6 +56,7 @@ CREATE OR REPLACE VIEW vta_stock_productos AS
 SELECT
     p.codigo AS producto_id,
     p.nombre,
+    p.marca,
     p.descripcion,
     p.imagen,
     p.precio,
