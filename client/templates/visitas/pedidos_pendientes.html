@@ -96,16 +96,11 @@ ${p.detalle.map(d => `
                  style="width:44px;height:44px;object-fit:cover;border-radius:6px;background:#f5f5f5;display:block;">
         </td>
         <td>${d.producto_nombre}</td>
-        <td>
-            <input type="number" id="cant-${d.cod_producto}" value="${d.cantidad}" min="1"
-                   style="width:60px; padding:4px;">
-        </td>
+        <td>${d.cantidad}</td>
         <td>$${d.precio_unitario.toFixed(2)}</td>
         <td>${d.stock_disponible}</td>
         <td>$${d.importe.toFixed(2)}</td>
         <td>
-            <button class="btn btn-primary" style="padding:4px 8px; font-size:11px;"
-                onclick="ajustarCantidad(${p.pedido_id}, '${d.cod_producto}')">Ajustar</button>
             <button class="btn btn-danger" style="padding:4px 8px; font-size:11px;"
                 onclick="cancelarProducto(${p.pedido_id}, '${d.cod_producto}')">Cancelar</button>
         </td>
@@ -118,22 +113,6 @@ ${p.detalle.map(d => `
         `;
     }
 
-    async function ajustarCantidad(pedidoId, codProducto) {
-        const nuevaCantidad = document.getElementById(`cant-${codProducto}`).value;
-        const res = await fetch(`/api/visitas/pedidos/${pedidoId}/detalle/${codProducto}/ajustar/`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ cantidad: parseInt(nuevaCantidad) })
-        });
-        const data = await res.json();
-
-        if (res.ok) {
-            mostrarToast(data.mensaje, 'success');
-            verDetalle(pedidoId);
-        } else {
-            mostrarToast(data.error, 'error');
-        }
-    }
 
     async function cancelarProducto(pedidoId, codProducto) {
         if (!confirm('¿Cancelar este producto del pedido?')) return;

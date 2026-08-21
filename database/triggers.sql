@@ -4,7 +4,7 @@
 #################
 
 
-####Trigger 1: Verificar zona y capacidad 
+####Trigger 1: Verificar zona y capacidad
 
 DELIMITER $$
 CREATE OR REPLACE TRIGGER tg_verificar_zona_capacidad
@@ -17,6 +17,7 @@ BEGIN
     DECLARE peso_nuevo_pedido DECIMAL(10,2);
     DECLARE capacidad_vehiculo DECIMAL(10,2);
     DECLARE total_pedidos INT;
+    DECLARE es_express BOOLEAN DEFAULT FALSE;
 
     IF NEW.entrega IS NOT NULL AND OLD.entrega IS NULL THEN
 
@@ -29,27 +30,40 @@ BEGIN
         INNER JOIN establecimiento e ON e.numero = v.establecimiento
         WHERE v.numero = NEW.visita;
 
-        IF total_pedidos > 0 THEN
-            SELECT e.zona INTO zona_entrega
-            FROM pedido p
-            INNER JOIN visita v ON v.numero = p.visita
-            INNER JOIN establecimiento e ON e.numero = v.establecimiento
-            WHERE p.entrega = NEW.entrega
-            LIMIT 1;
-
-            IF zona_entrega <> zona_nuevo_pedido THEN
-                SIGNAL SQLSTATE '45000'
-                SET MESSAGE_TEXT = 'El pedido no pertenece a la zona de esta entrega';
-            END IF;
-        END IF;
-
         SELECT m.capacidad INTO capacidad_vehiculo
         FROM vehiculo v
         INNER JOIN modelo m ON m.numero = v.modelo
         WHERE v.entrega = NEW.entrega;
 
-        IF capacidad_vehiculo > 0 THEN
+        SET es_express = (capacidad_vehiculo IS NOT NULL AND capacidad_vehiculo < 11);
 
+        IF es_express THEN
+            IF NEW.devolucion_origen IS NULL THEN
+                SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'Esta camioneta Express es exclusiva para pedidos de devolución';
+            END IF;
+        ELSE
+            IF NEW.devolucion_origen IS NOT NULL THEN
+                SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'Los pedidos de devolución solo pueden ir en la camioneta Express';
+            END IF;
+
+            IF total_pedidos > 0 THEN
+                SELECT e.zona INTO zona_entrega
+                FROM pedido p
+                INNER JOIN visita v ON v.numero = p.visita
+                INNER JOIN establecimiento e ON e.numero = v.establecimiento
+                WHERE p.entrega = NEW.entrega
+                LIMIT 1;
+
+                IF zona_entrega <> zona_nuevo_pedido THEN
+                    SIGNAL SQLSTATE '45000'
+                    SET MESSAGE_TEXT = 'El pedido no pertenece a la zona de esta entrega';
+                END IF;
+            END IF;
+        END IF;
+
+        IF capacidad_vehiculo > 0 THEN
             SELECT COALESCE(SUM(dp.cantidad * pr.peso), 0) / 1000 INTO peso_actual
             FROM pedido p
             INNER JOIN detalle_pedido dp ON dp.num_pedido = p.num
@@ -65,22 +79,19 @@ BEGIN
                 SIGNAL SQLSTATE '45000'
                 SET MESSAGE_TEXT = 'El peso total de los pedidos excede la capacidad del vehículo';
             END IF;
-
         END IF;
-
-    ###Pa que quede validaddo en la bitacora como evidencia###
 
         INSERT INTO bitacora_trigger (trigger_nombre, detalle, fecha)
         VALUES ('tg_verificar_zona_capacidad',
                 CONCAT('Pedido ', NEW.num, ' aceptado en entrega ', NEW.entrega,
-                       ' (zona ', zona_nuevo_pedido, ', peso ',
-                       ROUND(peso_actual + peso_nuevo_pedido, 2), ' kg de ',
-                       capacidad_vehiculo, ' kg)'),
+                       IF(es_express, ' (Express, multi-zona)', CONCAT(' (zona ', zona_nuevo_pedido, ')')),
+                       ', peso ', ROUND(peso_actual + peso_nuevo_pedido, 2), ' kg de ',
+                       capacidad_vehiculo, ' kg'),
                 NOW());
-
     END IF;
 END$$
 DELIMITER ;
+
 
 ###TRIGGER 2: un establecimiento solo a una ruta asi solo es una visita a la semana por el negocio
 DELIMITER $$

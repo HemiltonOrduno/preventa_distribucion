@@ -286,3 +286,70 @@ BEGIN
             'OK', NOW());
 END$$
 DELIMITER ;
+
+###PROCEDIMIENTO 6: CONFIRMAR PEDIDO Y GENERAR SALIDA DE INVENTARIO###
+-- El almacenista valida el pedido. El procedimiento exige que todos los
+-- renglones tengan existencia suficiente, cambia el estado a Registrado
+-- y genera el movimiento de salida. El descuento del stock lo hace el
+-- trigger tg_actualizar_stock al insertarse el detalle del movimiento.
+
+DELIMITER $$
+CREATE PROCEDURE sp_confirmar_pedido(
+    IN p_pedido INT,
+    IN p_empleado INT,
+    OUT p_movimiento INT
+)
+BEGIN
+    DECLARE v_insuficientes INT;
+    DECLARE v_estado VARCHAR(10);
+    DECLARE v_faltante VARCHAR(60);
+
+    SELECT edo_pedido INTO v_estado
+    FROM pedido WHERE num = p_pedido;
+
+    IF v_estado IS NULL THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'El pedido no existe';
+    END IF;
+
+    IF v_estado <> 'EPD001' THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'El pedido ya no esta pendiente de validacion';
+    END IF;
+
+    -- Ningun renglon puede quedar sin cobertura: si uno solo no alcanza,
+    -- el pedido completo se rechaza
+    SELECT COUNT(*), MIN(pr.nombre)
+      INTO v_insuficientes, v_faltante
+    FROM detalle_pedido dp
+    INNER JOIN producto pr ON pr.codigo = dp.cod_producto
+    WHERE dp.num_pedido = p_pedido
+      AND dp.cantidad > pr.stock;
+
+    IF v_insuficientes > 0 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Hay productos sin stock suficiente: ajusta o cancela antes de confirmar';
+    END IF;
+
+    UPDATE pedido SET edo_pedido = 'EPD003' WHERE num = p_pedido;
+
+    INSERT INTO movimientos (observaciones, fecha, tipo_movimiento, empleado)
+    VALUES (CONCAT('Salida por validacion del pedido #', p_pedido), NOW(), 'TM002', p_empleado);
+
+    SET p_movimiento = LAST_INSERT_ID();
+
+    -- Los productos se leen del propio detalle del pedido: cada INSERT
+    -- dispara el trigger que descuenta el stock
+    INSERT INTO detalle_movimiento
+        (cod_movimientos, cod_producto, cantidad, precioUnitario, subtotal)
+    SELECT p_movimiento, dp.cod_producto, dp.cantidad,
+           dp.precioUnitario, dp.cantidad * dp.precioUnitario
+    FROM detalle_pedido dp
+    WHERE dp.num_pedido = p_pedido;
+
+    INSERT INTO bitacora_procedimiento (procedimiento, detalle, resultado, fecha)
+    VALUES ('sp_confirmar_pedido',
+            CONCAT('Pedido ', p_pedido, ' confirmado, movimiento ', p_movimiento),
+            'OK', NOW());
+END$$
+DELIMITER ;

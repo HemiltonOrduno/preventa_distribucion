@@ -136,18 +136,22 @@ function inicializarMapaRutas() {
         .bindPopup(`<b>${ALMACEN.nombre}</b><br>Punto de salida`);
 }
 
+let establecimientosSinRutaIds = new Set();
+
 function cargarDatos() {
     Promise.all([
         fetch('/api/rutas/rutas-visita-todas/').then(r => r.json()),
         fetch('/api/rutas/rutas-visita-hoy/').then(r => r.json()),
         fetch('/api/rutas/zonas/').then(r => r.json()),
-        fetch('/api/rutas/establecimientos/').then(r => r.json())
-    ]).then(([rutasData, hoyData, zonasData, estData]) => {
+        fetch('/api/rutas/establecimientos/').then(r => r.json()),
+        fetch('/api/rutas/establecimientos-sin-ruta/').then(r => r.json())
+    ]).then(([rutasData, hoyData, zonasData, estData, sinRutaData]) => {
         todasLasRutas = rutasData.rutas;
         vendedoresDisponibles = hoyData.vendedores_disponibles;
         diaHoy = hoyData.dia_hoy;
         zonas = zonasData.zonas;
         establecimientos = estData.establecimientos;
+        establecimientosSinRutaIds = new Set(sinRutaData.establecimientos.map(e => e.id));
 
         const selectZona = document.getElementById('ruta-zona');
         selectZona.innerHTML = '<option value="">Selecciona una zona...</option>';
@@ -161,7 +165,6 @@ function cargarDatos() {
         const btnActivo = document.querySelector('.filtro-dia button.active')
             || document.querySelector('.filtro-dia button');
         filtrarDia(diaFiltroActual, btnActivo);
-
 
         const params = new URLSearchParams(window.location.search);
         const zonaParam = params.get('zona');
@@ -318,19 +321,32 @@ function asignarVendedor(rutaId) {
 }
 
 
-function iconoEstNormal() {
+function iconoEstNormal(sinRuta) {
+    const halo = sinRuta
+        ? `<div style="position:absolute;inset:0;background:#ef6c00;border-radius:50%;opacity:0.85;box-shadow:0 0 0 2px white, 0 2px 5px rgba(0,0,0,0.3);"></div>`
+        : '';
     return L.divIcon({
         className: '',
-        html: `<div style="font-size:22px;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.3));">🏪</div>`,
-        iconAnchor: [11, 22]
+        html: `<div style="position:relative;width:30px;height:30px;display:flex;align-items:center;justify-content:center;">
+                    ${halo}
+                    <div style="position:relative;font-size:20px;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.3));">🏪</div>
+               </div>`,
+        iconAnchor: [15, 15]
     });
 }
 
-function iconoEstNumerado(num) {
+function iconoEstNumerado(num, sinRuta) {
+    const halo = sinRuta
+        ? `<div style="position:absolute;inset:0;background:#ef6c00;border-radius:50%;opacity:0.85;box-shadow:0 0 0 2px white, 0 2px 5px rgba(0,0,0,0.3);"></div>`
+        : '';
     return L.divIcon({
         className: '',
-        html: `<div style="position:relative;font-size:22px;">🏪<div style="position:absolute;top:-6px;right:-6px;background:#c62828;color:white;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:bold;border:1px solid white;">${num}</div></div>`,
-        iconAnchor: [11, 22]
+        html: `<div style="position:relative;width:30px;height:30px;display:flex;align-items:center;justify-content:center;">
+                    ${halo}
+                    <div style="position:relative;font-size:20px;">🏪</div>
+                    <div style="position:absolute;top:-4px;right:-4px;background:#c62828;color:white;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:bold;border:1px solid white;">${num}</div>
+               </div>`,
+        iconAnchor: [15, 15]
     });
 }
 
@@ -449,11 +465,12 @@ function cargarEstablecimientosZona() {
     const estsZona = establecimientos.filter(e => e.zona_id === zonaId);
     const zona = zonas.find(z => z.id === zonaId);
 
-    estsZona.forEach(e => {
+        estsZona.forEach(e => {
         if (!e.latitud || !e.longitud) return;
-        const m = L.marker([e.latitud, e.longitud], { icon: iconoEstNormal() })
+        const sinRuta = establecimientosSinRutaIds.has(e.id);
+        const m = L.marker([e.latitud, e.longitud], { icon: iconoEstNormal(sinRuta) })
             .addTo(mapaRutas)
-            .bindPopup(`<b>${e.nombre}</b><br>${e.colonia}`)
+            .bindPopup(`<b>${e.nombre}</b><br>${e.colonia}${sinRuta ? '<br><span style="color:#ef6c00;font-weight:600;">Sin ruta asignada</span>' : ''}`)
             .on('click', () => toggleParada(e, m));
         marcadoresEdicion[e.id] = m;
     });
@@ -465,13 +482,14 @@ function cargarEstablecimientosZona() {
 
 function toggleParada(est, marker) {
     const index = paradasSeleccionadas.findIndex(p => p.id === est.id);
+    const sinRuta = establecimientosSinRutaIds.has(est.id);
     if (index !== -1) {
         paradasSeleccionadas.splice(index, 1);
-        marker.setIcon(iconoEstNormal());
+        marker.setIcon(iconoEstNormal(sinRuta));
         actualizarNumerosEnMarcadores();
     } else {
         paradasSeleccionadas.push(est);
-        marker.setIcon(iconoEstNumerado(paradasSeleccionadas.length));
+        marker.setIcon(iconoEstNumerado(paradasSeleccionadas.length, sinRuta));
     }
     actualizarListaParadas();
 }
@@ -516,8 +534,10 @@ function actualizarListaParadas() {
 function actualizarNumerosEnMarcadores() {
     Object.entries(marcadoresEdicion).forEach(([id, m]) => {
         if (!m) return;
-        const idx = paradasSeleccionadas.findIndex(p => p.id === parseInt(id));
-        m.setIcon(idx !== -1 ? iconoEstNumerado(idx + 1) : iconoEstNormal());
+        const estId = parseInt(id);
+        const sinRuta = establecimientosSinRutaIds.has(estId);
+        const idx = paradasSeleccionadas.findIndex(p => p.id === estId);
+        m.setIcon(idx !== -1 ? iconoEstNumerado(idx + 1, sinRuta) : iconoEstNormal(sinRuta));
     });
 }
 
@@ -536,10 +556,10 @@ function guardarRutaDesdePanel() {
     if (!zonaId) { alert('Selecciona una zona'); return; }
     if (paradasSeleccionadas.length === 0) { alert('Selecciona al menos un establecimiento'); return; }
 
-
     const eraEdicion = modoEdicion === 'editar';
     guardarRuta(nombre, dia, descripcion, zonaId, eraEdicion);
 }
+
 function ordenarConOSRM(callback) {
     if (paradasSeleccionadas.length < 2) { callback(); return; }
 
@@ -597,11 +617,11 @@ function rutaAutomatica() {
     if (!zonaId) { alert('Selecciona primero una zona'); return; }
 
     const estsZona = establecimientos.filter(
-        e => e.zona_id === zonaId && e.latitud && e.longitud
+        e => e.zona_id === zonaId && e.latitud && e.longitud && establecimientosSinRutaIds.has(e.id)
     );
 
     if (estsZona.length < 2) {
-        alert('Esta zona no tiene suficientes establecimientos');
+        alert('Esta zona no tiene suficientes establecimientos sin ruta para armar un recorrido automático');
         return;
     }
 
@@ -611,7 +631,7 @@ function rutaAutomatica() {
     ordenarConOSRM(() => {
         actualizarNumerosEnMarcadores();
         actualizarListaParadas();
-        mostrarToast(` ${paradasSeleccionadas.length} paradas ordenadas — ajústalas si hace falta`);
+        mostrarToast(`${paradasSeleccionadas.length} paradas sin ruta ordenadas — ajústalas si hace falta`);
     });
 }
 
@@ -632,28 +652,38 @@ function guardarRuta(nombre, dia, descripcion, zonaId, eraEdicion) {
     })
     .then(res => res.json())
     .then(data => {
-        if (data.error) { alert('Error: ' + data.error); return; }
-        cerrarEdicion();
-
-
         const rechazados = data.establecimientos_rechazados || [];
-        if (rechazados.length > 0) {
-            alert(`La ruta se creó, pero ${rechazados.length} establecimiento(s) no se ` +
-                  `pudieron agregar porque ya pertenecen a otra ruta de visita.`);
-        } else {
-            mostrarToast(eraEdicion ? 'Ruta actualizada' : 'Ruta creada');
+
+        if (data.error) {
+
+            if (rechazados.length > 0) {
+                const idsRechazados = new Set(rechazados.map(r => r.establecimiento));
+                paradasSeleccionadas = paradasSeleccionadas.filter(p => !idsRechazados.has(p.id));
+                actualizarNumerosEnMarcadores();
+                actualizarListaParadas();
+
+                const detalle = rechazados.map(r => `#${r.establecimiento}: ${r.motivo}`).join(' | ');
+                mostrarToast(detalle, 'error');
+            } else {
+                mostrarToast(data.error, 'error');
+            }
+            return;
         }
 
+        cerrarEdicion();
+        mostrarToast(eraEdicion ? 'Ruta actualizada' : 'Ruta creada');
         cargarDatos();
     })
-    .catch(() => alert('Error de conexión'));
+    .catch(() => mostrarToast('Error de conexión', 'error'));
 }
 
-function mostrarToast(msg) {
+function mostrarToast(msg, tipo) {
     const toast = document.getElementById('toast');
     toast.innerText = msg;
+    toast.style.background = tipo === 'error' ? '#c62828' : '#2e7d32';
+    toast.style.color = 'white';
     toast.style.display = 'block';
-    setTimeout(() => toast.style.display = 'none', 3000);
+    setTimeout(() => toast.style.display = 'none', 4000);
 }
 </script>
 {% endblock %}

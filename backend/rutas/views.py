@@ -826,10 +826,11 @@ def _establecimientos_ocupados(cursor, dia, establecimientos, ruta_excluir=None)
 @csrf_exempt
 def crear_ruta_visita(request):
     """
-    Crea una ruta de visita con sus paradas. El trigger
-    tg_establecimiento_una_sola_ruta valida que ningún establecimiento
-    pertenezca ya a otra ruta; los que se rechacen se reportan sin
-    tumbar la creación de la ruta.
+    Crea una ruta de visita con sus paradas, todo o nada: si el trigger
+    tg_establecimiento_una_sola_ruta rechaza cualquiera, se revierte la
+    ruta completa. El mensaje que se guarda en bitacora y se manda al
+    front es el texto real del SIGNAL del trigger, sin envolturas de
+    Python — Python solo relee y reenvía, nunca redacta el motivo.
     """
     if request.method != 'POST':
         return JsonResponse({"error": "Método no permitido"}, status=405)
@@ -849,44 +850,51 @@ def crear_ruta_visita(request):
         return JsonResponse({"error": "Faltan datos requeridos"}, status=400)
 
     rechazados = []
+    nuevo_num = None
 
-    with connection.cursor() as cursor:
-        cursor.execute("""
-            INSERT INTO ruta_visita (nombre, descripcion, dia, zona)
-            VALUES (%s, %s, %s, %s)
-        """, [nombre, descripcion, dia, zona_id])
-        nuevo_num = cursor.lastrowid
-    for i, est_id in enumerate(establecimientos):
-        try:
-            with transaction.atomic():
-                with connection.cursor() as cursor:
-                    cursor.execute("""
-                        INSERT INTO ruta_visita_orden (ruta_visita, establecimiento, orden)
-                        VALUES (%s, %s, %s)
-                    """, [nuevo_num, est_id, i + 1])
-        except Exception as e:
-            rechazados.append({"establecimiento": est_id, "motivo": str(e)})
-            with connection.cursor() as cur2:
+    try:
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    INSERT INTO ruta_visita (nombre, descripcion, dia, zona)
+                    VALUES (%s, %s, %s, %s)
+                """, [nombre, descripcion, dia, zona_id])
+                nuevo_num = cursor.lastrowid
+
+            for i, est_id in enumerate(establecimientos):
+                try:
+                    with transaction.atomic():
+                        with connection.cursor() as cursor:
+                            cursor.execute("""
+                                INSERT INTO ruta_visita_orden (ruta_visita, establecimiento, orden)
+                                VALUES (%s, %s, %s)
+                            """, [nuevo_num, est_id, i + 1])
+                except Exception as e:
+                    # e.args suele traer (codigo_error, mensaje_real_del_signal).
+                    # Se toma solo el mensaje, tal cual lo mandó el trigger.
+                    mensaje_real = str(e.args[1]) if hasattr(e, 'args') and len(e.args) >= 2 else str(e)
+                    rechazados.append({"establecimiento": est_id, "motivo": mensaje_real})
+
+            if rechazados:
+                raise ValueError("lote rechazado")
+
+    except ValueError:
+        with connection.cursor() as cur2:
+            for r in rechazados:
                 cur2.execute("""
                     INSERT INTO bitacora_trigger (trigger_nombre, detalle, fecha)
                     VALUES ('tg_establecimiento_una_sola_ruta', %s, NOW())
-                """, [f"Establecimiento {est_id} RECHAZADO en ruta {nuevo_num}: {str(e)[:120]}"])
+                """, [f"Establecimiento {r['establecimiento']} RECHAZADO: {r['motivo'][:150]}"])
 
-    
-
-
-    if establecimientos and len(rechazados) == len(establecimientos):
-        with connection.cursor() as cursor:
-            cursor.execute("DELETE FROM ruta_visita WHERE numero = %s", [nuevo_num])
         return JsonResponse({
-            "error": "Ningún establecimiento pudo agregarse: todos pertenecen ya a otra ruta",
+            "error": "No se creó la ruta",
             "establecimientos_rechazados": rechazados
         }, status=409)
 
     return JsonResponse({
         "mensaje": "Ruta creada correctamente",
         "ruta_id": nuevo_num,
-        "establecimientos_rechazados": rechazados
+        "establecimientos_rechazados": []
     }, json_dumps_params={'ensure_ascii': False})
     
     
@@ -943,7 +951,10 @@ def ruta_visita_datos(request, ruta_id):
 @csrf_exempt
 def editar_ruta_visita(request, ruta_id):
     """
-    Edita una ruta de visita existente.
+    Edita una ruta de visita existente. Mismo criterio todo-o-nada que
+    crear_ruta_visita: si algún establecimiento es rechazado, se
+    revierte TODO el intento de edición (encabezado y paradas), la
+    ruta se queda exactamente como estaba antes de tocarla.
     """
     if request.method != 'POST':
         return JsonResponse({"error": "Método no permitido"}, status=405)
@@ -962,23 +973,44 @@ def editar_ruta_visita(request, ruta_id):
     if not nombre or not dia or not zona_id:
         return JsonResponse({"error": "Faltan datos requeridos"}, status=400)
 
-    with connection.cursor() as cursor:
-        cursor.execute("""
-            UPDATE ruta_visita SET nombre=%s, dia=%s, descripcion=%s, zona=%s
-            WHERE numero=%s
-        """, [nombre, dia, descripcion, zona_id, ruta_id])
+    rechazados = []
 
-        cursor.execute("DELETE FROM ruta_visita_orden WHERE ruta_visita = %s", [ruta_id])
-        for i, est_id in enumerate(establecimientos):
-            cursor.execute("""
-                INSERT INTO ruta_visita_orden (ruta_visita, establecimiento, orden)
-                VALUES (%s, %s, %s)
-            """, [ruta_id, est_id, i + 1])
+    try:
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    UPDATE ruta_visita SET nombre=%s, dia=%s, descripcion=%s, zona=%s
+                    WHERE numero=%s
+                """, [nombre, dia, descripcion, zona_id, ruta_id])
+
+                cursor.execute("DELETE FROM ruta_visita_orden WHERE ruta_visita = %s", [ruta_id])
+
+            for i, est_id in enumerate(establecimientos):
+                try:
+                    with transaction.atomic():
+                        with connection.cursor() as cursor:
+                            cursor.execute("""
+                                INSERT INTO ruta_visita_orden (ruta_visita, establecimiento, orden)
+                                VALUES (%s, %s, %s)
+                            """, [ruta_id, est_id, i + 1])
+                except Exception as e:
+                    rechazados.append({"establecimiento": est_id, "motivo": str(e)})
+
+            if rechazados:
+                raise ValueError("hay establecimientos que ya pertenecen a otra ruta")
+
+    except ValueError:
+        return JsonResponse({
+            "error": "No se guardaron los cambios: hay establecimientos que ya pertenecen a otra ruta",
+            "establecimientos_rechazados": rechazados
+        }, status=409)
 
     return JsonResponse({
         "mensaje": "Ruta actualizada correctamente",
-        "ruta_id": ruta_id
+        "ruta_id": ruta_id,
+        "establecimientos_rechazados": []
     }, json_dumps_params={'ensure_ascii': False})
+    
     
 def historial_rutas(request):
     """
@@ -1383,4 +1415,29 @@ def establecimientos_sin_ruta(request):
         "establecimientos": establecimientos
     }, json_dumps_params={'ensure_ascii': False})
     
-    
+@csrf_exempt
+def validar_establecimientos_ruta(request):
+    """
+    Valida nomas y yap, para que no salga el mensaje feo de arriba
+    """
+    if request.method != 'POST':
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+
+    try:
+        body = json.loads(request.body)
+    except Exception:
+        return JsonResponse({"error": "JSON inválido"}, status=400)
+
+    dia = body.get('dia')
+    establecimientos = body.get('establecimientos', [])
+    ruta_excluir = body.get('ruta_excluir')  # se manda al editar, para no chocar contra sí misma
+
+    if not dia or not establecimientos:
+        return JsonResponse({"ocupados": []}, json_dumps_params={'ensure_ascii': False})
+
+    with connection.cursor() as cursor:
+        ocupados = _establecimientos_ocupados(cursor, dia, establecimientos, ruta_excluir)
+
+    return JsonResponse({
+        "ocupados": ocupados
+    }, json_dumps_params={'ensure_ascii': False})

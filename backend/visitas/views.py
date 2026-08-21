@@ -641,16 +641,16 @@ def mapa_ruta_del_dia_api(request):
         "distancia_total_km": distancia,
         "duracion_total_min": duracion
     }, json_dumps_params={'ensure_ascii': False})
-    
+
 
 @rol_requerido('Almacenista', 'Administrador')
 @csrf_exempt
 def confirmar_pedido(request, pedido_id):
     """
-    Cierra el flujo de validación: revisa que TODAS las líneas del
-    pedido tengan stock suficiente antes de dejarlo pasar a Registrado,
-    y genera el movimiento de salida por pedido (TM002). El descuento
-    de stock lo hace el trigger tg_actualizar_stock, no este código.
+    Cierra el flujo de validación. El procedimiento sp_confirmar_pedido
+    exige que todas las líneas tengan existencia suficiente, pasa el
+    pedido a Registrado y genera el movimiento de salida. El descuento
+    del stock lo hace el trigger tg_actualizar_stock, no este código.
     """
     if request.method != 'POST':
         return JsonResponse({"error": "Método no permitido"}, status=405)
@@ -659,48 +659,24 @@ def confirmar_pedido(request, pedido_id):
     if not empleado_num:
         return JsonResponse({"error": "Sesión no válida, inicia sesión de nuevo"}, status=401)
 
-    with transaction.atomic():
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                SELECT dp.cod_producto, pr.nombre, dp.cantidad, pr.stock, dp.precioUnitario
-                FROM detalle_pedido dp
-                INNER JOIN producto pr ON pr.codigo = dp.cod_producto
-                WHERE dp.num_pedido = %s
-            """, [pedido_id])
-            lineas = cursor.fetchall()
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT COUNT(*) FROM detalle_pedido WHERE num_pedido = %s", [pedido_id])
+        if cursor.fetchone()[0] == 0:
+            return JsonResponse({"error": "El pedido no tiene productos"}, status=400)
 
-            if not lineas:
-                return JsonResponse({"error": "El pedido no tiene productos"}, status=400)
-
-            insuficientes = [
-                {"producto": nombre, "solicitado": cantidad, "disponible": stock}
-                for cod, nombre, cantidad, stock, precio in lineas if cantidad > stock
-            ]
-            if insuficientes:
-                return JsonResponse({
-                    "error": "Hay productos sin stock suficiente. Ajusta o cancela antes de confirmar.",
-                    "detalle": insuficientes
-                }, status=400)
-
-            cursor.execute("""
-                UPDATE pedido SET edo_pedido = 'EPD003' WHERE num = %s AND edo_pedido = 'EPD001'
-            """, [pedido_id])
-            if cursor.rowcount == 0:
-                return JsonResponse({"error": "El pedido ya no está pendiente de validación"}, status=400)
-
-            # Salida por pedido: el INSERT en detalle_movimiento dispara el trigger
-            cursor.execute("""
-                INSERT INTO movimientos (observaciones, fecha, tipo_movimiento, empleado)
-                VALUES (%s, NOW(), 'TM002', %s)
-            """, [f"Salida por validación del pedido #{pedido_id}", empleado_num])
-            nuevo_mov = cursor.lastrowid
-
-            for cod, _nombre, cantidad, _stock, precio in lineas:
-                cursor.execute("""
-                    INSERT INTO detalle_movimiento
-                        (cod_movimientos, cod_producto, cantidad, precioUnitario, subtotal)
-                    VALUES (%s, %s, %s, %s, %s)
-                """, [nuevo_mov, cod, cantidad, precio, cantidad * precio])
+        try:
+            cursor.callproc('sp_confirmar_pedido', [pedido_id, empleado_num, 0])
+            cursor.execute("SELECT @_sp_confirmar_pedido_2")
+            nuevo_mov = cursor.fetchone()[0]
+        except Exception as e:
+            mensaje = str(e)
+            with connection.cursor() as cur2:
+                cur2.execute("""
+                    INSERT INTO bitacora_procedimiento
+                        (procedimiento, detalle, resultado, fecha)
+                    VALUES ('sp_confirmar_pedido', %s, 'RECHAZADO', NOW())
+                """, [f"Pedido {pedido_id}: {mensaje[:130]}"])
+            return JsonResponse({"error": mensaje}, status=400)
 
     # El stock cambió por el movimiento de salida: se limpia el caché
     # para que el catálogo del almacenista lo refleje de inmediato

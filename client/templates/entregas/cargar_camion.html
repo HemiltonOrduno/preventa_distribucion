@@ -126,9 +126,11 @@
             return;
         }
 
-        select.innerHTML = data.vehiculos.map(v =>
-            `<option value="${v.vehiculo_id}">${v.placas} — ${v.modelo_nombre} (capacidad: ${v.capacidad} kg)</option>`
-        ).join('');
+                select.innerHTML = data.vehiculos.map(v => {
+            const esExpress = v.capacidad < 11;
+            const etiqueta = esExpress ? ' EXPRESS (solo devoluciones)' : '';
+            return `<option value="${v.vehiculo_id}" data-express="${esExpress}">${v.placas} — ${v.modelo_nombre} (capacidad: ${v.capacidad} kg)${etiqueta}</option>`;
+        }).join('');
     }
 
     async function cargarPedidosValidados() {
@@ -142,11 +144,13 @@
         }
 
         cont.innerHTML = data.pedidos.map(p => `
-            <label style="display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #eee; font-size:13px;">
-                <input type="checkbox" class="pedido-check" value="${p.pedido_id}">
+            <label style="display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #eee; font-size:13px;" data-devolucion="${p.es_devolucion}">
+                <input type="checkbox" class="pedido-check" value="${p.pedido_id}" data-devolucion="${p.es_devolucion}">
                 <span><strong>#${p.pedido_id}</strong> — ${p.establecimiento_nombre}
                     <br>
-                    <span class="zona-badge">${p.zona_nombre}</span>
+                    ${p.es_devolucion
+                        ? '<span class="zona-badge" style="background:#fff3e0;color:#e65100;">Pedido express</span>'
+                        : `<span class="zona-badge">${p.zona_nombre}</span>`}
                     <span style="color:#666;">Peso: ${p.peso_estimado} kg · $${p.total.toFixed(2)}</span>
                 </span>
             </label>
@@ -203,7 +207,9 @@
                     <span>
                         <strong>#${p.pedido_id}</strong> ${p.establecimiento}
                         <br>
-                        <span class="zona-badge camion">${p.zona}</span>
+                        ${p.es_devolucion
+                            ? '<span class="zona-badge camion" style="background:#fff3e0;color:#e65100;"> Express</span>'
+                            : `<span class="zona-badge camion">${p.zona}</span>`}
                         <small>${p.peso.toFixed(1)} kg</small>
                     </span>
                     <span style="color:#1b5e20;font-weight:600;white-space:nowrap;">

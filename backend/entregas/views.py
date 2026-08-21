@@ -52,6 +52,7 @@ def pedidos_validados_por_zona(request):
                 e.zona AS zona_id,
                 z.nombre AS zona_nombre,
                 e.nombre AS establecimiento_nombre,
+                p.devolucion_origen IS NOT NULL AS es_devolucion,
                 COALESCE((
                     SELECT SUM(dp.cantidad * pr.peso) / 1000
                     FROM detalle_pedido dp
@@ -71,6 +72,7 @@ def pedidos_validados_por_zona(request):
     for p in pedidos:
         p['total'] = float(p['total'])
         p['peso_estimado'] = float(p['peso_estimado'])
+        p['es_devolucion'] = bool(p['es_devolucion'])
 
     return JsonResponse({"pedidos": pedidos}, json_dumps_params={'ensure_ascii': False})
 
@@ -84,6 +86,12 @@ def crear_entrega(request):
     ya lo valida en BD); cualquier pedido de otra zona o que exceda la
     capacidad del vehículo se EXCLUYE en vez de tumbar toda la entrega.
     El empleado se toma de la sesión activa, no se manda desde el front.
+
+    Si el vehículo elegido es una camioneta Express (capacidad < 11 kg),
+    no se exige que los pedidos sean de la misma zona, pero todos deben
+    venir de una devolución (devolucion_origen no nulo) — el trigger
+    revalida esto mismo por pedido, esto es solo un pre-check para dar
+    un mensaje más claro antes de intentar nada.
 
     También crea la RUTA_ENTREGA asociada, sin repartidor asignado
     (empleado = NULL) para que quede disponible y cualquier repartidor
@@ -108,30 +116,66 @@ def crear_entrega(request):
         return JsonResponse({"error": "Se requiere vehiculo y pedidos"}, status=400)
 
     with connection.cursor() as cursor:
+        # Determina si el vehículo elegido es la camioneta Express
+        cursor.execute("""
+            SELECT m.capacidad FROM vehiculo v
+            INNER JOIN modelo m ON m.numero = v.modelo
+            WHERE v.numero = %s
+        """, [vehiculo_id])
+        row = cursor.fetchone()
+        if not row:
+            return JsonResponse({"error": "Vehículo no encontrado"}, status=404)
+        es_express = float(row[0]) < 11
+
         marcas = ','.join(['%s'] * len(pedidos_ids))
-        cursor.execute(f"""
-            SELECT e.zona,
-                   COALESCE(SUM(dp.cantidad * pr.peso), 0) / 1000 AS peso
-            FROM pedido p
-            INNER JOIN visita v ON v.numero = p.visita
-            INNER JOIN establecimiento e ON e.numero = v.establecimiento
-            LEFT JOIN detalle_pedido dp ON dp.num_pedido = p.num
-            LEFT JOIN producto pr ON pr.codigo = dp.cod_producto
-            WHERE p.num IN ({marcas})
-            GROUP BY e.zona
-        """, pedidos_ids)
-        filas = cursor.fetchall()
 
-        if not filas:
-            return JsonResponse({"error": "Los pedidos seleccionados no existen"}, status=400)
-        if len(filas) > 1:
-            return JsonResponse({
-                "error": "Los pedidos seleccionados son de zonas distintas"
-            }, status=400)
+        if es_express:
+            # Express: no se exige zona única, pero sí que todos sean
+            # de devolución (el trigger lo revalida de todos modos).
+            cursor.execute(f"""
+                SELECT COUNT(*) FROM pedido WHERE num IN ({marcas}) AND devolucion_origen IS NULL
+            """, pedidos_ids)
+            if cursor.fetchone()[0] > 0:
+                return JsonResponse({
+                    "error": "La camioneta Express solo acepta pedidos de devolución"
+                }, status=400)
 
-        zona_pedidos = filas[0][0]
-        peso_pedidos = float(filas[0][1] or 0)
+            cursor.execute(f"""
+                SELECT COALESCE(SUM(dp.cantidad * pr.peso), 0) / 1000
+                FROM pedido p
+                LEFT JOIN detalle_pedido dp ON dp.num_pedido = p.num
+                LEFT JOIN producto pr ON pr.codigo = dp.cod_producto
+                WHERE p.num IN ({marcas})
+            """, pedidos_ids)
+            peso_pedidos = float(cursor.fetchone()[0] or 0)
+            zona_pedidos = None
 
+        else:
+            cursor.execute(f"""
+                SELECT e.zona,
+                       COALESCE(SUM(dp.cantidad * pr.peso), 0) / 1000 AS peso
+                FROM pedido p
+                INNER JOIN visita v ON v.numero = p.visita
+                INNER JOIN establecimiento e ON e.numero = v.establecimiento
+                LEFT JOIN detalle_pedido dp ON dp.num_pedido = p.num
+                LEFT JOIN producto pr ON pr.codigo = dp.cod_producto
+                WHERE p.num IN ({marcas})
+                GROUP BY e.zona
+            """, pedidos_ids)
+            filas = cursor.fetchall()
+
+            if not filas:
+                return JsonResponse({"error": "Los pedidos seleccionados no existen"}, status=400)
+            if len(filas) > 1:
+                return JsonResponse({
+                    "error": "Los pedidos seleccionados son de zonas distintas"
+                }, status=400)
+
+            zona_pedidos = filas[0][0]
+            peso_pedidos = float(filas[0][1] or 0)
+
+        # Sugerencia de reutilizar un camión ya en carga (mismo tipo:
+        # Express con Express, zona con zona)
         cursor.execute("""
             SELECT en.numero, veh.placas, mdl.capacidad,
                    COALESCE(SUM(dp.cantidad * pr.peso) / 1000, 0) AS cargado,
@@ -149,7 +193,10 @@ def crear_entrega(request):
             GROUP BY en.numero, veh.placas, mdl.capacidad
         """)
         for num, placas, capacidad, cargado, zona in cursor.fetchall():
-            if zona != zona_pedidos:
+            otro_es_express = float(capacidad or 0) < 11
+            if otro_es_express != es_express:
+                continue
+            if not es_express and zona != zona_pedidos:
                 continue
             restante = float(capacidad or 0) - float(cargado)
 
@@ -209,7 +256,6 @@ def crear_entrega(request):
         return JsonResponse({"error": str(e)}, status=400)
     except Exception as e:
         return JsonResponse({"error": f"No se pudo crear la entrega: {str(e)}"}, status=400)
-
 
     if not pedidos_incluidos:
         with connection.cursor() as cursor:
@@ -912,6 +958,7 @@ def entregas_en_carga(request):
             cursor.execute("""
                 SELECT p.num AS pedido_id, p.total,
                        est.nombre AS establecimiento, z.nombre AS zona,
+                       p.devolucion_origen IS NOT NULL AS es_devolucion,
                        COALESCE(SUM(dp.cantidad * pr.peso) / 1000, 0) AS peso
                 FROM pedido p
                 INNER JOIN visita v ON v.numero = p.visita
@@ -920,7 +967,7 @@ def entregas_en_carga(request):
                 LEFT JOIN detalle_pedido dp ON dp.num_pedido = p.num
                 LEFT JOIN producto pr ON pr.codigo = dp.cod_producto
                 WHERE p.entrega = %s
-                GROUP BY p.num, p.total, est.nombre, z.nombre
+                GROUP BY p.num, p.total, est.nombre, z.nombre, p.devolucion_origen
                 ORDER BY p.num
             """, [e['entrega_id']])
             cols = [c[0] for c in cursor.description]
@@ -928,6 +975,7 @@ def entregas_en_carga(request):
             for ped in e['pedidos']:
                 ped['total'] = float(ped['total'] or 0)
                 ped['peso'] = float(ped['peso'])
+                ped['es_devolucion'] = bool(ped['es_devolucion'])
 
     return JsonResponse({"entregas": entregas}, json_dumps_params={'ensure_ascii': False})
 
